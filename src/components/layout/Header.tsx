@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown, Globe } from "lucide-react";
+import { Menu, X, ChevronDown, Globe, LogIn, LogOut, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import LanguageSelector from "@/components/LanguageSelector";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   {
@@ -37,6 +38,15 @@ const Header = () => {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -119,9 +129,29 @@ const Header = () => {
           <Link to="/pricing">
             <Button variant="ghost" size="sm">Compare fees</Button>
           </Link>
-          <Link to="/contact">
-            <Button variant="hero" size="sm">Get started</Button>
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <Link to="/profile">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <User className="w-4 h-4" />
+                  {user.displayName || user.email?.split('@')[0] || 'Profile'}
+                </Button>
+              </Link>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
+                <LogOut className="w-4 h-4" />
+                Đăng xuất
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Link to="/login">
+                <Button variant="ghost" size="sm">Đăng nhập</Button>
+              </Link>
+              <Link to="/register">
+                <Button variant="hero" size="sm">Get started</Button>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -169,12 +199,32 @@ const Header = () => {
               ))}
               <div className="pt-4 space-y-2">
                 <LanguageSelector variant="mobile" />
-                <Link to="/pricing" className="block">
-                  <Button variant="outline" className="w-full">Compare fees</Button>
-                </Link>
-                <Link to="/contact" className="block">
-                  <Button variant="hero" className="w-full">Get started</Button>
-                </Link>
+                {user ? (
+                  <>
+                    <Link to="/profile" className="block">
+                      <Button variant="outline" className="w-full gap-2">
+                        <User className="w-4 h-4" />
+                        {user.displayName || user.email?.split('@')[0] || 'Profile'}
+                      </Button>
+                    </Link>
+                    <Button variant="outline" onClick={handleLogout} className="w-full gap-2">
+                      <LogOut className="w-4 h-4" />
+                      Đăng xuất
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className="block">
+                      <Button variant="outline" className="w-full gap-2">
+                        <LogIn className="w-4 h-4" />
+                        Đăng nhập
+                      </Button>
+                    </Link>
+                    <Link to="/register" className="block">
+                      <Button variant="hero" className="w-full">Get started</Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </nav>
           </motion.div>

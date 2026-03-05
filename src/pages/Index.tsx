@@ -63,7 +63,7 @@ const Index = () => {
               <div className="flex flex-wrap gap-4">
                 <Link to="/contact">
                   <Button variant="hero" size="lg" className="text-base px-8">
-                    <Play className="w-4 h-4 mr-2" /> Watch Story
+                    <Play className="w-4 h-4 mr-2" /> Contact Us
                   </Button>
                 </Link>
                 <Link to="/about">
