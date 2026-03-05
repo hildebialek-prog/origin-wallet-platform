@@ -29,12 +29,12 @@ const ForgotPassword = () => {
 
     // Validate email
     if (!email) {
-      setError("Vui lòng nhập email");
+      setError("Please enter your email");
       return;
     }
 
     if (!validateEmail(email)) {
-      setError("Email không hợp lệ");
+      setError("Invalid email address");
       return;
     }
 
@@ -44,7 +44,7 @@ const ForgotPassword = () => {
       await resetPassword(email);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Gửi email đặt lại mật khẩu thất bại. Vui lòng thử lại");
+      setError(err.message || "Failed to send password reset email. Please try again");
     } finally {
       setIsLoading(false);
     }
@@ -73,9 +73,9 @@ const ForgotPassword = () => {
                 className="h-16 w-auto"
               />
             </div>
-            <CardTitle className="text-2xl font-bold">Quên mật khẩu</CardTitle>
+            <CardTitle className="text-2xl font-bold">Forgot password</CardTitle>
             <CardDescription>
-              Nhập email để nhận liên kết đặt lại mật khẩu
+              Enter your email to receive a password reset link
             </CardDescription>
           </CardHeader>
           
@@ -100,7 +100,7 @@ const ForgotPassword = () => {
                 className="mb-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400 text-sm flex items-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                Đã gửi email đặt lại mật khẩu. Vui lòng kiểm tra hộp thư của bạn!
+                Password reset email sent! Please check your inbox.
               </motion.div>
             )}
 
@@ -134,15 +134,15 @@ const ForgotPassword = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Đang gửi...
+                    Sending...
                   </>
                 ) : success ? (
                   <>
                     <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Đã gửi!
+                    Sent!
                   </>
                 ) : (
-                  "Gửi liên kết đặt lại"
+                  "Send reset link"
                 )}
               </Button>
             </form>
@@ -151,7 +151,7 @@ const ForgotPassword = () => {
             <div className="text-center mt-6">
               <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
                 <ArrowLeft className="w-4 h-4" />
-                Quay về đăng nhập
+                Back to login
               </Link>
             </div>
           </CardContent>
@@ -160,7 +160,7 @@ const ForgotPassword = () => {
         {/* Back to Home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Quay về trang chủ
+            ← Back to home
           </Link>
         </div>
       </motion.div>

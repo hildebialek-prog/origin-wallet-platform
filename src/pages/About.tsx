@@ -402,7 +402,7 @@ const About = () => {
               </div>
               <div className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-white">170+</div>
-                <div className="text-blue-200 text-sm">Quốc gia</div>
+                <div className="text-blue-200 text-sm">Countries</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-white">50+</div>
@@ -410,13 +410,13 @@ const About = () => {
               </div>
               <div className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-white">1M+</div>
-                <div className="text-blue-200 text-sm">Người dùng</div>
+                <div className="text-blue-200 text-sm">Users</div>
               </div>
             </div>
             
             <Link to="/contact">
               <Button variant="secondary" size="lg" className="gap-2">
-                Liên hệ ngay <ArrowRight className="w-4 h-4" />
+                Contact us <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
           </motion.div>

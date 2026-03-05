@@ -5,20 +5,13 @@ import Footer from "./Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 import CookieConsent from "@/components/CookieConsent";
 import { Languages } from "lucide-react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, LANGUAGES } from "@/contexts/LanguageContext";
 
 const Layout = () => {
   const { currentLanguage, setLanguage, isTranslating } = useLanguage();
   const [showLangMenu, setShowLangMenu] = useState(false);
 
-  const languages = [
-    { code: 'vi' as const, name: 'Tiếng Việt', flag: '🇻🇳' },
-    { code: 'en' as const, name: 'English', flag: '🇺🇸' },
-    { code: 'zh-CN' as const, name: '中文', flag: '🇨🇳' },
-    { code: 'ja' as const, name: '日本語', flag: '🇯🇵' },
-  ];
-
-  const currentLang = languages.find(l => l.code === currentLanguage) || languages[0];
+  const currentLang = LANGUAGES.find(l => l.code === currentLanguage) || LANGUAGES[0];
 
   const handleLanguageChange = (lang: 'vi' | 'en' | 'zh-CN' | 'ja') => {
     setLanguage(lang);
@@ -43,7 +36,7 @@ const Layout = () => {
             className={`w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all flex items-center justify-center ${
               isTranslating ? 'animate-pulse' : ''
             }`}
-            title="Đổi ngôn ngữ"
+            title="Change language"
           >
             <span className="text-2xl">{currentLang.flag}</span>
           </button>
@@ -53,9 +46,9 @@ const Layout = () => {
             <div className="absolute bottom-16 right-0 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="p-2">
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 px-3 py-2">
-                  Chọn ngôn ngữ
+                  Select language
                 </p>
-                {languages.map((lang) => (
+                {LANGUAGES.map((lang) => (
                   <button
                     key={lang.code}
                     onClick={() => handleLanguageChange(lang.code)}

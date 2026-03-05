@@ -139,13 +139,13 @@ const Header = () => {
               </Link>
               <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
                 <LogOut className="w-4 h-4" />
-                Đăng xuất
+                Sign out
               </Button>
             </div>
           ) : (
             <>
               <Link to="/login">
-                <Button variant="ghost" size="sm">Đăng nhập</Button>
+                <Button variant="ghost" size="sm">Sign in</Button>
               </Link>
               <Link to="/register">
                 <Button variant="hero" size="sm">Get started</Button>
@@ -209,7 +209,7 @@ const Header = () => {
                     </Link>
                     <Button variant="outline" onClick={handleLogout} className="w-full gap-2">
                       <LogOut className="w-4 h-4" />
-                      Đăng xuất
+                      Sign out
                     </Button>
                   </>
                 ) : (
@@ -217,7 +217,7 @@ const Header = () => {
                     <Link to="/login" className="block">
                       <Button variant="outline" className="w-full gap-2">
                         <LogIn className="w-4 h-4" />
-                        Đăng nhập
+                        Sign in
                       </Button>
                     </Link>
                     <Link to="/register" className="block">

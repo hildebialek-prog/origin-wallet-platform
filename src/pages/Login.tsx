@@ -36,23 +36,23 @@ const Login = () => {
 
     // Validate email
     if (!email) {
-      setError("Vui lòng nhập email");
+      setError("Please enter your email");
       return;
     }
 
     if (!validateEmail(email)) {
-      setError("Email không hợp lệ");
+      setError("Invalid email address");
       return;
     }
 
     // Validate password
     if (!password) {
-      setError("Vui lòng nhập mật khẩu");
+      setError("Please enter your password");
       return;
     }
 
     if (password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự");
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -63,7 +63,7 @@ const Login = () => {
       navigate("/");
     } catch (err: any) {
       // Error already handled in AuthContext, just display it
-      setError(err.message || "Đăng nhập thất bại. Vui lòng thử lại");
+      setError(err.message || "Login failed. Please try again");
     } finally {
       setIsLoading(false);
     }
@@ -81,9 +81,9 @@ const Login = () => {
       const errorMessage = err.message || "Failed to sign in with Google";
       
       if (errorMessage.includes("popup-closed-by-user")) {
-        setError("Đã hủy đăng nhập Google");
+        setError("Google sign-in was cancelled");
       } else if (errorMessage.includes("auth/unauthorized-domain")) {
-        setError("Domain không được phép. Liên hệ quản trị viên");
+        setError("Domain not authorized. Contact administrator");
       } else {
         setError(errorMessage);
       }
@@ -115,9 +115,9 @@ const Login = () => {
                 className="h-16 w-auto"
               />
             </div>
-            <CardTitle className="text-2xl font-bold">Chào mừng trở lại</CardTitle>
+            <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
             <CardDescription>
-              Đăng nhập để tiếp tục sử dụng Origin Wallet
+              Sign in to continue using Origin Wallet
             </CardDescription>
           </CardHeader>
           
@@ -163,7 +163,7 @@ const Login = () => {
                   />
                 </svg>
               )}
-              Tiếp tục với Google
+              Continue with Google
             </Button>
 
             {/* Divider */}
@@ -173,7 +173,7 @@ const Login = () => {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">
-                  Hoặc đăng nhập với email
+                  Or sign in with email
                 </span>
               </div>
             </div>
@@ -201,9 +201,9 @@ const Login = () => {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Mật khẩu</label>
+                  <label className="text-sm font-medium">Password</label>
                   <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                    Quên mật khẩu?
+                    Forgot password?
                   </Link>
                 </div>
                 <div className="relative">
@@ -239,19 +239,19 @@ const Login = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Đang đăng nhập...
+                    Signing in...
                   </>
                 ) : (
-                  "Đăng nhập"
+                  "Sign in"
                 )}
               </Button>
             </form>
 
             {/* Register Link */}
             <p className="text-center text-sm text-muted-foreground mt-6">
-              Chưa có tài khoản?{" "}
+              Don't have an account?{" "}
               <Link to="/register" className="text-blue-600 hover:underline font-medium">
-                Đăng ký ngay
+                Sign up now
               </Link>
             </p>
           </CardContent>
@@ -260,7 +260,7 @@ const Login = () => {
         {/* Back to Home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Quay về trang chủ
+            ← Back to home
           </Link>
         </div>
       </motion.div>

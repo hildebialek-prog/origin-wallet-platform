@@ -51,15 +51,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error("Error signing in with email:", error);
       if (error.code === "auth/invalid-email") {
-        throw new Error("Email không hợp lệ");
+        throw new Error("Invalid email");
       } else if (error.code === "auth/user-not-found") {
-        throw new Error("Tài khoản không tồn tại");
+        throw new Error("Account does not exist");
       } else if (error.code === "auth/wrong-password") {
-        throw new Error("Mật khẩu không đúng");
+        throw new Error("Incorrect password");
       } else if (error.code === "auth/invalid-credential") {
-        throw new Error("Email hoặc mật khẩu không đúng");
+        throw new Error("Incorrect email or password");
       } else {
-        throw new Error("Đăng nhập thất bại. Vui lòng thử lại");
+        throw new Error("Login failed. Please try again");
       }
     }
   };
@@ -70,13 +70,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error("Error signing up with email:", error);
       if (error.code === "auth/email-already-in-use") {
-        throw new Error("Email đã được sử dụng");
+        throw new Error("Email already in use");
       } else if (error.code === "auth/invalid-email") {
-        throw new Error("Email không hợp lệ");
+        throw new Error("Invalid email");
       } else if (error.code === "auth/weak-password") {
-        throw new Error("Mật khẩu phải có ít nhất 6 ký tự");
+        throw new Error("Password must be at least 6 characters");
       } else {
-        throw new Error("Đăng ký thất bại. Vui lòng thử lại");
+        throw new Error("Sign up failed. Please try again");
       }
     }
   };
@@ -87,11 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error("Error resetting password:", error);
       if (error.code === "auth/invalid-email") {
-        throw new Error("Email không hợp lệ");
+        throw new Error("Invalid email");
       } else if (error.code === "auth/user-not-found") {
-        throw new Error("Tài khoản không tồn tại");
+        throw new Error("Account does not exist");
       } else {
-        throw new Error("Gửi email đặt lại mật khẩu thất bại");
+        throw new Error("Failed to send password reset email");
       }
     }
   };

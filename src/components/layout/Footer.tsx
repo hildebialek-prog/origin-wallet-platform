@@ -47,15 +47,15 @@ const Footer = () => {
             <div className="md:ml-auto flex gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-accent">2022</div>
-                <div className="text-xs text-primary-foreground/50">Thành lập</div>
+                <div className="text-xs text-primary-foreground/50">Established</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-accent">170+</div>
-                <div className="text-xs text-primary-foreground/50">Quốc gia</div>
+                <div className="text-xs text-primary-foreground/50">Countries</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-accent">50+</div>
-                <div className="text-xs text-primary-foreground/50">Tiền tệ</div>
+                <div className="text-xs text-primary-foreground/50">Currencies</div>
               </div>
             </div>
           </div>

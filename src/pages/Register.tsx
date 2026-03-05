@@ -41,40 +41,40 @@ const Register = () => {
 
     // Validate name
     if (!name.trim()) {
-      setError("Vui lòng nhập họ tên");
+      setError("Please enter your full name");
       return;
     }
 
     // Validate email
     if (!email) {
-      setError("Vui lòng nhập email");
+      setError("Please enter your email");
       return;
     }
 
     if (!validateEmail(email)) {
-      setError("Email không hợp lệ");
+      setError("Invalid email address");
       return;
     }
 
     // Validate password
     if (!password) {
-      setError("Vui lòng nhập mật khẩu");
+      setError("Please enter your password");
       return;
     }
 
     if (password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự");
+      setError("Password must be at least 6 characters");
       return;
     }
 
     // Validate confirm password
     if (!confirmPassword) {
-      setError("Vui lòng xác nhận mật khẩu");
+      setError("Please confirm your password");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp");
+      setError("Confirm password does not match");
       return;
     }
 
@@ -88,7 +88,7 @@ const Register = () => {
         navigate("/");
       }, 1500);
     } catch (err: any) {
-      setError(err.message || "Đăng ký thất bại. Vui lòng thử lại");
+      setError(err.message || "Registration failed. Please try again");
     } finally {
       setIsLoading(false);
     }
@@ -106,9 +106,9 @@ const Register = () => {
       const errorMessage = err.message || "Failed to sign up with Google";
       
       if (errorMessage.includes("popup-closed-by-user")) {
-        setError("Đã hủy đăng ký Google");
+        setError("Google sign-up was cancelled");
       } else if (errorMessage.includes("auth/unauthorized-domain")) {
-        setError("Domain không được phép. Liên hệ quản trị viên");
+        setError("Domain not authorized. Contact administrator");
       } else {
         setError(errorMessage);
       }
@@ -140,9 +140,9 @@ const Register = () => {
                 className="h-16 w-auto"
               />
             </div>
-            <CardTitle className="text-2xl font-bold">Tạo tài khoản</CardTitle>
+            <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
             <CardDescription>
-              Đăng ký để bắt đầu sử dụng Origin Wallet
+              Sign up to start using Origin Wallet
             </CardDescription>
           </CardHeader>
           
@@ -167,7 +167,7 @@ const Register = () => {
                 className="mb-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400 text-sm flex items-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                Đăng ký thành công! Đang chuyển hướng...
+                Registration successful! Redirecting...
               </motion.div>
             )}
 
@@ -200,7 +200,7 @@ const Register = () => {
                   />
                 </svg>
               )}
-              Đăng ký với Google
+              Sign up with Google
             </Button>
 
             {/* Divider */}
@@ -210,7 +210,7 @@ const Register = () => {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">
-                  Hoặc đăng ký với email
+                  Or sign up with email
                 </span>
               </div>
             </div>
@@ -218,12 +218,12 @@ const Register = () => {
             {/* Email Register Form */}
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Họ và tên</label>
+                <label className="text-sm font-medium">Full name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="Nguyễn Văn A"
+                    placeholder="John Doe"
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
@@ -258,7 +258,7 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Số điện thoại (tùy chọn)</label>
+                <label className="text-sm font-medium">Phone number (optional)</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -273,7 +273,7 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Mật khẩu</label>
+                <label className="text-sm font-medium">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -302,7 +302,7 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Xác nhận mật khẩu</label>
+                <label className="text-sm font-medium">Confirm password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -329,24 +329,24 @@ const Register = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Đang đăng ký...
+                    Signing up...
                   </>
                 ) : success ? (
                   <>
                     <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Đăng ký thành công!
+                    Signed up successfully!
                   </>
                 ) : (
-                  "Đăng ký"
+                  "Sign up"
                 )}
               </Button>
             </form>
 
             {/* Login Link */}
             <p className="text-center text-sm text-muted-foreground mt-6">
-              Đã có tài khoản?{" "}
+              Already have an account?{" "}
               <Link to="/login" className="text-blue-600 hover:underline font-medium">
-                Đăng nhập ngay
+                Sign in now
               </Link>
             </p>
           </CardContent>
@@ -355,7 +355,7 @@ const Register = () => {
         {/* Back to Home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Quay về trang chủ
+            ← Back to home
           </Link>
         </div>
       </motion.div>

@@ -1,122 +1,77 @@
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Globe } from 'lucide-react';
-import { useLanguage, LANGUAGES, Language } from '@/contexts/LanguageContext';
+import { useState } from "react";
+import { ChevronDown, Globe } from "lucide-react";
+import { useLanguage, LANGUAGES } from "@/contexts/LanguageContext";
+
+type Variant = "desktop" | "mobile";
 
 interface LanguageSelectorProps {
-  variant?: 'header' | 'mobile';
+  variant?: Variant;
 }
 
-export function LanguageSelector({ variant = 'header' }: LanguageSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+const LanguageSelector = ({ variant = "desktop" }: LanguageSelectorProps) => {
   const { currentLanguage, setLanguage, isTranslating } = useLanguage();
-  
-  const currentLang = LANGUAGES.find(l => l.code === currentLanguage) || LANGUAGES[0];
+  const [open, setOpen] = useState(false);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const current = LANGUAGES.find(l => l.code === currentLanguage) ?? LANGUAGES[0];
 
-  const handleSelect = (lang: Language) => {
-    setLanguage(lang);
-    setIsOpen(false);
+  const handleSelect = (code: (typeof current)["code"]) => {
+    setOpen(false);
+    setLanguage(code);
   };
 
-  if (variant === 'mobile') {
-    return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <Globe className="w-5 h-5 text-blue-600" />
-            <span className="font-medium">Ngôn ngữ</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{currentLang.flag}</span>
-            <span className="font-medium">{currentLang.nativeName}</span>
-            {isTranslating && (
-              <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            )}
-            <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </div>
-        </button>
-        
-        {isOpen && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
-            {LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => handleSelect(lang.code)}
-                className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                  lang.code === currentLanguage ? 'bg-blue-50 dark:bg-blue-900/30' : ''
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{lang.flag}</span>
-                  <span className={`font-medium ${lang.code === currentLanguage ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                    {lang.nativeName}
-                  </span>
-                </div>
-                {lang.code === currentLanguage && <Check className="w-5 h-5 text-blue-600" />}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const wrapperClass =
+    variant === "mobile"
+      ? "w-full"
+      : "relative";
 
-  // Header variant
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className={wrapperClass}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border bg-background/80 hover:bg-muted transition ${
+          isTranslating ? "opacity-70 cursor-wait" : ""
+        }`}
       >
-        <Globe className="w-5 h-5 text-blue-600" />
-        <span className="text-lg">{currentLang.flag}</span>
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden md:inline">
-          {currentLang.nativeName}
-        </span>
-        {isTranslating && (
-          <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        )}
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <Globe className="w-4 h-4" />
+        <span className="uppercase text-xs">{current.code}</span>
+        <span>{current.name}</span>
+        <ChevronDown className="w-3 h-3" />
       </button>
-      
-      {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
-          {LANGUAGES.map((lang) => (
+
+      {open && (
+        <div
+          className="absolute z-40 mt-2 w-56 rounded-xl border bg-background shadow-lg overflow-hidden"
+        >
+          {LANGUAGES.map(lang => (
             <button
               key={lang.code}
+              type="button"
               onClick={() => handleSelect(lang.code)}
-              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                lang.code === currentLanguage ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+              className={`w-full flex items-start gap-3 px-3 py-2 text-left hover:bg-muted transition ${
+                lang.code === currentLanguage ? "bg-muted/60" : ""
               }`}
             >
-              <span className="text-xl">{lang.flag}</span>
-              <div className="flex-1 text-left">
-                <p className={`font-medium ${lang.code === currentLanguage ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+              <span className="mt-0.5 text-xs font-semibold w-8">
+                {lang.code === "en" && "EN"}
+                {lang.code === "vi" && "VN"}
+                {lang.code === "zh-CN" && "CN"}
+                {lang.code === "ja" && "JP"}
+              </span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">
+                  {lang.name}
+                </span>
+                <span className="text-xs text-muted-foreground">
                   {lang.nativeName}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{lang.name}</p>
+                </span>
               </div>
-              {lang.code === currentLanguage && <Check className="w-5 h-5 text-blue-600" />}
             </button>
           ))}
         </div>
       )}
     </div>
   );
-}
+};
 
 export default LanguageSelector;
