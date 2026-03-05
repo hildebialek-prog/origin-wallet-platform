@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Target, Heart, Eye, Users, ArrowRight, Download, User } from "lucide-react";
+import { Target, Heart, Eye, Users, ArrowRight, Download, User, CreditCard, Globe, Shield, Smartphone, Wallet, Banknote, RefreshCw } from "lucide-react";
 import content1 from "/content/content1.jpg";
 import content2 from "/content/content2.jpg";
+import content3 from "/content/content3.jpg";
 
 const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -88,6 +89,202 @@ const About = () => {
                 </div>
                 <h3 className="text-lg font-bold mb-2">{v.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">{v.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Seamless Payments Section */}
+      <section className="section-padding bg-background">
+        <div className="container-tight mx-auto">
+          <motion.div {...fadeUp} className="text-center mb-12">
+            <h2 className="text-3xl font-extrabold mb-4">Seamless Global Payments</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Send and receive money anywhere in the world with just a few taps. Fast, secure, and transparent.
+            </p>
+          </motion.div>
+
+          {/* Payment Feature 1: Card Payments */}
+          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="order-2 md:order-1"
+            >
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-3xl p-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center">
+                    <CreditCard className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Card Payments</h3>
+                    <p className="text-muted-foreground text-sm">Visa, Mastercard & more</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-blue-600" />
+                    <span>Instant funding from any debit/credit card</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-blue-600" />
+                    <span>Secure 3D authentication</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-blue-600" />
+                    <span>Support for 150+ currencies</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="order-1 md:order-2"
+            >
+              <img 
+                src={content3} 
+                alt="Card Payments" 
+                className="rounded-2xl shadow-xl w-full h-auto object-cover"
+              />
+            </motion.div>
+          </div>
+
+          {/* Payment Feature 2: Bank Transfers */}
+          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <img 
+                src={content1} 
+                alt="Bank Transfers" 
+                className="rounded-2xl shadow-xl w-full h-auto object-cover"
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-3xl p-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-green-600 flex items-center justify-center">
+                    <Banknote className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Bank Transfers</h3>
+                    <p className="text-muted-foreground text-sm">Direct to bank accounts</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-green-600" />
+                    <span>SWIFT & local bank transfers</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-green-600" />
+                    <span>Low fees, always transparent</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-green-600" />
+                    <span>Track transfers in real-time</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Payment Feature 3: Mobile Wallets */}
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="order-2 md:order-1"
+            >
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-3xl p-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-purple-600 flex items-center justify-center">
+                    <Smartphone className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Mobile Wallets</h3>
+                    <p className="text-muted-foreground text-sm">Pay your way</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-purple-600" />
+                    <span>Apple Pay & Google Pay integration</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-purple-600" />
+                    <span>QR code payments</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="w-2 h-2 rounded-full bg-purple-600" />
+                    <span>Contactless NFC payments</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="order-1 md:order-2"
+            >
+              <img 
+                src={content2} 
+                alt="Mobile Payments" 
+                className="rounded-2xl shadow-xl w-full h-auto object-cover"
+              />
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Choose Us */}
+      <section className="section-padding bg-surface-subtle">
+        <div className="container-wide mx-auto">
+          <motion.div {...fadeUp} className="text-center mb-12">
+            <h2 className="text-3xl font-extrabold mb-4">Why choose Origin Wallet?</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Experience the future of international payments with these advantages.
+            </p>
+          </motion.div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { icon: Globe, title: "170+ Countries", desc: "Send money to over 170 countries worldwide with extensive coverage.", color: "blue" },
+              { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with industry-leading encryption and security.", color: "green" },
+              { icon: RefreshCw, title: "Real-Time Exchange", desc: "Get live exchange rates with no markups or hidden spreads.", color: "purple" },
+              { icon: Wallet, title: "Multi-Currency Wallet", desc: "Hold and manage multiple currencies in one secure wallet.", color: "orange" },
+              { icon: CreditCard, title: "Virtual Cards", desc: "Create virtual cards for online shopping with full control.", color: "pink" },
+              { icon: Users, title: "24/7 Support", desc: "Our support team is available around the clock to help you.", color: "cyan" },
+            ].map((feature, i) => (
+              <motion.div 
+                key={feature.title} 
+                {...fadeUp}
+                transition={{ delay: i * 0.1 }}
+                className="bg-card rounded-2xl border border-border p-6 hover:shadow-lg transition-shadow"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-${feature.color}-100 dark:bg-${feature.color}-900/30 flex items-center justify-center mb-4`}>
+                  <feature.icon className={`w-6 h-6 text-${feature.color}-600 dark:text-${feature.color}-400`} />
+                </div>
+                <h3 className="text-lg font-bold mb-2">{feature.title}</h3>
+                <p className="text-muted-foreground text-sm">{feature.desc}</p>
               </motion.div>
             ))}
           </div>

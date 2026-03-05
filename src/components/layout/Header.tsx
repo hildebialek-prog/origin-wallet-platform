@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import LanguageSelector from "@/components/LanguageSelector";
 
 const navItems = [
   {
@@ -114,10 +115,7 @@ const Header = () => {
 
         {/* Desktop CTAs */}
         <div className="hidden lg:flex items-center gap-3">
-          <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <Globe className="w-4 h-4" />
-            EN
-          </button>
+          <LanguageSelector />
           <Link to="/pricing">
             <Button variant="ghost" size="sm">Compare fees</Button>
           </Link>
@@ -170,6 +168,7 @@ const Header = () => {
                 </div>
               ))}
               <div className="pt-4 space-y-2">
+                <LanguageSelector variant="mobile" />
                 <Link to="/pricing" className="block">
                   <Button variant="outline" className="w-full">Compare fees</Button>
                 </Link>
