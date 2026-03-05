@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 // High-quality magazine-style images
-const heroBg = "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1920&h=1080&fit=crop";
+const heroBg = "/content/banner.jpg";
 const featureImg1 = "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=800&fit=crop";
 const featureImg2 = "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop";
 const featureImg3 = "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=600&fit=crop";
