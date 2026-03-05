@@ -62,14 +62,15 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
   }) => {
     const cur = currencies.find((c) => c.code === value)!;
     return (
-      <div className="relative">
+      <div className="relative flex-shrink-0">
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-sm font-medium"
+          className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-xs sm:text-sm font-medium whitespace-nowrap"
         >
-          <span className="text-lg">{cur.flag}</span>
-          {cur.code}
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-base sm:text-lg">{cur.flag}</span>
+          <span className="hidden sm:inline">{cur.code}</span>
+          <span className="sm:hidden">{cur.code}</span>
+          <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground" />
         </button>
         {open && (
           <div className="absolute top-full right-0 mt-1 w-52 bg-card rounded-xl shadow-xl border border-border p-1 z-20 max-h-64 overflow-y-auto">
@@ -94,16 +95,16 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
   };
 
   return (
-    <div className="bg-card rounded-2xl shadow-xl border border-border p-6 w-full max-w-md">
+    <div className="bg-card rounded-2xl shadow-xl border border-border p-4 sm:p-6 w-full max-w-md">
       {/* Send */}
       <div className="mb-1">
         <label className="text-xs font-medium text-muted-foreground mb-2 block">You send</label>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <input
             type="text"
             value={sendAmount}
             onChange={(e) => setSendAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-            className="flex-1 text-2xl font-bold bg-transparent outline-none text-foreground"
+            className="flex-1 min-w-0 text-xl sm:text-2xl font-bold bg-transparent outline-none text-foreground"
           />
           <CurrencySelect
             value={sendCurrency}
@@ -166,8 +167,8 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
       {/* Receive */}
       <div>
         <label className="text-xs font-medium text-muted-foreground mb-2 block">Recipient gets</label>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 text-2xl font-bold text-foreground">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex-1 min-w-0 text-xl sm:text-2xl font-bold text-foreground truncate">
             {formatNum(receiveAmount)}
           </div>
           <CurrencySelect
