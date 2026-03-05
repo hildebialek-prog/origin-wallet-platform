@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Target, Heart, Eye, Users, ArrowRight, Download } from "lucide-react";
+import { Target, Heart, Eye, Users, ArrowRight, Download, User } from "lucide-react";
+import content1 from "/content/content1.jpg";
+import content2 from "/content/content2.jpg";
 
 const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -30,27 +32,45 @@ const About = () => {
         <div className="container-tight mx-auto">
           <motion.div {...fadeUp}>
             <h2 className="text-3xl font-extrabold mb-6 text-center">Why we exist</h2>
-            <div className="text-muted-foreground space-y-4 leading-relaxed text-lg max-w-2xl mx-auto">
-              <p>
-                For decades, sending money internationally has been expensive, slow, and opaque. Banks and traditional providers 
-                hide their fees in exchange rate markups, making it nearly impossible to know the true cost of a transfer.
-              </p>
-              <p>
-                We started Origin Wallet to change that. We believe everyone — whether you're sending money home to family, 
-                paying a supplier abroad, or managing a global business — deserves to see exactly what they're paying.
-              </p>
-              <p>
-                Our name reflects our philosophy: going back to the <strong className="text-foreground">origin</strong> of fair finance. 
-                Building something from the ground up with transparency as the foundation, not an afterthought.
-              </p>
+            <div className="grid md:grid-cols-2 gap-8 items-center">
+              <div className="text-muted-foreground space-y-4 leading-relaxed text-lg">
+                <p>
+                  For decades, sending money internationally has been expensive, slow, and opaque. Banks and traditional providers 
+                  hide their fees in exchange rate markups, making it nearly impossible to know the true cost of a transfer.
+                </p>
+                <p>
+                  We started Origin Wallet to change that. We believe everyone — whether you're sending money home to family, 
+                  paying a supplier abroad, or managing a global business — deserves to see exactly what they're paying.
+                </p>
+                <p>
+                  Our name reflects our philosophy: going back to the <strong className="text-foreground">origin</strong> of fair finance. 
+                  Building something from the ground up with transparency as the foundation, not an afterthought.
+                </p>
+              </div>
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="relative"
+              >
+                <img 
+                  src={content1} 
+                  alt="Why we exist" 
+                  className="rounded-2xl shadow-xl w-full h-auto object-cover"
+                />
+              </motion.div>
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* Mission & Values */}
-      <section className="section-padding bg-surface-subtle">
-        <div className="container-wide mx-auto">
+      <section className="section-padding bg-surface-subtle relative overflow-hidden">
+        <div className="absolute inset-0 opacity-5">
+          <img src={content2} alt="Background" className="w-full h-full object-cover" />
+        </div>
+        <div className="container-wide mx-auto relative">
           <motion.div {...fadeUp} className="text-center mb-12">
             <h2 className="text-3xl font-extrabold mb-4">Mission & values</h2>
           </motion.div>
@@ -129,8 +149,8 @@ const About = () => {
               { name: "Team Member", role: "Head of Compliance" },
             ].map((person, i) => (
               <motion.div key={i} {...fadeUp} className="bg-card rounded-2xl border border-border p-6 text-center">
-                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-muted-foreground" />
+                <div className="w-20 h-20 rounded-full mx-auto mb-4 overflow-hidden bg-muted flex items-center justify-center">
+                  <User className="w-10 h-10 text-muted-foreground" />
                 </div>
                 <h3 className="font-bold">{person.name}</h3>
                 <p className="text-sm text-muted-foreground">{person.role}</p>
@@ -161,7 +181,7 @@ const About = () => {
         <div className="container-tight mx-auto text-center">
           <motion.div {...fadeUp}>
             <p className="text-muted-foreground text-sm mb-2">Origin Wallet is a platform by</p>
-            <p className="text-xl font-bold mb-4">KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</p>
+            <p className="text-xl font-bold mb-4">ORIGIN WALLET</p>
             <Link to="/contact">
               <Button variant="hero" size="lg">Get in touch <ArrowRight className="w-4 h-4 ml-1" /></Button>
             </Link>

@@ -133,7 +133,7 @@ const Contact = () => {
                   ORIGIN WALLET
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">
-                  A platform by <strong>KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</strong>
+                  A platform by <strong>ORIGIN WALLET</strong>
                 </p>
               </div>
 

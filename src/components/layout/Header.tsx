@@ -59,10 +59,14 @@ const Header = () => {
       <div className="container-wide mx-auto flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 font-extrabold text-xl tracking-tight text-foreground">
-          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-accent-foreground text-sm font-black">
-            O
-          </div>
-          ORIGIN WALLET
+          <img 
+            src="/logo/logo.jpg" 
+            alt="Origin Wallet" 
+            className="w-8 h-8 rounded-lg object-contain"
+          />
+          <span className="hidden sm:inline">
+            <span className="text-accent">ORIGIN</span> WALLET
+          </span>
         </Link>
 
         {/* Desktop Nav */}

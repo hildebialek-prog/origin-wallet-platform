@@ -31,13 +31,17 @@ const Footer = () => {
           {/* Brand */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-4 lg:mb-0">
             <div className="flex items-center gap-2 font-extrabold text-lg mb-3">
-              <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center text-accent-foreground text-xs font-black">
-                O
-              </div>
-              ORIGIN WALLET
+              <img 
+                src="/logo/logo.jpg" 
+                alt="Origin Wallet" 
+                className="w-7 h-7 rounded-md object-contain"
+              />
+              <span className="hidden lg:inline">
+                <span className="text-accent">ORIGIN</span> WALLET
+              </span>
             </div>
             <p className="text-primary-foreground/70 text-sm leading-relaxed max-w-xs">
-              Move and manage money globally with full transparency. Low fees, real exchange rates.
+              Ví điện tử dựa trên - nền tảng, gốc rễ, bền vững
             </p>
           </div>
 
@@ -66,11 +70,11 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="text-xs text-primary-foreground/50 leading-relaxed max-w-2xl">
               <p className="mb-2">
-                A platform by <strong className="text-primary-foreground/70">KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</strong>
+                A platform by <strong className="text-primary-foreground/70">ORIGIN WALLET</strong>
               </p>
               <p>
-                ORIGIN WALLET is a financial technology platform. Services described on this website are for informational purposes. 
-                ORIGIN WALLET does not claim to hold any specific licenses or regulatory approvals unless explicitly stated. 
+                Origin Wallet is a financial technology platform. Services described on this website are for informational purposes. 
+                Origin Wallet does not claim to hold any specific licenses or regulatory approvals unless explicitly stated. 
                 Fees and exchange rates shown are illustrative and may vary.
               </p>
             </div>
