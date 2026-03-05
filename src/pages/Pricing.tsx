@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import CurrencyCalculator from "@/components/CurrencyCalculator";
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, ArrowRight, Info } from "lucide-react";
+import { CheckCircle2, ChevronRight, ArrowRight, Info, RefreshCw } from "lucide-react";
+import useExchangeRates from "@/hooks/useExchangeRates";
 
 const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -11,15 +12,29 @@ const fadeUp = {
   transition: { duration: 0.5 },
 };
 
-const corridors = [
-  { from: "USD", to: "EUR", amount: "1,000", fee: "4.00", rate: "0.9200", gets: "916.32" },
-  { from: "GBP", to: "VND", amount: "500", fee: "2.00", rate: "31,500", gets: "15,681,000" },
-  { from: "EUR", to: "USD", amount: "2,000", fee: "8.00", rate: "1.0870", gets: "2,165.36" },
-  { from: "USD", to: "JPY", amount: "5,000", fee: "20.00", rate: "149.50", gets: "744,510" },
-  { from: "AUD", to: "GBP", amount: "1,000", fee: "4.00", rate: "0.5160", gets: "513.94" },
+const corridorExamples = [
+  { from: "USD", to: "EUR", amount: 1000 },
+  { from: "GBP", to: "VND", amount: 500 },
+  { from: "EUR", to: "USD", amount: 2000 },
+  { from: "USD", to: "JPY", amount: 5000 },
+  { from: "AUD", to: "GBP", amount: 1000 },
 ];
 
 const Pricing = () => {
+  const { loading, lastUpdated, getCorridorData, refreshRates } = useExchangeRates();
+
+  // Format last updated time
+  const formatLastUpdated = () => {
+    if (!lastUpdated) return "Loading...";
+    const date = new Date(lastUpdated);
+    return date.toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
   return (
     <div>
       {/* Hero */}
@@ -59,36 +74,64 @@ const Pricing = () => {
             <CurrencyCalculator expanded />
           </motion.div>
 
-          {/* Example corridors */}
+          {/* Example transfers */}
           <motion.div {...fadeUp}>
-            <h3 className="text-2xl font-extrabold mb-6 text-center">Example transfers</h3>
-            <p className="text-muted-foreground text-center mb-8 max-w-lg mx-auto">
-              Here are some example transfers to show you how our pricing works in practice. Actual rates and fees may vary.
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-extrabold text-center">Live exchange rates</h3>
+              <div className="flex items-center gap-2">
+                {loading ? (
+                  <span className="text-sm text-muted-foreground">Updating...</span>
+                ) : (
+                  <button 
+                    onClick={refreshRates}
+                    className="text-sm text-accent hover:underline flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-muted-foreground text-center mb-2 max-w-lg mx-auto">
+              Here are some example transfers with today's live exchange rates. Rates update daily.
             </p>
+            <p className="text-xs text-muted-foreground text-center mb-6">
+              Last updated: {formatLastUpdated()}
+            </p>
+            
             <div className="overflow-x-auto">
               <table className="w-full max-w-3xl mx-auto text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
                     <th className="pb-3 font-medium">You send</th>
-                    <th className="pb-3 font-medium">Fee</th>
+                    <th className="pb-3 font-medium">Fee (0.4%)</th>
                     <th className="pb-3 font-medium">Rate</th>
                     <th className="pb-3 font-medium">Recipient gets</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {corridors.map((c, i) => (
-                    <tr key={i} className="border-b border-border/50">
-                      <td className="py-3 font-medium">{c.amount} {c.from}</td>
-                      <td className="py-3 text-muted-foreground">{c.fee} {c.from}</td>
-                      <td className="py-3 text-accent font-medium">1 {c.from} = {c.rate} {c.to}</td>
-                      <td className="py-3 font-bold">{c.gets} {c.to}</td>
-                    </tr>
-                  ))}
+                  {corridorExamples.map((c, i) => {
+                    const data = getCorridorData(c.from, c.to, c.amount);
+                    return (
+                      <tr key={i} className="border-b border-border/50">
+                        <td className="py-3 font-medium">{c.amount.toLocaleString()} {c.from}</td>
+                        <td className="py-3 text-muted-foreground">
+                          {data ? `${data.fee} ${c.from}` : <span className="text-muted-foreground/50">--</span>}
+                        </td>
+                        <td className="py-3 text-accent font-medium">
+                          1 {c.from} = {data ? `${data.rate} ${c.to}` : <span className="text-muted-foreground/50">--</span>}
+                        </td>
+                        <td className="py-3 font-bold">
+                          {data ? `${data.gets} ${c.to}` : <span className="text-muted-foreground/50">--</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-muted-foreground/60 text-center mt-4">
-              Rates and fees shown are illustrative examples. Actual amounts depend on the corridor, amount, and market conditions at the time of transfer.
+              Rates and fees shown are based on live mid-market rates. Actual amounts depend on the corridor, amount, and market conditions at the time of transfer.
             </p>
           </motion.div>
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown, Globe, LogIn, LogOut, User } from "lucide-react";
+import { Menu, X, ChevronDown, Globe, LogIn, LogOut, User, Languages } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import LanguageSelector from "@/components/LanguageSelector";
 import { useAuth } from "@/contexts/AuthContext";
@@ -173,6 +173,17 @@ const Header = () => {
             exit={{ opacity: 0, height: 0 }}
             className="lg:hidden bg-card border-b border-border overflow-hidden"
           >
+            {/* Mobile Language Section - AT THE TOP - FULL WIDTH */}
+            <div className="px-4 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-b border-blue-100 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Languages className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-semibold text-blue-900 dark:text-blue-300">Select Language / Chọn ngôn ngữ</span>
+              </div>
+              <div className="w-full">
+                <LanguageSelector variant="mobile" />
+              </div>
+            </div>
+
             <nav className="px-4 py-4 space-y-1">
               {navItems.map((item) => (
                 <div key={item.label}>
@@ -197,8 +208,8 @@ const Header = () => {
                   )}
                 </div>
               ))}
+
               <div className="pt-4 space-y-2">
-                <LanguageSelector variant="mobile" />
                 {user ? (
                   <>
                     <Link to="/profile" className="block">

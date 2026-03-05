@@ -36,14 +36,17 @@ declare global {
     googleTranslateElementInit: () => void;
     google: any;
     gtag: any;
+    gtag: any;
   }
 }
 
 let translateInitialized = false;
+let translateResolve: ((value: boolean) => void) | null = null;
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isWidgetReady, setIsWidgetReady] = useState(false);
   const translateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
   const hasTranslated = useRef(false);
@@ -53,31 +56,46 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (translateInitialized) return;
     translateInitialized = true;
 
-    // Add CSS to hide Google Translate elements
+    // Add CSS to hide Google Translate banner but keep widget accessible
     const style = document.createElement('style');
     style.id = 'google-translate-hide-style';
     style.textContent = `
       .goog-te-banner-frame { display: none !important; }
-      .goog-te-gadget-simple { display: none !important; }
-      .goog-te-gadget { display: none !important; }
+      .goog-te-gadget-simple { 
+        display: inline-block !important;
+        opacity: 0;
+        position: absolute;
+        pointer-events: none;
+      }
       body { position: static !important; }
-      .skiptranslate { display: none !important; }
+      .skiptranslate { display: block !important; }
       #goog-gt-tt { display: none !important; }
       .goog-te-balloon-frame { display: none !important; }
-      #googly-translate-button { display: none !important; }
       .translation-box { display: none !important; }
     `;
     document.head.appendChild(style);
 
-    // Set up callback
+    // Set up callback - THIS IS CRUCIAL FOR GOOGLE TRANSLATE TO WORK
     (window as any).googleTranslateElementInit = () => {
       console.log('✅ Google Translate initialized');
+      setIsWidgetReady(true);
+      if (translateResolve) {
+        translateResolve(true);
+        translateResolve = null;
+      }
     };
+
+    // Create the Google Translate widget container
+    const googleTranslateElement = document.createElement('div');
+    googleTranslateElement.id = 'google_translate_element';
+    googleTranslateElement.className = 'skiptranslate';
+    googleTranslateElement.style.display = 'none';
+    document.body.appendChild(googleTranslateElement);
 
     // Load Google Translate script
     const script = document.createElement('script');
     script.type = 'text/javascript';
-    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit&hl=en';
     script.async = true;
     script.defer = true;
     script.onerror = () => {
@@ -86,56 +104,64 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     document.head.appendChild(script);
   }, []);
 
-  // Hàm dịch bằng Google Translate
+  // Wait for Google Translate widget to be ready
+  const waitForWidget = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      // If already ready, resolve immediately
+      const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+      if (select) {
+        resolve(true);
+        return;
+      }
+
+      translateResolve = resolve;
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (translateResolve) {
+          resolve(false);
+          translateResolve = null;
+        }
+      }, 10000);
+    });
+  }, []);
+
+  // Apply translation
   const applyTranslation = useCallback(async (lang: Language) => {
     const langInfo = getLanguageByCode(lang);
     if (!langInfo) return;
 
-    // Nếu là tiếng Anh (ngôn ngữ gốc), xóa dịch
+    // If English (original language), remove translation
     if (lang === 'en') {
-      // Remove translation
+      // Clear translation
       const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
       if (select) {
         select.value = '';
         select.dispatchEvent(new Event('change', { bubbles: true }));
       }
       
-      // Reload page to clear all translations
+      // Clear cookies and reload
+      document.cookie.split(';').forEach((c) => {
+        document.cookie = c.trim() + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
+      });
+      localStorage.removeItem('google_translate_language');
+      
       window.location.reload();
       return;
     }
 
-    console.log(`🌐 Translating to: ${langInfo.name} (${langInfo.googleCode})`);
+    console.log(`🌐 Translating to: ${langInfo.name}`);
     setIsTranslating(true);
 
-    // Wait for Google Translate to be ready
-    const waitForTranslate = () => {
-      return new Promise<void>((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 20;
-        
-        const check = () => {
-          attempts++;
-          const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-          
-          if (select) {
-            resolve();
-          } else if (attempts < maxAttempts) {
-            setTimeout(check, 200);
-          } else {
-            // Force reload if widget not found
-            console.log('⚠️ Widget not found, trying force reload method');
-            resolve();
-          }
-        };
-        
-        check();
-      });
-    };
+    // Wait for widget to be ready
+    const widgetReady = await waitForWidget();
+    if (!widgetReady) {
+      console.log('⚠️ Widget not ready, retrying...');
+      // Try one more time after a delay
+      await new Promise(r => setTimeout(r, 2000));
+    }
 
-    await waitForTranslate();
-
-    // Apply translation
+    // Try to translate
     const doTranslate = (): boolean => {
       const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
       if (!select) return false;
@@ -144,14 +170,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         select.value = langInfo.googleCode;
         select.dispatchEvent(new Event('change', { bubbles: true }));
         
-        // Also try triggering via gtag if available
-        if (window.gtag) {
-          window.gtag('event', 'conversion', {
-            'send_to': 'AW-123456789'
-          });
-        }
+        // Save to localStorage
+        localStorage.setItem('google_translate_language', lang);
         
-        console.log(`✅ Translation triggered for: ${langInfo.name}`);
+        console.log(`✅ Translation set to: ${langInfo.name}`);
         return true;
       } catch (e) {
         console.error('Translation error:', e);
@@ -160,7 +182,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
 
     // Try multiple times with increasing delays
-    const delays = [100, 300, 500, 800, 1200, 2000];
+    const delays = [100, 200, 300, 500, 800, 1000, 1500, 2000];
     let success = false;
     
     for (const delay of delays) {
@@ -171,52 +193,40 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // If still not working, try direct URL parameter method
+    // If still not working, try URL-based translation
     if (!success) {
-      console.log('🔄 Trying alternative translation method...');
+      console.log('🔄 Trying URL parameter method...');
       
-      // Method 2: Create and click the select element
-      const createWidget = () => {
-        const container = document.getElementById('google_translate_element');
-        if (!container) return false;
-        
-        // Trigger translation via the widget if it exists
-        const select = container.querySelector('.goog-te-combo') as HTMLSelectElement;
-        if (select) {
-          select.value = langInfo.googleCode;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
-        }
-        return false;
-      };
+      // Add parameter to URL
+      const langParam = lang === 'zh-CN' ? 'zh-CN' : lang;
+      const currentUrl = new URL(window.location.href);
       
-      if (!createWidget()) {
-        // Method 3: Use meta tag for translation
-        const meta = document.createElement('meta');
-        meta.name = 'google-translate-customization';
-        meta.content = '9f3e8a4c6f7e8a4c';
-        document.head.appendChild(meta);
+      // Only add if not already there
+      if (!currentUrl.searchParams.get('tl')) {
+        currentUrl.searchParams.set('tl', langParam);
+        // Note: We don't actually navigate to this URL as it would reload
+        // Instead, we try to trigger translation via the DOM
       }
     }
 
-    // Keep checking and maintaining translation
+    // Keep checking for a while
     const maintainInterval = setInterval(() => {
       const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
       if (select && select.value !== langInfo.googleCode) {
         select.value = langInfo.googleCode;
         select.dispatchEvent(new Event('change', { bubbles: true }));
       }
-    }, 2000);
+    }, 3000);
 
-    // Stop maintaining after 10 seconds
+    // Stop maintaining after 15 seconds
     setTimeout(() => {
       clearInterval(maintainInterval);
       setIsTranslating(false);
-    }, 10000);
+    }, 15000);
 
-  }, []);
+  }, [waitForWidget]);
 
-  // Load saved language từ localStorage
+  // Load saved language
   useEffect(() => {
     const saved = localStorage.getItem('website_language') as Language;
     if (saved && LANGUAGES.some(l => l.code === saved)) {
@@ -224,16 +234,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Apply translation khi mount (chỉ 1 lần)
+  // Apply translation on mount if needed
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       
-      // Apply sau khi DOM ready
       const applyOnMount = async () => {
-        await new Promise(r => setTimeout(r, 2000));
+        // Wait for Google Translate to load
+        await new Promise(r => setTimeout(r, 3000));
         
-        // Only translate if not English
         if (currentLanguage !== 'en' && !hasTranslated.current) {
           hasTranslated.current = true;
           await applyTranslation(currentLanguage);
@@ -256,10 +265,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     // Apply translation
     await applyTranslation(lang);
     
-    // Reset translating state after a delay
+    // Reset translating state
     translateTimeoutRef.current = setTimeout(() => {
       setIsTranslating(false);
-    }, 2000);
+    }, 3000);
   }, [currentLanguage, applyTranslation]);
 
   return (
