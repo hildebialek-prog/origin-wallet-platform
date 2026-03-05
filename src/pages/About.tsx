@@ -374,13 +374,50 @@ const About = () => {
       </section>
 
       {/* Parent company */}
-      <section className="section-padding bg-surface-subtle">
-        <div className="container-tight mx-auto text-center">
-          <motion.div {...fadeUp}>
-            <p className="text-muted-foreground text-sm mb-2">Origin Wallet is a platform by</p>
-            <p className="text-xl font-bold mb-4">ORIGIN WALLET</p>
+      <section className="section-padding bg-gradient-to-br from-blue-600 to-indigo-700">
+        <div className="container-tight mx-auto">
+          <motion.div {...fadeUp} className="text-center">
+            {/* Company Logo */}
+            <div className="mb-6">
+              <img 
+                src="/logo/knt-logo.svg" 
+                alt="KNT - Khoi Nguyen Technology" 
+                className="h-20 w-auto mx-auto"
+              />
+            </div>
+            
+            <p className="text-blue-100 text-sm mb-2 uppercase tracking-wider">Powered by</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4">
+              CÔNG TY CỔ PHẦN CÔNG NGHỆ KHỞI NGUYÊN
+            </h2>
+            <p className="text-blue-100 text-lg mb-6">
+              Khoi Nguyen Technology Joint Stock Company
+            </p>
+            
+            {/* Stats */}
+            <div className="flex flex-wrap justify-center gap-8 md:gap-16 mb-8">
+              <div className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-white">2022</div>
+                <div className="text-blue-200 text-sm">Năm thành lập</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-white">170+</div>
+                <div className="text-blue-200 text-sm">Quốc gia</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-white">50+</div>
+                <div className="text-blue-200 text-sm">Tiền tệ</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl md:text-4xl font-bold text-white">1M+</div>
+                <div className="text-blue-200 text-sm">Người dùng</div>
+              </div>
+            </div>
+            
             <Link to="/contact">
-              <Button variant="hero" size="lg">Get in touch <ArrowRight className="w-4 h-4 ml-1" /></Button>
+              <Button variant="secondary" size="lg" className="gap-2">
+                Liên hệ ngay <ArrowRight className="w-4 h-4" />
+              </Button>
             </Link>
           </motion.div>
         </div>

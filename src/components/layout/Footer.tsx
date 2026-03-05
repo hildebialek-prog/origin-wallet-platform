@@ -26,6 +26,41 @@ const Footer = () => {
   return (
     <footer className="bg-primary text-primary-foreground">
       <div className="container-wide mx-auto section-padding">
+        {/* Parent Company Highlight */}
+        <div className="bg-white/5 rounded-2xl p-6 mb-10 border border-white/10">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="flex-shrink-0">
+              <img 
+                src="/logo/knt-logo.svg" 
+                alt="KNT - Khoi Nguyen Technology" 
+                className="h-16 w-auto"
+              />
+            </div>
+            <div className="text-center md:text-left">
+              <h3 className="text-lg font-bold text-white mb-1">
+                CÔNG TY CỔ PHẦN CÔNG NGHỆ KHỞI NGUYÊN
+              </h3>
+              <p className="text-sm text-primary-foreground/60">
+                Khoi Nguyen Technology Joint Stock Company
+              </p>
+            </div>
+            <div className="md:ml-auto flex gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-accent">2022</div>
+                <div className="text-xs text-primary-foreground/50">Thành lập</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-accent">170+</div>
+                <div className="text-xs text-primary-foreground/50">Quốc gia</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-accent">50+</div>
+                <div className="text-xs text-primary-foreground/50">Tiền tệ</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Top */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
@@ -70,7 +105,7 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="text-xs text-primary-foreground/50 leading-relaxed max-w-2xl">
               <p className="mb-2">
-                A platform by <strong className="text-primary-foreground/70">ORIGIN WALLET</strong>
+                A platform by <strong className="text-primary-foreground/70">KHOI NGUYEN TECHNOLOGY JSC</strong>
               </p>
               <p>
                 Origin Wallet is a financial technology platform. Services described on this website are for informational purposes. 
@@ -79,7 +114,7 @@ const Footer = () => {
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">
-              © {new Date().getFullYear()} ORIGIN WALLET. All rights reserved.
+              © {new Date().getFullYear()} KHOI NGUYEN TECHNOLOGY JSC. All rights reserved.
             </div>
           </div>
         </div>
