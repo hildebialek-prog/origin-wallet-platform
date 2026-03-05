@@ -23,33 +23,53 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Google Translate Styles - Lighter version to allow widget to work -->
+    <!-- Google Translate Styles - Completely hidden but functional -->
     <style>
-      /* Hide Google Translate banner and UI elements - but NOT the combo box */
+      /* Hide ALL Google Translate UI elements completely */
       .goog-te-banner-frame,
       .goog-te-flot,
       .goog-te-button-frame,
       .goog-te-menu-frame,
       .goog-te-balloon-frame,
       .goog-te-banner,
-      .goog-te-status {
+      .goog-te-status,
+      .goog-te-gadget,
+      .goog-te-gadget-simple,
+      .skiptranslate {
         display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        clip: rect(0, 0, 0, 0) !important;
       }
       
-      /* Hide gadget wrapper but keep combo accessible */
-      .goog-te-gadget {
-        display: inline-block;
-        font-size: 0 !important;
+      /* Hide the visual display of combo but keep it accessible for JavaScript */
+      .goog-te-combo {
+        visibility: hidden !important;
+        opacity: 0 !important;
+        position: absolute !important;
+        pointer-events: none !important;
+        height: 1px !important;
+        width: 1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
       }
       
-      /* Container - hidden visually but functional */
+      /* Container - completely hidden */
       #google_translate_element {
-        position: absolute;
-        top: -1000px;
-        left: -1000px;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        clip: rect(0, 0, 0, 0) !important;
       }
       
       /* Body reset for translation */
@@ -62,16 +82,17 @@
         margin-top: 0 !important;
       }
       
-      /* Hide iframes */
-      iframe[src*="translate.google"] {
+      /* Hide iframes from Google */
+      iframe[src*="translate.google"],
+      iframe.goog-te-balloon-frame {
         display: none !important;
       }
     </style>
   </head>
 
   <body>
-    <!-- Google Translate Widget Container -->
-    <div id="google_translate_element"></div>
+    <!-- Google Translate Widget Container - Hidden but functional for translation -->
+    <div id="google_translate_element" style="display: none !important;"></div>
     
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
