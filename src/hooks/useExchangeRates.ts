@@ -7,131 +7,99 @@ export interface ExchangeRate {
   lastUpdated: string;
 }
 
-export interface CurrencyPair {
-  from: string;
-  to: string;
-  amount: number;
-  fee: number;
-}
-
-// Service fee percentage (0.4%)
 const SERVICE_FEE_PERCENT = 0.004;
+const CACHE_DURATION = 60 * 1000;
+const POLL_INTERVAL_MS = 60 * 1000;
+const FREE_RATES_URL = 'https://api.coinbase.com/v2/exchange-rates?currency=USD';
+const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'VND', 'JPY', 'AUD', 'CAD', 'SGD'] as const;
+type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
+type UsdRates = Record<SupportedCurrency, number>;
 
-// Cache duration 24 hours in milliseconds
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
+const DEFAULT_USD_RATES: UsdRates = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  VND: 24500,
+  JPY: 149.5,
+  AUD: 1.53,
+  CAD: 1.36,
+  SGD: 1.34,
+};
 
-// Fallback rates in case API fails
-const FALLBACK_RATES: ExchangeRate[] = [
-  { from: 'USD', to: 'EUR', rate: 0.92, lastUpdated: new Date().toISOString() },
-  { from: 'GBP', to: 'VND', rate: 31500, lastUpdated: new Date().toISOString() },
-  { from: 'EUR', to: 'USD', rate: 1.087, lastUpdated: new Date().toISOString() },
-  { from: 'USD', to: 'JPY', rate: 149.5, lastUpdated: new Date().toISOString() },
-  { from: 'AUD', to: 'GBP', rate: 0.516, lastUpdated: new Date().toISOString() },
-  { from: 'USD', to: 'VND', rate: 24500, lastUpdated: new Date().toISOString() },
-  { from: 'EUR', to: 'VND', rate: 26800, lastUpdated: new Date().toISOString() },
-  { from: 'GBP', to: 'EUR', rate: 1.17, lastUpdated: new Date().toISOString() },
-];
-
-// Get cached rates from localStorage
 const getCachedRates = (): ExchangeRate[] | null => {
   try {
     const cached = localStorage.getItem('exchange_rates_cache');
     if (!cached) return null;
-    
     const { rates, timestamp } = JSON.parse(cached);
-    const now = Date.now();
-    
-    // Check if cache is still valid (24 hours)
-    if (now - timestamp < CACHE_DURATION) {
-      return rates;
-    }
-    
+    if (Date.now() - timestamp < CACHE_DURATION) return rates;
     return null;
   } catch {
     return null;
   }
 };
 
-// Save rates to localStorage
 const saveRatesToCache = (rates: ExchangeRate[]) => {
   try {
-    localStorage.setItem('exchange_rates_cache', JSON.stringify({
-      rates,
-      timestamp: Date.now()
-    }));
+    localStorage.setItem('exchange_rates_cache', JSON.stringify({ rates, timestamp: Date.now() }));
   } catch {
-    console.error('Failed to save rates to cache');
+    // ignore
   }
 };
 
-// Fetch rates from free API (exchangerate.host or frankfurter.app)
-const fetchRatesFromAPI = async (): Promise<ExchangeRate[]> => {
+const buildAllPairsFromUsdRates = (usdRates: UsdRates, updatedAt: string): ExchangeRate[] => {
+  return SUPPORTED_CURRENCIES.flatMap((from) =>
+    SUPPORTED_CURRENCIES.map((to) => ({
+      from,
+      to,
+      rate: usdRates[to] / usdRates[from],
+      lastUpdated: updatedAt,
+    })),
+  );
+};
+
+const normalizeUsdRates = (rawRates: Record<string, unknown>): UsdRates => {
+  const next: UsdRates = { ...DEFAULT_USD_RATES, USD: 1 };
+  for (const c of SUPPORTED_CURRENCIES) {
+    if (c === 'USD') continue;
+    const v = rawRates[c];
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+      next[c] = v;
+      continue;
+    }
+    if (typeof v === 'string') {
+      const parsed = Number(v);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        next[c] = parsed;
+      }
+    }
+  }
+  return next;
+};
+
+const fetchRatesFromAPI = async (): Promise<{ rates: ExchangeRate[]; updatedAt: string }> => {
   try {
-    // Try Frankfurter API (free, no API key needed)
-    const responses = await Promise.allSettled([
-      fetch('https://api.frankfurter.app/latest?from=USD&to=EUR,GBP,JPY,VND'),
-      fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,VND'),
-      fetch('https://api.frankfurter.app/latest?from=GBP&to=USD,EUR,VND'),
-      fetch('https://api.frankfurter.app/latest?from=AUD&to=GBP'),
-    ]);
-
-    const rates: ExchangeRate[] = [];
-    const now = new Date().toISOString();
-
-    // Process USD rates
-    if (responses[0].status === 'fulfilled') {
-      const data = await responses[0].value.json();
-      if (data.rates) {
-        if (data.rates.EUR) rates.push({ from: 'USD', to: 'EUR', rate: data.rates.EUR, lastUpdated: now });
-        if (data.rates.GBP) rates.push({ from: 'USD', to: 'GBP', rate: data.rates.GBP, lastUpdated: now });
-        if (data.rates.JPY) rates.push({ from: 'USD', to: 'JPY', rate: data.rates.JPY, lastUpdated: now });
-        if (data.rates.VND) rates.push({ from: 'USD', to: 'VND', rate: data.rates.VND, lastUpdated: now });
-      }
-    }
-
-    // Process EUR rates
-    if (responses[1].status === 'fulfilled') {
-      const data = await responses[1].value.json();
-      if (data.rates) {
-        if (data.rates.USD) rates.push({ from: 'EUR', to: 'USD', rate: data.rates.USD, lastUpdated: now });
-        if (data.rates.GBP) rates.push({ from: 'EUR', to: 'GBP', rate: data.rates.GBP, lastUpdated: now });
-        if (data.rates.VND) rates.push({ from: 'EUR', to: 'VND', rate: data.rates.VND, lastUpdated: now });
-      }
-    }
-
-    // Process GBP rates
-    if (responses[2].status === 'fulfilled') {
-      const data = await responses[2].value.json();
-      if (data.rates) {
-        if (data.rates.USD) rates.push({ from: 'GBP', to: 'USD', rate: data.rates.USD, lastUpdated: now });
-        if (data.rates.EUR) rates.push({ from: 'GBP', to: 'EUR', rate: data.rates.EUR, lastUpdated: now });
-        if (data.rates.VND) rates.push({ from: 'GBP', to: 'VND', rate: data.rates.VND, lastUpdated: now });
-      }
-    }
-
-    // Process AUD rates
-    if (responses[3].status === 'fulfilled') {
-      const data = await responses[3].value.json();
-      if (data.rates) {
-        if (data.rates.GBP) rates.push({ from: 'AUD', to: 'GBP', rate: data.rates.GBP, lastUpdated: now });
-      }
-    }
-
-    return rates.length > 0 ? rates : FALLBACK_RATES;
-  } catch (error) {
-    console.error('Failed to fetch rates from API:', error);
-    return FALLBACK_RATES;
+    const response = await fetch(FREE_RATES_URL);
+    if (!response.ok) throw new Error(`free_api_http_${response.status}`);
+    const data = await response.json();
+    const usdRates = normalizeUsdRates((data?.data?.rates ?? {}) as Record<string, unknown>);
+    const updatedAt = new Date().toISOString();
+    return { rates: buildAllPairsFromUsdRates(usdRates, updatedAt), updatedAt };
+  } catch {
+    const updatedAt = new Date().toISOString();
+    return { rates: buildAllPairsFromUsdRates(DEFAULT_USD_RATES, updatedAt), updatedAt };
   }
 };
 
-// Calculate transfer result
-export const calculateTransfer = (amount: number, rate: number, feePercent: number = SERVICE_FEE_PERCENT): { fee: number; gets: number } => {
+export const calculateTransfer = (
+  amount: number,
+  rate: number,
+  feePercent: number = SERVICE_FEE_PERCENT,
+): { fee: number; gets: number } => {
   const fee = amount * feePercent;
   const gets = (amount - fee) * rate;
   return { fee, gets };
 };
 
-// Format number with thousand separators
 export const formatCurrency = (value: number, currency: string): string => {
   if (currency === 'VND' || currency === 'JPY') {
     return new Intl.NumberFormat('en-US').format(Math.round(value));
@@ -139,65 +107,83 @@ export const formatCurrency = (value: number, currency: string): string => {
   return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
 
-// Hook to get exchange rates
+export const formatRate = (value: number): string => {
+  if (value >= 1000) return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+  if (value >= 1) return new Intl.NumberFormat('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(value);
+  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 8 }).format(value);
+};
+
 export const useExchangeRates = () => {
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRates = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    // Check cache first
-    const cachedRates = getCachedRates();
-    if (cachedRates) {
-      setRates(cachedRates);
-      setLastUpdated(cachedRates[0]?.lastUpdated || null);
-      setLoading(false);
-      return;
+  const refreshFromApi = useCallback(async (silent = true, skipCache = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
     }
 
-    // Fetch fresh rates
-    const freshRates = await fetchRatesFromAPI();
+    if (!skipCache) {
+      const cached = getCachedRates();
+      if (cached) {
+        setRates(cached);
+        setLastUpdated(cached[0]?.lastUpdated ?? null);
+        if (!silent) setLoading(false);
+        return;
+      }
+    }
+
+    const { rates: freshRates, updatedAt } = await fetchRatesFromAPI();
     setRates(freshRates);
-    setLastUpdated(freshRates[0]?.lastUpdated || null);
+    setLastUpdated(updatedAt);
     saveRatesToCache(freshRates);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
-  // Force refresh rates (admin or manual refresh)
   const refreshRates = useCallback(async () => {
     localStorage.removeItem('exchange_rates_cache');
-    await fetchRates();
-  }, [fetchRates]);
+    await refreshFromApi(false, true);
+  }, [refreshFromApi]);
 
   useEffect(() => {
-    fetchRates();
-  }, [fetchRates]);
+    refreshFromApi(false);
+  }, [refreshFromApi]);
 
-  // Calculate corridor data
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      refreshFromApi(true, true);
+    }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [refreshFromApi]);
+
+  const getRate = useCallback((from: string, to: string): number | null => {
+    const direct = rates.find((r) => r.from === from && r.to === to);
+    return direct?.rate ?? null;
+  }, [rates]);
+
   const getCorridorData = useCallback((from: string, to: string, amount: number): { fee: string; rate: string; gets: string } | null => {
-    const rateObj = rates.find(r => r.from === from && r.to === to);
-    if (!rateObj) return null;
-
-    const { fee, gets } = calculateTransfer(amount, rateObj.rate);
-    
+    const rate = getRate(from, to);
+    if (!rate) return null;
+    const { fee, gets } = calculateTransfer(amount, rate);
     return {
       fee: formatCurrency(fee, from),
-      rate: formatCurrency(rateObj.rate, to),
-      gets: formatCurrency(gets, to)
+      rate: formatRate(rate),
+      gets: formatCurrency(gets, to),
     };
-  }, [rates]);
+  }, [getRate]);
 
   return {
     rates,
     loading,
     lastUpdated,
     error,
+    realtimeEnabled: false,
+    rateSource: 'rest' as const,
     refreshRates,
-    getCorridorData
+    getRate,
+    getCorridorData,
   };
 };
 

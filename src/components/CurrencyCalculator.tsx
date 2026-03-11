@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { ChevronDown, Info } from "lucide-react";
+import useExchangeRates from "@/hooks/useExchangeRates";
 
 const currencies = [
   { code: "USD", name: "US Dollar", symbol: "$", flag: "🇺🇸" },
@@ -12,22 +13,12 @@ const currencies = [
   { code: "SGD", name: "Singapore Dollar", symbol: "S$", flag: "🇸🇬" },
 ];
 
-const mockRates: Record<string, Record<string, number>> = {
-  USD: { EUR: 0.92, GBP: 0.79, VND: 24850, JPY: 149.5, AUD: 1.53, CAD: 1.36, SGD: 1.34, USD: 1 },
-  EUR: { USD: 1.087, GBP: 0.858, VND: 27020, JPY: 162.5, AUD: 1.664, CAD: 1.479, SGD: 1.457, EUR: 1 },
-  GBP: { USD: 1.266, EUR: 1.166, VND: 31500, JPY: 189.3, AUD: 1.939, CAD: 1.723, SGD: 1.698, GBP: 1 },
-  VND: { USD: 0.0000402, EUR: 0.000037, GBP: 0.0000317, JPY: 0.006, AUD: 0.0000615, CAD: 0.0000547, SGD: 0.0000539, VND: 1 },
-  JPY: { USD: 0.00669, EUR: 0.00615, GBP: 0.00528, VND: 166.2, AUD: 0.01024, CAD: 0.0091, SGD: 0.00896, JPY: 1 },
-  AUD: { USD: 0.654, EUR: 0.601, GBP: 0.516, VND: 16240, JPY: 97.7, CAD: 0.889, SGD: 0.876, AUD: 1 },
-  CAD: { USD: 0.735, EUR: 0.676, GBP: 0.58, VND: 18270, JPY: 109.9, AUD: 1.125, SGD: 0.985, CAD: 1 },
-  SGD: { USD: 0.746, EUR: 0.686, GBP: 0.589, VND: 18540, JPY: 111.6, AUD: 1.142, CAD: 1.015, SGD: 1 },
-};
-
 interface Props {
   expanded?: boolean;
 }
 
 const CurrencyCalculator = ({ expanded = false }: Props) => {
+  const { getRate, loading } = useExchangeRates();
   const [sendAmount, setSendAmount] = useState("1000");
   const [sendCurrency, setSendCurrency] = useState("USD");
   const [receiveCurrency, setReceiveCurrency] = useState("EUR");
@@ -35,8 +26,9 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
   const [showReceiveDropdown, setShowReceiveDropdown] = useState(false);
 
   const rate = useMemo(() => {
-    return mockRates[sendCurrency]?.[receiveCurrency] || 1;
-  }, [sendCurrency, receiveCurrency]);
+    const liveRate = getRate(sendCurrency, receiveCurrency);
+    return liveRate ?? 1;
+  }, [getRate, sendCurrency, receiveCurrency]);
 
   const amount = parseFloat(sendAmount) || 0;
   const serviceFee = Math.max(amount * 0.004, 0.5);
@@ -47,6 +39,12 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
     if (n > 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
     if (n < 0.01) return n.toFixed(6);
     return n.toFixed(2);
+  };
+
+  const formatRate = (n: number) => {
+    if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    if (n >= 1) return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+    return n.toLocaleString("en-US", { minimumFractionDigits: 6, maximumFractionDigits: 8 });
   };
 
   const CurrencySelect = ({
@@ -139,7 +137,9 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
               </span>
             </span>
           </span>
-          <span className="font-medium text-accent">1 {sendCurrency} = {formatNum(rate)} {receiveCurrency}</span>
+          <span className="font-medium text-accent">
+            {loading ? "Updating..." : `1 ${sendCurrency} = ${formatRate(rate)} ${receiveCurrency}`}
+          </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Total cost</span>

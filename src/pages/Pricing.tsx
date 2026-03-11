@@ -23,15 +23,14 @@ const corridorExamples = [
 const Pricing = () => {
   const { loading, lastUpdated, getCorridorData, refreshRates } = useExchangeRates();
 
-  // Format last updated time
-  const formatLastUpdated = () => {
-    if (!lastUpdated) return "Loading...";
-    const date = new Date(lastUpdated);
-    return date.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit' 
+  const formatLiveTimestamp = (value: string | null) => {
+    if (!value) return "Loading...";
+    return new Date(value).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
   };
 
@@ -93,10 +92,10 @@ const Pricing = () => {
               </div>
             </div>
             <p className="text-muted-foreground text-center mb-2 max-w-lg mx-auto">
-              Here are some example transfers with today's live exchange rates. Rates update daily.
+              Here are some example transfers with live exchange rates.
             </p>
             <p className="text-xs text-muted-foreground text-center mb-6">
-              Last updated: {formatLastUpdated()}
+              Last updated: {formatLiveTimestamp(lastUpdated)} (auto refresh every 1m)
             </p>
             
             <div className="overflow-x-auto">
