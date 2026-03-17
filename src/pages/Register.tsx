@@ -2,113 +2,31 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Lock, Eye, EyeOff, Loader2, User, Phone, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
-};
 
 const Register = () => {
   const navigate = useNavigate();
-  const { signInWithGoogle, signUpWithEmail } = useAuth();
-  
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { signInWithGoogle } = useAuth();
+
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-
-  // Validation
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess(false);
-
-    // Validate name
-    if (!name.trim()) {
-      setError("Please enter your full name");
-      return;
-    }
-
-    // Validate email
-    if (!email) {
-      setError("Please enter your email");
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      setError("Invalid email address");
-      return;
-    }
-
-    // Validate password
-    if (!password) {
-      setError("Please enter your password");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
-    // Validate confirm password
-    if (!confirmPassword) {
-      setError("Please confirm your password");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Confirm password does not match");
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      await signUpWithEmail(email, password);
-      setSuccess(true);
-      // Navigate to home after successful registration
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-    } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGoogleRegister = async () => {
     setError("");
-    setSuccess(false);
     setIsGoogleLoading(true);
-    
+
     try {
       await signInWithGoogle();
       navigate("/");
     } catch (err: any) {
       const errorMessage = err.message || "Failed to sign up with Google";
-      
-      if (errorMessage.includes("popup-closed-by-user")) {
+
+      if (errorMessage.includes("popup_closed")) {
         setError("Google sign-up was cancelled");
-      } else if (errorMessage.includes("auth/unauthorized-domain")) {
-        setError("Domain not authorized. Contact administrator");
+      } else if (errorMessage.includes("origin_mismatch")) {
+        setError("This domain is not allowed in your Google Cloud OAuth client");
       } else {
         setError(errorMessage);
       }
@@ -119,13 +37,12 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-blue-950 dark:via-slate-900 dark:to-purple-950 p-4">
-      {/* Background decorations */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -134,49 +51,31 @@ const Register = () => {
         <Card className="border-0 shadow-2xl">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <img 
-                src="/logo/knt-logo.svg" 
-                alt="Origin Wallet" 
-                className="h-16 w-auto"
-              />
+              <img src="/logo/knt-logo.svg" alt="Origin Wallet" className="h-16 w-auto" />
             </div>
             <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
             <CardDescription>
-              Sign up to start using Origin Wallet
+              Create your account with Google to start using Origin Wallet
             </CardDescription>
           </CardHeader>
-          
-          <CardContent className="pt-4">
-            {/* Error Message */}
+
+          <CardContent className="pt-4 space-y-4">
             {error && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
+                className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
               >
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 {error}
               </motion.div>
             )}
 
-            {/* Success Message */}
-            {success && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400 text-sm flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                Registration successful! Redirecting...
-              </motion.div>
-            )}
-
-            {/* Google Register Button */}
             <Button
               onClick={handleGoogleRegister}
-              disabled={isGoogleLoading || success}
+              disabled={isGoogleLoading}
               variant="outline"
-              className="w-full h-12 mb-4"
+              className="w-full h-12"
             >
               {isGoogleLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -203,159 +102,22 @@ const Register = () => {
               Sign up with Google
             </Button>
 
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or sign up with email
-                </span>
-              </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50/80 p-4 text-sm text-blue-900">
+              Registration is now handled directly by Google Cloud sign-in. We no longer store passwords in this app.
             </div>
 
-            {/* Email Register Form */}
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Full name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="John Doe"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      setError("");
-                      setSuccess(false);
-                    }}
-                    className="pl-10"
-                    required
-                    disabled={isLoading || success}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setError("");
-                      setSuccess(false);
-                    }}
-                    className="pl-10"
-                    required
-                    disabled={isLoading || success}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone number (optional)</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="tel"
-                    placeholder="+84 123 456 789"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading || success}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setError("");
-                      setSuccess(false);
-                    }}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isLoading || success}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
-                    disabled={isLoading || success}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Confirm password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setError("");
-                      setSuccess(false);
-                    }}
-                    className="pl-10"
-                    required
-                    disabled={isLoading || success}
-                  />
-                </div>
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-12" 
-                disabled={isLoading || success}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Signing up...
-                  </>
-                ) : success ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Signed up successfully!
-                  </>
-                ) : (
-                  "Sign up"
-                )}
-              </Button>
-            </form>
-
-            {/* Login Link */}
-            <p className="text-center text-sm text-muted-foreground mt-6">
+            <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link to="/login" className="text-blue-600 hover:underline font-medium">
-                Sign in now
+                Sign in with Google
               </Link>
             </p>
           </CardContent>
         </Card>
 
-        {/* Back to Home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to home
+            â† Back to home
           </Link>
         </div>
       </motion.div>
