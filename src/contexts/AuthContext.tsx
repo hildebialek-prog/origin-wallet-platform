@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { authApi } from "@/lib/auth-api";
 
 const googleClientId =
   "251785792812-mpjegenufvk3ujl1tsq4sjd1n0k1bf0l.apps.googleusercontent.com";
@@ -10,16 +9,13 @@ export interface GoogleUser {
   email: string;
   name: string;
   picture?: string;
-  accessToken?: string;
+  accessToken: string;
 }
 
 interface AuthContextType {
   user: GoogleUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (name: string, email: string, password: string, phone?: string) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -156,58 +152,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signInWithEmail = async (email: string, password: string) => {
-    try {
-      const session = await authApi.loginWithEmail(email, password);
-      const nextUser: GoogleUser = {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        picture: session.user.picture,
-        accessToken: session.accessToken,
-      };
-
-      localStorage.setItem(authStorageKey, JSON.stringify(nextUser));
-      setUser(nextUser);
-    } catch (error) {
-      console.error("Error signing in with email:", error);
-      throw error;
-    }
-  };
-
-  const signUpWithEmail = async (
-    name: string,
-    email: string,
-    password: string,
-    phone?: string,
-  ) => {
-    try {
-      const session = await authApi.registerWithEmail(name, email, password, phone);
-      const nextUser: GoogleUser = {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        picture: session.user.picture,
-        accessToken: session.accessToken,
-      };
-
-      localStorage.setItem(authStorageKey, JSON.stringify(nextUser));
-      setUser(nextUser);
-    } catch (error) {
-      console.error("Error signing up with email:", error);
-      throw error;
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      await authApi.forgotPassword(email);
-    } catch (error) {
-      console.error("Error requesting password reset:", error);
-      throw error;
-    }
-  };
-
   const logout = async () => {
     try {
       const accessToken = user?.accessToken;
@@ -215,7 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem(authStorageKey);
       setUser(null);
 
-      if (accessToken && user?.id) {
+      if (accessToken) {
         await loadGoogleIdentityScript();
         (
           window.google?.accounts?.oauth2 as
@@ -235,9 +179,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         loading,
         signInWithGoogle,
-        signInWithEmail,
-        signUpWithEmail,
-        resetPassword,
         logout,
       }}
     >
