@@ -60,7 +60,7 @@ const Login = () => {
     
     try {
       await signInWithEmail(email, password);
-      navigate("/");
+      navigate("/account");
     } catch (err: any) {
       // Error already handled in AuthContext, just display it
       setError(err.message || "Login failed. Please try again");
@@ -75,7 +75,7 @@ const Login = () => {
     
     try {
       await signInWithGoogle();
-      navigate("/");
+      navigate("/account");
     } catch (err: any) {
       // Handle specific Google auth errors
       const errorMessage = err.message || "Failed to sign in with Google";
