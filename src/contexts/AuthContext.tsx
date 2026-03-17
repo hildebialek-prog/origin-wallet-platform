@@ -1,104 +1,172 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { 
-  User, 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut, 
-  onAuthStateChanged,
-  sendPasswordResetEmail
-} from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+
+const googleClientId =
+  "251785792812-mpjegenufvk3ujl1tsq4sjd1n0k1bf0l.apps.googleusercontent.com";
+const authStorageKey = "origin-wallet-google-auth";
+
+export interface GoogleUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  accessToken: string;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: GoogleUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+let googleScriptPromise: Promise<void> | null = null;
+
+const loadGoogleIdentityScript = () => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Google sign-in is only available in the browser"));
+  }
+
+  if (window.google?.accounts?.oauth2) {
+    return Promise.resolve();
+  }
+
+  if (googleScriptPromise) {
+    return googleScriptPromise;
+  }
+
+  googleScriptPromise = new Promise<void>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Google sign-in")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google sign-in"));
+    document.head.appendChild(script);
+  });
+
+  return googleScriptPromise;
+};
+
+const requestGoogleAccessToken = async () => {
+  await loadGoogleIdentityScript();
+
+  return new Promise<string>((resolve, reject) => {
+    const tokenClient = window.google?.accounts?.oauth2.initTokenClient({
+      client_id: googleClientId,
+      scope: "openid email profile",
+      callback: (response) => {
+        if (response.error) {
+          reject(new Error(response.error));
+          return;
+        }
+
+        if (!response.access_token) {
+          reject(new Error("Google did not return an access token"));
+          return;
+        }
+
+        resolve(response.access_token);
+      },
+      error_callback: () => {
+        reject(new Error("Google sign-in was cancelled"));
+      },
+    });
+
+    if (!tokenClient) {
+      reject(new Error("Google sign-in is not available"));
+      return;
+    }
+
+    tokenClient.requestAccessToken({
+      prompt: "select_account",
+    });
+  });
+};
+
+const getGoogleUserProfile = async (accessToken: string): Promise<GoogleUser> => {
+  const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch your Google profile");
+  }
+
+  const profile = await response.json();
+
+  return {
+    id: profile.sub,
+    email: profile.email,
+    name: profile.name,
+    picture: profile.picture,
+    accessToken,
+  };
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<GoogleUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    try {
+      const savedUser = localStorage.getItem(authStorageKey);
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch (error) {
+      console.error("Error restoring Google session:", error);
+      localStorage.removeItem(authStorageKey);
+    } finally {
       setLoading(false);
-    });
-
-    return () => unsubscribe();
+    }
   }, []);
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const accessToken = await requestGoogleAccessToken();
+      const profile = await getGoogleUserProfile(accessToken);
+
+      localStorage.setItem(authStorageKey, JSON.stringify(profile));
+      setUser(profile);
     } catch (error) {
       console.error("Error signing in with Google:", error);
       throw error;
     }
   };
 
-  const signInWithEmail = async (email: string, password: string) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      console.error("Error signing in with email:", error);
-      if (error.code === "auth/invalid-email") {
-        throw new Error("Invalid email");
-      } else if (error.code === "auth/user-not-found") {
-        throw new Error("Account does not exist");
-      } else if (error.code === "auth/wrong-password") {
-        throw new Error("Incorrect password");
-      } else if (error.code === "auth/invalid-credential") {
-        throw new Error("Incorrect email or password");
-      } else {
-        throw new Error("Login failed. Please try again");
-      }
-    }
-  };
-
-  const signUpWithEmail = async (email: string, password: string) => {
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      console.error("Error signing up with email:", error);
-      if (error.code === "auth/email-already-in-use") {
-        throw new Error("Email already in use");
-      } else if (error.code === "auth/invalid-email") {
-        throw new Error("Invalid email");
-      } else if (error.code === "auth/weak-password") {
-        throw new Error("Password must be at least 6 characters");
-      } else {
-        throw new Error("Sign up failed. Please try again");
-      }
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error: any) {
-      console.error("Error resetting password:", error);
-      if (error.code === "auth/invalid-email") {
-        throw new Error("Invalid email");
-      } else if (error.code === "auth/user-not-found") {
-        throw new Error("Account does not exist");
-      } else {
-        throw new Error("Failed to send password reset email");
-      }
-    }
-  };
-
   const logout = async () => {
     try {
-      await signOut(auth);
+      const accessToken = user?.accessToken;
+
+      localStorage.removeItem(authStorageKey);
+      setUser(null);
+
+      if (accessToken) {
+        await loadGoogleIdentityScript();
+        (
+          window.google?.accounts?.oauth2 as
+            | { revoke?: (token: string, callback?: () => void) => void }
+            | undefined
+        )?.revoke?.(accessToken, () => undefined);
+      }
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;
@@ -106,15 +174,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      signInWithGoogle, 
-      signInWithEmail,
-      signUpWithEmail,
-      resetPassword,
-      logout 
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signInWithGoogle,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

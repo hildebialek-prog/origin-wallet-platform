@@ -2,88 +2,31 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
-};
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signInWithGoogle, signInWithEmail } = useAuth();
-  
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { signInWithGoogle } = useAuth();
+
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Validation
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    // Validate email
-    if (!email) {
-      setError("Please enter your email");
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      setError("Invalid email address");
-      return;
-    }
-
-    // Validate password
-    if (!password) {
-      setError("Please enter your password");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      await signInWithEmail(email, password);
-      navigate("/account");
-    } catch (err: any) {
-      // Error already handled in AuthContext, just display it
-      setError(err.message || "Login failed. Please try again");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGoogleLogin = async () => {
     setError("");
     setIsGoogleLoading(true);
-    
+
     try {
       await signInWithGoogle();
       navigate("/account");
     } catch (err: any) {
-      // Handle specific Google auth errors
       const errorMessage = err.message || "Failed to sign in with Google";
-      
-      if (errorMessage.includes("popup-closed-by-user")) {
+
+      if (errorMessage.includes("popup_closed")) {
         setError("Google sign-in was cancelled");
-      } else if (errorMessage.includes("auth/unauthorized-domain")) {
-        setError("Domain not authorized. Contact administrator");
+      } else if (errorMessage.includes("origin_mismatch")) {
+        setError("This domain is not allowed in your Google Cloud OAuth client");
       } else {
         setError(errorMessage);
       }
@@ -94,13 +37,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-blue-950 dark:via-slate-900 dark:to-purple-950 p-4">
-      {/* Background decorations */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -109,37 +51,31 @@ const Login = () => {
         <Card className="border-0 shadow-2xl">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <img 
-                src="/logo/knt-logo.svg" 
-                alt="Origin Wallet" 
-                className="h-16 w-auto"
-              />
+              <img src="/logo/knt-logo.svg" alt="Origin Wallet" className="h-16 w-auto" />
             </div>
             <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
             <CardDescription>
-              Sign in to continue using Origin Wallet
+              Sign in with your Google account to continue using Origin Wallet
             </CardDescription>
           </CardHeader>
-          
-          <CardContent className="pt-4">
-            {/* Error Message */}
+
+          <CardContent className="pt-4 space-y-4">
             {error && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
+                className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
               >
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 {error}
               </motion.div>
             )}
 
-            {/* Google Login Button */}
             <Button
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading}
               variant="outline"
-              className="w-full h-12 mb-4"
+              className="w-full h-12"
             >
               {isGoogleLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -166,101 +102,22 @@ const Login = () => {
               Continue with Google
             </Button>
 
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or sign in with email
-                </span>
-              </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50/80 p-4 text-sm text-blue-900">
+              We now use Google Cloud login only. Email and password sign-in has been removed from this app.
             </div>
 
-            {/* Email Login Form */}
-            <form onSubmit={handleEmailLogin} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setError(""); // Clear error when user types
-                    }}
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Password</label>
-                  <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setError(""); // Clear error when user types
-                    }}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-12" 
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign in"
-                )}
-              </Button>
-            </form>
-
-            {/* Register Link */}
-            <p className="text-center text-sm text-muted-foreground mt-6">
+            <p className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link to="/register" className="text-blue-600 hover:underline font-medium">
-                Sign up now
+                Continue with Google
               </Link>
             </p>
           </CardContent>
         </Card>
 
-        {/* Back to Home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to home
+            â† Back to home
           </Link>
         </div>
       </motion.div>

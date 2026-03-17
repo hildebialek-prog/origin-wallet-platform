@@ -134,7 +134,7 @@ const Header = () => {
               <Link to="/profile">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <User className="w-4 h-4" />
-                  {user.displayName || user.email?.split('@')[0] || 'Profile'}
+                  {user.name || user.email?.split('@')[0] || 'Profile'}
                 </Button>
               </Link>
               <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
@@ -215,7 +215,7 @@ const Header = () => {
                     <Link to="/profile" className="block">
                       <Button variant="outline" className="w-full gap-2">
                         <User className="w-4 h-4" />
-                        {user.displayName || user.email?.split('@')[0] || 'Profile'}
+                        {user.name || user.email?.split('@')[0] || 'Profile'}
                       </Button>
                     </Link>
                     <Button variant="outline" onClick={handleLogout} className="w-full gap-2">
