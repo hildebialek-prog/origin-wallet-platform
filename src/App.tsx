@@ -29,6 +29,8 @@ import AccountTeam from "./pages/account/AccountTeam";
 import AccountIntegrations from "./pages/account/AccountIntegrations";
 import AccountSettings from "./pages/account/AccountSettings";
 import AccountVirtualAccountRequest from "./pages/account/AccountVirtualAccountRequest";
+import AccountPlaceholder from "./pages/account/AccountPlaceholder";
+
 
 const queryClient = new QueryClient();
 

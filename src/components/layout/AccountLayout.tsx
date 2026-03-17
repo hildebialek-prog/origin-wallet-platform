@@ -90,9 +90,9 @@ const AccountLayout = () => {
               end={item.to === "/account"}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-2 border-transparent",
                   isActive
-                    ? "bg-gray-700/80 text-green-400"
+                    ? "bg-gray-700/80 text-green-400 border-l-green-400"
                     : "text-gray-300 hover:bg-gray-700/50 hover:text-white"
                 )
               }
