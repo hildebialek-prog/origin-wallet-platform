@@ -21,6 +21,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
 import AccountLayout from "@/components/layout/AccountLayout";
 import AccountDashboard from "./pages/account/AccountDashboard";
+import AccountBalances from "./pages/account/AccountBalances";
 import AccountPlaceholder from "./pages/account/AccountPlaceholder";
 
 const queryClient = new QueryClient();
@@ -50,7 +51,7 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/account" element={<AccountLayout />}>
                 <Route index element={<AccountDashboard />} />
-                <Route path="balances" element={<AccountPlaceholder title="Balances" />} />
+                <Route path="balances" element={<AccountBalances />} />
                 <Route path="transactions" element={<AccountPlaceholder title="Transactions" />} />
                 <Route path="virtual-accounts" element={<AccountPlaceholder title="Virtual accounts" />} />
                 <Route path="beneficiaries" element={<AccountPlaceholder title="Beneficiaries" />} />
