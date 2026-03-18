@@ -3,29 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Origin Wallet — Ví điện tử dựa trên nền tảng, gốc rễ, bền vững</title>
-    <meta name="description" content="Origin Wallet - Ví điện tử dựa trên nền tảng, gốc rễ, bền vững. Di chuyển và quản lý tiền toàn cầu với phí thấp, tỷ giá thực." />
+    <title>Origin Wallet</title>
+    <meta
+      name="description"
+      content="Origin Wallet - Move and manage global money with lower fees and better visibility."
+    />
     <meta name="author" content="KHOI NGUYEN TECHNOLOGY JSC" />
 
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/logo/logo.jpg" />
     <link rel="apple-touch-icon" href="/logo/logo.jpg" />
 
-    <meta property="og:title" content="Origin Wallet — Ví điện tử dựa trên nền tảng, gốc rễ, bền vững" />
-    <meta property="og:description" content="Ví điện tử dựa trên nền tảng, gốc rễ, bền vững. Di chuyển và quản lý tiền toàn cầu với phí thấp, tỷ giá thực." />
+    <meta property="og:title" content="Origin Wallet" />
+    <meta
+      property="og:description"
+      content="Move and manage global money with lower fees and better visibility."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/logo/knt-logo.svg" />
-
     <meta name="twitter:card" content="summary_large_image" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Google Translate Styles - Completely hidden but functional -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
     <style>
-      /* Hide ALL Google Translate UI elements completely */
       .goog-te-banner-frame,
       .goog-te-flot,
       .goog-te-button-frame,
@@ -46,8 +51,7 @@
         position: absolute !important;
         clip: rect(0, 0, 0, 0) !important;
       }
-      
-      /* Hide the visual display of combo but keep it accessible for JavaScript */
+
       .goog-te-combo {
         visibility: hidden !important;
         opacity: 0 !important;
@@ -58,8 +62,7 @@
         overflow: hidden !important;
         clip: rect(0, 0, 0, 0) !important;
       }
-      
-      /* Container - completely hidden */
+
       #google_translate_element {
         display: none !important;
         visibility: hidden !important;
@@ -71,18 +74,16 @@
         position: absolute !important;
         clip: rect(0, 0, 0, 0) !important;
       }
-      
-      /* Body reset for translation */
+
       body {
         position: relative;
       }
-      
+
       html.goog-translate body,
       html.goog-translate {
         margin-top: 0 !important;
       }
-      
-      /* Hide iframes from Google */
+
       iframe[src*="translate.google"],
       iframe.goog-te-balloon-frame {
         display: none !important;
@@ -91,25 +92,27 @@
   </head>
 
   <body>
-    <!-- Google Translate Widget Container - Hidden but functional for translation -->
-    <div id="google_translate_element" style="display: none !important;"></div>
-    
+    <div id="google_translate_element" style="display: none !important"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Google Translate Script -->
+
     <script type="text/javascript">
       function googleTranslateElementInit() {
-        console.log('🔄 Google Translate Element Init called');
-        new google.translate.TranslateElement({
-          pageLanguage: 'vi',
-          includedLanguages: 'en,vi,zh-CN,ja',
-          layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL,
-          autoDisplay: false,
-          floatPosition: google.translate.TranslateElement.FloatPosition.TOP_LEFT
-        }, 'google_translate_element');
+        new google.translate.TranslateElement(
+          {
+            pageLanguage: "vi",
+            includedLanguages: "en,vi,zh-CN,ja",
+            layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL,
+            autoDisplay: false,
+            floatPosition: google.translate.TranslateElement.FloatPosition.TOP_LEFT,
+          },
+          "google_translate_element",
+        );
       }
     </script>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script
+      type="text/javascript"
+      src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+    ></script>
   </body>
 </html>

@@ -15,10 +15,10 @@ import {
 } from "lucide-react";
 
 const TOP_BALANCES = [
-  { code: "EUR", amount: "45.80", flag: "🇪🇺" },
-  { code: "HKD", amount: "314.03", flag: "🇭🇰" },
-  { code: "USD", amount: "0", flag: "🇺🇸" },
-  { code: "GBP", amount: "0", flag: "🇬🇧" },
+  { code: "EUR", amount: "45.80", flag: "EU" },
+  { code: "HKD", amount: "314.03", flag: "HK" },
+  { code: "USD", amount: "0", flag: "US" },
+  { code: "GBP", amount: "0", flag: "GB" },
 ];
 
 const QUICK_ACTIONS = [
@@ -56,32 +56,18 @@ const RECENT_ACTIVITY = [
   {
     date: "10 Mar 2026",
     text: "Received HKD 177.03 from NONGKRAN JOMSAWAN",
-    type: "in",
   },
   {
     date: "9 Mar 2026",
     text: "Received HKD 137.00 from NONGKRAN JOMSAWAN",
-    type: "in",
   },
   {
     date: "6 Mar 2026",
     text: "Received EUR 45.80 from NONGKRAN JOMSAWAN",
-    type: "in",
   },
   {
     date: "7 Jan 2026",
     text: 'Your Hong Kong virtual account request "Monroca OU" was not approved.',
-    type: "info",
-  },
-  {
-    date: "7 Jan 2026",
-    text: 'You have requested to add Hong Kong virtual account "Monroca OU". We should approve within 2 business days.',
-    type: "info",
-  },
-  {
-    date: "18 Dec 2025",
-    text: 'Your Hong Kong virtual account "Multi Currency Account-AUD" has been approved.',
-    type: "info",
   },
 ];
 
@@ -93,8 +79,8 @@ const SETUP_STEPS = [
 ];
 
 const VIRTUAL_ACCOUNTS = [
-  { name: "Multi Currency Account", country: "Hong Kong", flag: "🇭🇰", currencies: "AUD, CNH, SGD, USD, EUR, GBP" },
-  { name: "Euro EU IBAN", country: "Europe", flag: "🇪🇺", currencies: "EUR" },
+  { name: "Multi Currency Account", country: "Hong Kong", flag: "HK", currencies: "AUD, CNH, SGD, USD, EUR, GBP" },
+  { name: "Euro EU IBAN", country: "Europe", flag: "EU", currencies: "EUR" },
 ];
 
 const AccountDashboard = () => {
@@ -103,45 +89,36 @@ const AccountDashboard = () => {
   const totalBalance = "92.55";
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-[#f5f5f5]">
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left + center: main content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Account name & total balance */}
+    <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
+      <div className="mx-auto max-w-7xl p-6">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 mb-1">
-                {displayName}
-              </h1>
-              <p className="text-4xl font-bold text-gray-900">USD {totalBalance}</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Your total balance estimate
-              </p>
+              <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">{displayName}</h1>
+              <p className="text-4xl font-bold text-gray-900 dark:text-white">USD {totalBalance}</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Your total balance estimate</p>
             </div>
 
-            {/* Quick actions */}
-            <Card className="border border-gray-200 bg-white shadow-sm">
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">
-                  Quick actions
-                </CardTitle>
+                <CardTitle className="text-base font-semibold dark:text-white">Quick actions</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   {QUICK_ACTIONS.map((action) => (
                     <Link
                       key={action.label}
                       to={action.href}
-                      className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50/30 transition-all group"
+                      className="group flex flex-col items-center gap-2 rounded-lg border border-gray-100 p-4 transition-all hover:border-green-200 hover:bg-green-50/30 dark:border-white/5 dark:hover:bg-white/5"
                     >
-                      <div className={`w-10 h-10 ${action.color} rounded-lg flex items-center justify-center`}>
-                        <action.icon className="w-5 h-5 text-white" />
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${action.color}`}>
+                        <action.icon className="h-5 w-5 text-white" />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-green-700">
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-green-700 dark:text-white dark:group-hover:text-green-400">
                           {action.label}
                         </p>
-                        <p className="text-xs text-gray-500">{action.desc}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{action.desc}</p>
                       </div>
                     </Link>
                   ))}
@@ -149,29 +126,23 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Top balances */}
-            <Card className="border border-gray-200 bg-white shadow-sm">
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-semibold">
-                  Top balances
-                </CardTitle>
-                <Link
-                  to="/account/balances"
-                  className="text-sm text-green-600 hover:underline font-medium"
-                >
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base font-semibold dark:text-white">Top balances</CardTitle>
+                <Link to="/account/balances" className="text-sm font-medium text-green-600 hover:underline dark:text-green-400">
                   View all
                 </Link>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   {TOP_BALANCES.map((b) => (
                     <div
                       key={b.code}
-                      className="p-4 rounded-lg border border-gray-200 bg-gray-50/50 flex items-center gap-3"
+                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-white/10 dark:bg-white/5"
                     >
-                      <span className="text-2xl">{b.flag}</span>
+                      <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{b.flag}</span>
                       <div>
-                        <p className="font-semibold text-gray-900">
+                        <p className="font-semibold text-gray-900 dark:text-white">
                           {b.code} {b.amount}
                         </p>
                       </div>
@@ -181,61 +152,47 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Virtual accounts */}
-            <Card className="border border-gray-200 bg-white shadow-sm">
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-semibold">
-                  Your virtual accounts
-                </CardTitle>
-                <Link
-                  to="/account/virtual-accounts"
-                  className="text-sm text-green-600 hover:underline font-medium"
-                >
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base font-semibold dark:text-white">Your virtual accounts</CardTitle>
+                <Link to="/account/virtual-accounts" className="text-sm font-medium text-green-600 hover:underline dark:text-green-400">
                   View all
                 </Link>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="space-y-3">
-                  {VIRTUAL_ACCOUNTS.map((va, i) => (
+                  {VIRTUAL_ACCOUNTS.map((va) => (
                     <div
-                      key={i}
-                      className="flex items-center justify-between p-4 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors"
+                      key={va.name}
+                      className="flex items-center justify-between rounded-lg border border-gray-100 p-4 transition-colors hover:border-gray-200 dark:border-white/5 dark:hover:border-white/10"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{va.flag}</span>
+                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{va.flag}</span>
                         <div>
-                          <p className="font-semibold text-gray-900">{va.name}</p>
-                          <p className="text-sm text-gray-500">{va.country} • {va.currencies}</p>
+                          <p className="font-semibold text-gray-900 dark:text-white">{va.name}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{va.country} • {va.currencies}</p>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                      <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Recent activity */}
-            <Card className="border border-gray-200 bg-white shadow-sm">
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
-                <CardTitle className="text-base font-semibold">
-                  Recent activity
-                </CardTitle>
+                <CardTitle className="text-base font-semibold dark:text-white">Recent activity</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <ul className="divide-y divide-gray-100">
+                <ul className="divide-y divide-gray-100 dark:divide-white/5">
                   {RECENT_ACTIVITY.map((item, i) => (
-                    <li
-                      key={i}
-                      className="py-4 flex items-start justify-between gap-4 group cursor-pointer"
-                    >
+                    <li key={i} className="group flex cursor-pointer items-start justify-between gap-4 py-4">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-500">{item.date}</p>
-                        <p className="text-sm font-medium text-gray-900 mt-0.5">
-                          {item.text}
-                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{item.date}</p>
+                        <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">{item.text}</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0 group-hover:text-gray-600 mt-1" />
+                      <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300" />
                     </li>
                   ))}
                 </ul>
@@ -243,40 +200,30 @@ const AccountDashboard = () => {
             </Card>
           </div>
 
-          {/* Right sidebar */}
           <div className="space-y-6">
-            {/* Set up your account */}
-            <Card className="border border-gray-200 bg-white shadow-sm">
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
-                <CardTitle className="text-base font-semibold">
-                  Set up your account
-                </CardTitle>
+                <CardTitle className="text-base font-semibold dark:text-white">Set up your account</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <ul className="space-y-3">
                   {SETUP_STEPS.map((step, i) => (
                     <li key={i} className="flex items-center gap-3">
                       {step.done ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
                       ) : (
-                        <Circle className="w-5 h-5 text-gray-300 shrink-0" />
+                        <Circle className="h-5 w-5 shrink-0 text-gray-300 dark:text-gray-600" />
                       )}
                       {step.href && !step.disabled ? (
                         <Link
                           to={step.href}
-                          className="text-sm font-medium text-gray-900 hover:text-green-600 flex items-center gap-1 flex-1 group"
+                          className="group flex flex-1 items-center gap-1 text-sm font-medium text-gray-900 hover:text-green-600 dark:text-white dark:hover:text-green-400"
                         >
                           {step.label}
-                          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5" />
+                          <ChevronRight className="h-4 w-4" />
                         </Link>
                       ) : (
-                        <span
-                          className={
-                            step.disabled
-                              ? "text-sm text-gray-400"
-                              : "text-sm font-medium text-gray-900"
-                          }
-                        >
+                        <span className={step.disabled ? "text-sm text-gray-400 dark:text-gray-500" : "text-sm font-medium text-gray-900 dark:text-white"}>
                           {step.label}
                         </span>
                       )}
@@ -286,25 +233,21 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* No beneficiaries yet */}
-            <Card className="border border-gray-200 bg-white shadow-sm">
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
-                <CardTitle className="text-base font-semibold">
-                  No beneficiaries yet
-                </CardTitle>
-                <p className="text-sm text-gray-500 font-normal mt-1">
-                  Add beneficiaries to send payments in more than 20 currencies
-                  to accounts worldwide.
+                <CardTitle className="text-base font-semibold dark:text-white">No beneficiaries yet</CardTitle>
+                <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                  Add beneficiaries to send payments in more than 20 currencies to accounts worldwide.
                 </p>
               </CardHeader>
               <CardContent className="pt-0">
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700 gap-2"
+                  className="w-full gap-2 border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700 dark:border-green-500/50 dark:text-green-400 dark:hover:bg-green-500/10 dark:hover:text-green-300"
                 >
                   <Link to="/account/beneficiaries">
-                    <Plus className="w-4 h-4" />
+                    <Plus className="h-4 w-4" />
                     Add beneficiary
                   </Link>
                 </Button>
