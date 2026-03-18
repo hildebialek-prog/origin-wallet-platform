@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import AccountHeader from "@/components/layout/AccountHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  ArrowUpDown,
-  ArrowRight,
   ArrowDownLeft,
   ArrowUpRight,
   ChevronRight,
@@ -13,8 +12,6 @@ import {
   Plus,
   Wallet,
   CreditCard,
-  Send,
-  Globe,
   Building,
 } from "lucide-react";
 
@@ -107,19 +104,10 @@ const AccountDashboard = () => {
   const totalBalance = "92.55";
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5]">
-      {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end gap-4">
-        <Button className="bg-green-600 hover:bg-green-700 text-white gap-2">
-          <ArrowUpDown className="w-4 h-4" />
-          Move funds
-        </Button>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-200 bg-gray-50 text-sm font-medium">
-          EN
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
+      <AccountHeader />
 
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex-1 overflow-auto p-6 max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left + center: main content */}
           <div className="lg:col-span-2 space-y-6">

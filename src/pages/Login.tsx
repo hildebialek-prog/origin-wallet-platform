@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,16 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signInWithGoogle } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      navigate("/account", { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
     setError("");

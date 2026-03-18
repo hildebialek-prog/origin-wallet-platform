@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import AccountHeader from "@/components/layout/AccountHeader";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +13,6 @@ import {
   Search,
   MoreHorizontal,
   HelpCircle,
-  Globe,
-  ChevronDown,
   TrendingUp,
   Wallet,
   ArrowRight,
@@ -34,7 +33,6 @@ const BALANCES = [
 ];
 
 const AccountBalances = () => {
-  const [lang] = useState("EN");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredBalances = BALANCES.filter(
@@ -47,39 +45,8 @@ const AccountBalances = () => {
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
-      {/* Top bar - giống Currenxie */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <Button className="bg-green-600 hover:bg-green-700 text-white gap-2 shadow-sm">
-            <ArrowUpDown className="w-4 h-4" />
-            Move funds
-          </Button>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-200 bg-gray-50 text-sm font-medium cursor-pointer hover:bg-gray-100 transition-colors">
-            <Globe className="w-4 h-4 text-gray-500" />
-            {lang}
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors">
-                <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center">
-                  <span className="text-green-700 text-sm font-semibold">K</span>
-                </div>
-                <span>My account</span>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem className="cursor-pointer">Profile</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">Settings</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer text-red-600">Log out</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
+      <AccountHeader />
 
-      {/* Main content */}
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Total Balance Card */}
