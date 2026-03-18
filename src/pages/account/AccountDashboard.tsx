@@ -100,7 +100,7 @@ const VIRTUAL_ACCOUNTS = [
 
 const AccountDashboard = () => {
   const { user } = useAuth();
-  const displayName = user?.displayName || user?.email?.split("@")[0] || "Account";
+  const displayName = user?.name || user?.email?.split("@")[0] || "Account";
   const totalBalance = "92.55";
 
   return (

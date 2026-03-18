@@ -22,7 +22,15 @@ import NotFound from "./pages/NotFound";
 import AccountLayout from "@/components/layout/AccountLayout";
 import AccountDashboard from "./pages/account/AccountDashboard";
 import AccountBalances from "./pages/account/AccountBalances";
+import AccountTransactions from "./pages/account/AccountTransactions";
+import AccountVirtualAccounts from "./pages/account/AccountVirtualAccounts";
+import AccountBeneficiaries from "./pages/account/AccountBeneficiaries";
+import AccountTeam from "./pages/account/AccountTeam";
+import AccountIntegrations from "./pages/account/AccountIntegrations";
+import AccountSettings from "./pages/account/AccountSettings";
+import AccountVirtualAccountRequest from "./pages/account/AccountVirtualAccountRequest";
 import AccountPlaceholder from "./pages/account/AccountPlaceholder";
+
 
 const queryClient = new QueryClient();
 
@@ -52,11 +60,17 @@ const App = () => (
               <Route path="/account" element={<AccountLayout />}>
                 <Route index element={<AccountDashboard />} />
                 <Route path="balances" element={<AccountBalances />} />
-                <Route path="transactions" element={<AccountPlaceholder title="Transactions" />} />
-                <Route path="virtual-accounts" element={<AccountPlaceholder title="Virtual accounts" />} />
-                <Route path="beneficiaries" element={<AccountPlaceholder title="Beneficiaries" />} />
-                <Route path="team" element={<AccountPlaceholder title="Team" />} />
-                <Route path="integrations" element={<AccountPlaceholder title="Integrations" />} />
+                <Route path="transactions" element={<AccountTransactions />} />
+                <Route path="virtual-accounts" element={<AccountVirtualAccounts />} />
+                <Route path="virtual-accounts/request" element={<AccountVirtualAccountRequest />} />
+                <Route path="beneficiaries" element={<AccountBeneficiaries />} />
+                <Route path="team" element={<AccountTeam />} />
+                <Route path="integrations" element={<AccountIntegrations />} />
+                <Route path="settings">
+                  <Route index element={<AccountSettings />} />
+                  <Route path="general" element={<AccountSettings />} />
+                  <Route path="security" element={<AccountSettings />} />
+                </Route>
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
