@@ -1,0 +1,1 @@
+Improve balances UI, add redirect for logged-in users, sync dashboard header
