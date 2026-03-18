@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import AccountHeader from "@/components/layout/AccountHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -104,10 +103,8 @@ const AccountDashboard = () => {
   const totalBalance = "92.55";
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
-      <AccountHeader />
-
-      <div className="flex-1 overflow-auto p-6 max-w-7xl mx-auto">
+    <div className="min-h-0 flex-1 overflow-auto bg-[#f5f5f5]">
+      <div className="p-6 max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left + center: main content */}
           <div className="lg:col-span-2 space-y-6">

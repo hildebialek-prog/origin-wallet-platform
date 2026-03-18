@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import AccountHeader from "@/components/layout/AccountHeader";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +11,6 @@ import {
   ArrowUpDown,
   Search,
   MoreHorizontal,
-  HelpCircle,
   TrendingUp,
   Wallet,
   ArrowRight,
@@ -44,10 +42,8 @@ const AccountBalances = () => {
   const totalBalanceUSD = "92.55";
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
-      <AccountHeader />
-
-      <div className="flex-1 overflow-auto p-6">
+    <div className="min-h-0 flex-1 overflow-auto bg-[#f5f5f5]">
+      <div className="p-6">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Total Balance Card */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -190,17 +186,6 @@ const AccountBalances = () => {
             <p>Last updated: Today</p>
           </div>
         </div>
-      </div>
-
-      {/* Floating Help button */}
-      <div className="fixed bottom-6 right-6 z-30">
-        <Button
-          size="lg"
-          className="rounded-full h-12 px-5 bg-[#2d3238] hover:bg-[#3d4248] text-white shadow-lg gap-2 border-0"
-        >
-          <HelpCircle className="w-5 h-5" />
-          <span className="font-medium">Help</span>
-        </Button>
       </div>
     </div>
   );

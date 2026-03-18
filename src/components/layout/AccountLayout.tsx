@@ -114,7 +114,7 @@ const AccountLayout = () => {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="h-1 bg-gradient-to-r from-green-400 via-emerald-300 to-green-400" />
         <header className="sticky top-0 z-20 flex items-center justify-end gap-3 border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur">
           <Button className="gap-2 rounded-full bg-green-500 px-5 text-white hover:bg-green-600">
