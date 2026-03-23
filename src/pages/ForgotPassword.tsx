@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const ForgotPassword = () => {
-  const { requestPasswordReset, resetPassword, authError } = useAuth();
+  const navigate = useNavigate();
+  const { requestPasswordReset, resetPassword, authError, clearAuthError } = useAuth();
   const [step, setStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -19,6 +20,12 @@ const ForgotPassword = () => {
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  useEffect(() => {
+    clearAuthError();
+    setError("");
+    setSuccess("");
+  }, [clearAuthError]);
 
   const handleRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -58,10 +65,13 @@ const ForgotPassword = () => {
         password,
         passwordConfirmation: confirmPassword,
       });
-      setSuccess(message);
+      setSuccess(message || "Password reset successful. Redirecting to sign in...");
       setVerificationCode("");
       setPassword("");
       setConfirmPassword("");
+      window.setTimeout(() => {
+        navigate("/login", { replace: true });
+      }, 1200);
     } catch (resetError) {
       const message = resetError instanceof Error ? resetError.message : "Unable to reset password.";
       setError(message);
@@ -200,6 +210,8 @@ const ForgotPassword = () => {
                     setPassword("");
                     setConfirmPassword("");
                     setSuccess("");
+                    setError("");
+                    clearAuthError();
                   }}
                 >
                   Back

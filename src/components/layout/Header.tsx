@@ -131,7 +131,7 @@ const Header = () => {
           </Link>
           {user ? (
             <div className="flex items-center gap-2">
-              <Link to="/profile">
+                <Link to="/account/settings/profile">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <User className="w-4 h-4" />
                   {user.name || user.email?.split('@')[0] || 'Profile'}
@@ -212,7 +212,7 @@ const Header = () => {
               <div className="pt-4 space-y-2">
                 {user ? (
                   <>
-                    <Link to="/profile" className="block">
+                <Link to="/account/settings/profile" className="block">
                       <Button variant="outline" className="w-full gap-2">
                         <User className="w-4 h-4" />
                         {user.name || user.email?.split('@')[0] || 'Profile'}

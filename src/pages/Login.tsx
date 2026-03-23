@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertCircle, Loader2, Mail, Lock, ShieldCheck } from "lucide-react";
@@ -16,7 +16,7 @@ const getAuthErrorMessage = (error: unknown, fallback: string) => {
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, verifyLogin, authError } = useAuth();
+  const { login, verifyLogin, authError, clearAuthError } = useAuth();
 
   const [step, setStep] = useState<"credentials" | "verify">("credentials");
   const [email, setEmail] = useState("");
@@ -26,6 +26,12 @@ const Login = () => {
   const [error, setError] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [isVerifyLoading, setIsVerifyLoading] = useState(false);
+
+  useEffect(() => {
+    clearAuthError();
+    setError("");
+    setNotice("");
+  }, [clearAuthError]);
 
   const handleEmailLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -210,6 +216,8 @@ const Login = () => {
                     setStep("credentials");
                     setVerificationCode("");
                     setNotice("");
+                    setError("");
+                    clearAuthError();
                   }}
                 >
                   Back

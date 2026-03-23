@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 const googleClientId =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
@@ -77,6 +77,7 @@ interface AuthContextType {
   loading: boolean;
   authError: string | null;
   token: string | null;
+  clearAuthError: () => void;
   login: (email: string, password: string) => Promise<AuthChallenge>;
   verifyLogin: (email: string, verificationCode: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<AuthChallenge>;
@@ -300,6 +301,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(session.token ?? null);
     setAuthError(null);
   };
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -548,6 +553,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         authError,
         token,
+        clearAuthError,
         login,
         verifyLogin,
         register,
