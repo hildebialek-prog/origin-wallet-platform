@@ -1,7 +1,9 @@
-import { ChevronRight, Eye, Landmark, Repeat, Search, Users2 } from "lucide-react";
+import { Search, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+
+const TEAM_MEMBERS: Array<{ name: string; email: string }> = [];
 
 const AccountTeam = () => {
   return (
@@ -31,19 +33,14 @@ const AccountTeam = () => {
             <div className="pr-9 text-right">Permissions</div>
           </div>
           <CardContent className="p-0">
-            <div className="grid grid-cols-[1fr_220px] items-center border-b border-[#ecece7] px-5 py-4 dark:border-white/5">
-              <div>
-                <div className="text-[1.05rem] font-semibold text-[#202020] dark:text-white">Aleksandr Muzafarov (You)</div>
-                <div className="text-sm text-[#8a8a8a] dark:text-gray-400">providencegiebelmfum@hotmail.com</div>
+            {TEAM_MEMBERS.length === 0 && (
+              <div className="px-5 py-14 text-center">
+                <p className="text-[1.05rem] font-medium text-[#202020] dark:text-white">No team data available yet</p>
+                <p className="mt-2 text-sm text-[#8a8a8a] dark:text-gray-400">
+                  Team members and permissions will appear here after dynamic data is connected.
+                </p>
               </div>
-              <div className="flex items-center justify-end gap-3 text-[#555555] dark:text-gray-300">
-                <Eye className="h-4 w-4" />
-                <Landmark className="h-4 w-4" />
-                <Users2 className="h-4 w-4" />
-                <Repeat className="h-4 w-4" />
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

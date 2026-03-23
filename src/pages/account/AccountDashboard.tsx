@@ -10,16 +10,10 @@ import {
   Circle,
   Plus,
   Wallet,
-  CreditCard,
   Building,
 } from "lucide-react";
 
-const TOP_BALANCES = [
-  { code: "EUR", amount: "45.80", flag: "EU" },
-  { code: "HKD", amount: "314.03", flag: "HK" },
-  { code: "USD", amount: "0", flag: "US" },
-  { code: "GBP", amount: "0", flag: "GB" },
-];
+const TOP_BALANCES: Array<{ code: string; amount: string; flag: string }> = [];
 
 const QUICK_ACTIONS = [
   {
@@ -52,24 +46,7 @@ const QUICK_ACTIONS = [
   },
 ];
 
-const RECENT_ACTIVITY = [
-  {
-    date: "10 Mar 2026",
-    text: "Received HKD 177.03 from NONGKRAN JOMSAWAN",
-  },
-  {
-    date: "9 Mar 2026",
-    text: "Received HKD 137.00 from NONGKRAN JOMSAWAN",
-  },
-  {
-    date: "6 Mar 2026",
-    text: "Received EUR 45.80 from NONGKRAN JOMSAWAN",
-  },
-  {
-    date: "7 Jan 2026",
-    text: 'Your Hong Kong virtual account request "Monroca OU" was not approved.',
-  },
-];
+const RECENT_ACTIVITY: Array<{ date: string; text: string }> = [];
 
 const SETUP_STEPS = [
   { done: true, label: "Virtual account requested" },
@@ -78,15 +55,11 @@ const SETUP_STEPS = [
   { done: false, label: "Make a transfer", disabled: true },
 ];
 
-const VIRTUAL_ACCOUNTS = [
-  { name: "Multi Currency Account", country: "Hong Kong", flag: "HK", currencies: "AUD, CNH, SGD, USD, EUR, GBP" },
-  { name: "Euro EU IBAN", country: "Europe", flag: "EU", currencies: "EUR" },
-];
+const VIRTUAL_ACCOUNTS: Array<{ name: string; country: string; flag: string; currencies: string }> = [];
 
 const AccountDashboard = () => {
   const { user } = useAuth();
   const displayName = user?.name || user?.email?.split("@")[0] || "Account";
-  const totalBalance = "92.55";
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
@@ -95,8 +68,10 @@ const AccountDashboard = () => {
           <div className="space-y-6 lg:col-span-2">
             <div>
               <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">{displayName}</h1>
-              <p className="text-4xl font-bold text-gray-900 dark:text-white">USD {totalBalance}</p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Your total balance estimate</p>
+              <p className="text-4xl font-bold text-gray-900 dark:text-white">Waiting for live data</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Your total balance will appear here once synced.
+              </p>
             </div>
 
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
@@ -134,21 +109,27 @@ const AccountDashboard = () => {
                 </Link>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  {TOP_BALANCES.map((b) => (
-                    <div
-                      key={b.code}
-                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-white/10 dark:bg-white/5"
-                    >
-                      <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{b.flag}</span>
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {b.code} {b.amount}
-                        </p>
+                {TOP_BALANCES.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    {TOP_BALANCES.map((balance) => (
+                      <div
+                        key={balance.code}
+                        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-white/10 dark:bg-white/5"
+                      >
+                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{balance.flag}</span>
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {balance.code} {balance.amount}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-gray-200 p-6 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                    No balance data available yet. This card is waiting for dynamic balances.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -160,23 +141,31 @@ const AccountDashboard = () => {
                 </Link>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {VIRTUAL_ACCOUNTS.map((va) => (
-                    <div
-                      key={va.name}
-                      className="flex items-center justify-between rounded-lg border border-gray-100 p-4 transition-colors hover:border-gray-200 dark:border-white/5 dark:hover:border-white/10"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{va.flag}</span>
-                        <div>
-                          <p className="font-semibold text-gray-900 dark:text-white">{va.name}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{va.country} • {va.currencies}</p>
+                {VIRTUAL_ACCOUNTS.length > 0 ? (
+                  <div className="space-y-3">
+                    {VIRTUAL_ACCOUNTS.map((account) => (
+                      <div
+                        key={account.name}
+                        className="flex items-center justify-between rounded-lg border border-gray-100 p-4 transition-colors hover:border-gray-200 dark:border-white/5 dark:hover:border-white/10"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{account.flag}</span>
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {account.country} - {account.currencies}
+                            </p>
+                          </div>
                         </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                       </div>
-                      <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-gray-200 p-6 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                    No virtual accounts yet. This section is waiting for dynamic account data.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -185,17 +174,23 @@ const AccountDashboard = () => {
                 <CardTitle className="text-base font-semibold dark:text-white">Recent activity</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <ul className="divide-y divide-gray-100 dark:divide-white/5">
-                  {RECENT_ACTIVITY.map((item, i) => (
-                    <li key={i} className="group flex cursor-pointer items-start justify-between gap-4 py-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{item.date}</p>
-                        <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">{item.text}</p>
-                      </div>
-                      <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300" />
-                    </li>
-                  ))}
-                </ul>
+                {RECENT_ACTIVITY.length > 0 ? (
+                  <ul className="divide-y divide-gray-100 dark:divide-white/5">
+                    {RECENT_ACTIVITY.map((item, index) => (
+                      <li key={index} className="group flex cursor-pointer items-start justify-between gap-4 py-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.date}</p>
+                          <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">{item.text}</p>
+                        </div>
+                        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300" />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-gray-200 p-6 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                    No recent activity yet. Transactions will appear here when live data is available.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -207,8 +202,8 @@ const AccountDashboard = () => {
               </CardHeader>
               <CardContent className="pt-0">
                 <ul className="space-y-3">
-                  {SETUP_STEPS.map((step, i) => (
-                    <li key={i} className="flex items-center gap-3">
+                  {SETUP_STEPS.map((step, index) => (
+                    <li key={index} className="flex items-center gap-3">
                       {step.done ? (
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
                       ) : (
@@ -223,7 +218,13 @@ const AccountDashboard = () => {
                           <ChevronRight className="h-4 w-4" />
                         </Link>
                       ) : (
-                        <span className={step.disabled ? "text-sm text-gray-400 dark:text-gray-500" : "text-sm font-medium text-gray-900 dark:text-white"}>
+                        <span
+                          className={
+                            step.disabled
+                              ? "text-sm text-gray-400 dark:text-gray-500"
+                              : "text-sm font-medium text-gray-900 dark:text-white"
+                          }
+                        >
                           {step.label}
                         </span>
                       )}

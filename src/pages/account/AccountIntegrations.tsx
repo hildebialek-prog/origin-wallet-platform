@@ -1,6 +1,9 @@
-import { Building2, Link2 } from "lucide-react";
+import { Building2, CircleAlert, Link2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/components/ui/use-toast";
 
 const providers = [
   {
@@ -8,10 +11,42 @@ const providers = [
     name: "Currenxie",
     summary: "Connect your Currenxie account to sync balances, transactions, and provider activity into Origin Wallet.",
     status: "Available now",
+    onboardingUrl: "https://in.sumsub.com/websdk/p/RXN0ssu1U5gK1MGg",
   },
 ];
 
 const AccountIntegrations = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const requiredProfileFields = [
+    { label: "Full name", value: user?.name },
+    { label: "Email", value: user?.email },
+    { label: "Phone", value: user?.phone },
+    { label: "Company", value: user?.company },
+    { label: "Country", value: user?.country },
+  ];
+
+  const missingFields = requiredProfileFields
+    .filter(({ value }) => !String(value ?? "").trim())
+    .map(({ label }) => label);
+
+  const isProfileComplete = missingFields.length === 0;
+
+  const handleConnectProvider = (onboardingUrl: string) => {
+    if (!isProfileComplete) {
+      toast({
+        variant: "destructive",
+        title: "Profile incomplete",
+        description: `Please complete your profile before continuing. Missing: ${missingFields.join(", ")}.`,
+      });
+      navigate("/account/settings/profile");
+      return;
+    }
+
+    window.open(onboardingUrl, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="bg-[#f8f8f6] px-7 py-10 dark:bg-[#161a20]">
       <div className="mx-auto max-w-6xl">
@@ -22,6 +57,23 @@ const AccountIntegrations = () => {
             will add more providers over time.
           </p>
         </div>
+
+        {!isProfileComplete && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900">
+            <div className="flex items-start gap-3">
+              <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-semibold">Complete your profile before connecting a provider.</p>
+                <p className="text-sm">
+                  Missing information: {missingFields.join(", ")}.{" "}
+                  <Link to="/account/settings/profile" className="font-semibold underline underline-offset-4">
+                    Update profile
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {providers.map((provider) => (
@@ -46,7 +98,10 @@ const AccountIntegrations = () => {
                   </div>
                 </div>
 
-                <Button className="h-11 rounded-full bg-[#4f46e5] px-7 text-[1rem] font-semibold text-white hover:bg-[#4338ca] dark:shadow-[0_12px_24px_rgba(79,70,229,0.22)]">
+                <Button
+                  className="h-11 rounded-full bg-[#4f46e5] px-7 text-[1rem] font-semibold text-white hover:bg-[#4338ca] dark:shadow-[0_12px_24px_rgba(79,70,229,0.22)]"
+                  onClick={() => handleConnectProvider(provider.onboardingUrl)}
+                >
                   <Link2 className="mr-2 h-4 w-4" />
                   Connect provider
                 </Button>

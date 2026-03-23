@@ -15,20 +15,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-// aa
-const BALANCES = [
-  { name: "United States Dollar", code: "USD", amount: "0.00", flag: "USD" },
-  { name: "Euro", code: "EUR", amount: "45.80", flag: "EUR" },
-  { name: "Hong Kong Dollar", code: "HKD", amount: "314.03", flag: "HKD" },
-  { name: "Pound Sterling", code: "GBP", amount: "0.00", flag: "GBP" },
-  { name: "Japanese Yen", code: "JPY", amount: "0.00", flag: "JPY" },
-  { name: "Canadian Dollar", code: "CAD", amount: "0.00", flag: "CAD" },
-  { name: "Australian Dollar", code: "AUD", amount: "0.00", flag: "AUD" },
-  { name: "New Zealand Dollar", code: "NZD", amount: "0.00", flag: "NZD" },
-  { name: "Renminbi", code: "CNH", amount: "0.00", flag: "CNH" },
-  { name: "Singapore Dollar", code: "SGD", amount: "0.00", flag: "SGD" },
-  { name: "Swiss Franc", code: "CHF", amount: "0.00", flag: "CHF" },
-];
+const BALANCES: Array<{ name: string; code: string; amount: string; flag: string }> = [];
 
 const AccountBalances = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,8 +25,6 @@ const AccountBalances = () => {
       balance.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       balance.code.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
-  const totalBalanceUSD = "92.55";
 
   return (
     <div className="bg-[#f5f5f5] dark:bg-[#161a20]">
@@ -51,8 +36,10 @@ const AccountBalances = () => {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">Total balance</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">USD {totalBalanceUSD}</p>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Approx. 359.83 EUR / 723.96 HKD</p>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white">Waiting for live data</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      Balances will appear here after dynamic data is connected.
+                    </p>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 dark:bg-green-500/10">
                     <Wallet className="h-6 w-6 text-green-600" />
@@ -173,7 +160,10 @@ const AccountBalances = () => {
 
             {filteredBalances.length === 0 && (
               <div className="py-12 text-center">
-                <p className="text-gray-500 dark:text-gray-400">No currencies found</p>
+                <p className="text-gray-700 dark:text-gray-200">No balance data available yet</p>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  This section is ready for dynamic balances once the API is connected.
+                </p>
               </div>
             )}
           </Card>
@@ -182,7 +172,7 @@ const AccountBalances = () => {
             <p>
               Showing {filteredBalances.length} of {BALANCES.length} currencies
             </p>
-            <p>Last updated: Today</p>
+            <p>Last updated: Waiting for sync</p>
           </div>
         </div>
       </div>

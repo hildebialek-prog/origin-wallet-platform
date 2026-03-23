@@ -3,17 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const ACCOUNTS = [
-  { alias: "Multi Currency Account-AUD", location: "Hong Kong", currency: "AUD" },
-  { alias: "Multi Currency Account-CAD", location: "Hong Kong", currency: "CAD" },
-  { alias: "Multi Currency Account-CHF", location: "Hong Kong", currency: "CHF" },
-  { alias: "Multi Currency Account-CNH", location: "Hong Kong", currency: "CNH" },
-  { alias: "Multi Currency Account-EUR", location: "Hong Kong", currency: "EUR" },
-  { alias: "Multi Currency Account-GBP", location: "Hong Kong", currency: "GBP" },
-  { alias: "Multi Currency Account-HKD", location: "Hong Kong", currency: "HKD" },
-  { alias: "Multi Currency Account-JPY", location: "Hong Kong", currency: "JPY" },
-  { alias: "Multi Currency Account-NZD", location: "Hong Kong", currency: "NZD" },
-];
+const ACCOUNTS: Array<{ alias: string; location: string; currency: string }> = [];
 
 const AccountVirtualAccounts = () => {
   const location = useLocation();
@@ -91,6 +81,16 @@ const AccountVirtualAccounts = () => {
                 </button>
               </div>
             ))}
+            {(activeTab === "pending" ? ACCOUNTS.slice(0, 2) : ACCOUNTS).length === 0 && (
+              <div className="px-5 py-14 text-center">
+                <p className="text-[1.05rem] font-medium text-[#202020] dark:text-white">
+                  No virtual account data available yet
+                </p>
+                <p className="mt-2 text-sm text-[#6b6b6b] dark:text-gray-400">
+                  Approved and pending accounts will appear here after dynamic data is connected.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -3,20 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-const TRANSACTIONS = [
-  {
-    date: "10 Mar 2026",
-    id: "#6C7893A6",
-    description: "Payment from NONGKRAN JOMSAWAN",
-    amount: "HKD 177.03",
-  },
-  {
-    date: "09 Mar 2026",
-    id: "#AA71EDB0",
-    description: "Payment from NONGKRAN JOMSAWAN",
-    amount: "HKD 137.00",
-  },
-];
+const TRANSACTIONS: Array<{ date: string; id: string; description: string; amount: string }> = [];
 
 const AccountTransactions = () => {
   return (
@@ -77,6 +64,14 @@ const AccountTransactions = () => {
                 </button>
               </div>
             ))}
+            {TRANSACTIONS.length === 0 && (
+              <div className="px-5 py-14 text-center">
+                <p className="text-[1.05rem] font-medium text-[#202020] dark:text-white">No transaction data available yet</p>
+                <p className="mt-2 text-sm text-[#6b6b6b] dark:text-gray-400">
+                  Transactions will show here after the live data integration is ready.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
