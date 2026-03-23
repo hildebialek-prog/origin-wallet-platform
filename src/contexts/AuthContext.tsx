@@ -408,38 +408,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("No active user session");
     }
 
-    const profilePayload: Record<string, unknown> = {
-      user_type: company?.trim() ? "business" : "individual",
-    };
+    try {
+      const profilePayload: Record<string, unknown> = {
+        user_type: company?.trim() ? "business" : "individual",
+      };
 
-    if (country?.trim()) {
-      profilePayload.country_code = country.trim().slice(0, 2).toUpperCase();
+      if (country?.trim()) {
+        profilePayload.country_code = country.trim().slice(0, 2).toUpperCase();
+      }
+
+      if (company?.trim()) {
+        profilePayload.company_name = company.trim();
+      }
+
+      const payload = await requestApi(endpointConfig.profile, {
+        method: "PUT",
+        token,
+        body: {
+          phone: phone?.trim() || "",
+          full_name: name.trim(),
+          ...(user.providerCode ? { provider_code: user.providerCode } : {}),
+          profile: profilePayload,
+        },
+      });
+
+      const session = extractSession(payload);
+      applySession({
+        user: {
+          ...user,
+          ...session.user,
+          email: session.user.email ?? (email.trim() || user.email),
+        },
+        token: session.token ?? token,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to update profile";
+      setAuthError(message);
+      throw error;
     }
-
-    if (company?.trim()) {
-      profilePayload.company_name = company.trim();
-    }
-
-    const payload = await requestApi(endpointConfig.profile, {
-      method: "PUT",
-      token,
-      body: {
-        phone: phone?.trim() || "",
-        full_name: name.trim(),
-        ...(user.providerCode ? { provider_code: user.providerCode } : {}),
-        profile: profilePayload,
-      },
-    });
-
-    const session = extractSession(payload);
-    applySession({
-      user: {
-        ...user,
-        ...session.user,
-        email: session.user.email ?? (email.trim() || user.email),
-      },
-      token: session.token ?? token,
-    });
   };
 
   const updatePassword = async ({ currentPassword, newPassword }: UpdatePasswordPayload) => {

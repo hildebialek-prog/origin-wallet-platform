@@ -17,6 +17,7 @@ const AccountProfile = () => {
   const [country, setCountry] = useState(user?.country ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -34,6 +35,7 @@ const AccountProfile = () => {
     event.preventDefault();
     setIsSaving(true);
     setSavedMessage("");
+    setErrorMessage("");
 
     try {
       await updateProfile({
@@ -44,6 +46,9 @@ const AccountProfile = () => {
         country,
       });
       setSavedMessage("Profile updated successfully.");
+    } catch (error) {
+      const nextMessage = error instanceof Error ? error.message : "Unable to update profile.";
+      setErrorMessage(nextMessage);
     } finally {
       setIsSaving(false);
     }
@@ -143,7 +148,9 @@ const AccountProfile = () => {
               </div>
 
               <div className="flex items-center justify-between gap-4 border-t border-[#ecece8] pt-6">
-                <p className="text-sm text-[#6c6c68]">{savedMessage || ""}</p>
+                <p className={`text-sm ${errorMessage ? "text-[#dc2626]" : "text-[#6c6c68]"}`}>
+                  {errorMessage || savedMessage || ""}
+                </p>
                 <Button className="rounded-full bg-[#4f46e5] px-6 text-white hover:bg-[#4338ca]" disabled={isSaving}>
                   <Save className="mr-2 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save profile"}
