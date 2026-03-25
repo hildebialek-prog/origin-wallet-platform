@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
@@ -6,11 +6,14 @@ import {
   CircleAlert,
   Clock3,
   ExternalLink,
+  Link2,
   Loader2,
   RefreshCcw,
   SendHorizonal,
+  ShieldAlert,
+  Zap,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -22,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, type OnboardingState, type ProviderCapability } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 
 interface IntegrationProvider {
@@ -35,6 +38,7 @@ interface IntegrationProvider {
 interface ProviderAccount {
   id: number;
   status: string;
+  external_customer_id?: string | null;
   external_account_id?: string | null;
   account_name?: string | null;
 }
@@ -62,6 +66,12 @@ interface ProviderIntegrationItem {
   can_connect: boolean;
   can_request_connect: boolean;
   request_pending: boolean;
+}
+
+interface LinkResponse {
+  message?: string;
+  provider_account?: ProviderAccount | null;
+  onboarding?: OnboardingState | null;
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -117,48 +127,67 @@ const requestApi = async (
   return response.json();
 };
 
-const getProviderSummary = (item: ProviderIntegrationItem, isProfileComplete: boolean) => {
-  if (!isProfileComplete) {
-    return "Complete your profile first before requesting or connecting this provider.";
-  }
-
-  if (item.provider_account) {
-    return `Provider account status: ${item.provider_account.status}.`;
-  }
-
-  if (item.request_pending) {
-    return "Your connection request is pending review.";
-  }
-
-  if (item.can_connect && item.integration_link?.link_url) {
-    return "Your profile is eligible to connect this provider now.";
-  }
-
-  if (item.can_request_connect) {
-    return "A manual provider enablement request can be submitted from this screen.";
-  }
-
-  return "Provider connection is not available yet for this account.";
+const openExternalUrl = (url: string) => {
+  window.open(url, "_blank", "noopener,noreferrer");
 };
 
-const getProviderBadge = (item: ProviderIntegrationItem) => {
-  if (item.provider_account) {
-    return {
-      label: item.provider_account.status,
-      className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-    };
-  }
+const getCapability = (
+  item: ProviderIntegrationItem,
+  providerCapabilities: Map<string, ProviderCapability>,
+) => providerCapabilities.get(item.provider.code);
 
-  if (item.request_pending) {
+const getStatusTone = (status?: string | null) => {
+  const normalizedStatus = String(status ?? "").toLowerCase();
+
+  if (["pending", "submitted", "under_review"].includes(normalizedStatus)) {
     return {
-      label: "Request pending",
+      label: "In review",
       className: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
     };
   }
 
-  if (item.can_connect && item.integration_link?.link_url) {
+  if (normalizedStatus === "active") {
     return {
-      label: "Available now",
+      label: "Connected",
+      className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+    };
+  }
+
+  if (["rejected", "failed"].includes(normalizedStatus)) {
+    return {
+      label: "Needs attention",
+      className: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+    };
+  }
+
+  if (normalizedStatus) {
+    return {
+      label: normalizedStatus.replace(/_/g, " "),
+      className: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200",
+    };
+  }
+
+  return {
+    label: "Not started",
+    className: "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300",
+  };
+};
+
+const getProviderBadge = (item: ProviderIntegrationItem) => {
+  if (item.provider_account) {
+    return getStatusTone(item.provider_account.status);
+  }
+
+  if (item.integration_request?.status?.toLowerCase() === "pending" || item.request_pending) {
+    return {
+      label: "Request sent",
+      className: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+    };
+  }
+
+  if (item.can_connect && item.link_available) {
+    return {
+      label: "Ready to connect",
       className: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
     };
   }
@@ -176,24 +205,74 @@ const getProviderBadge = (item: ProviderIntegrationItem) => {
   };
 };
 
+const getProviderSummary = (
+  item: ProviderIntegrationItem,
+  isProfileComplete: boolean,
+  capability?: ProviderCapability,
+) => {
+  if (!isProfileComplete) {
+    return "Complete your profile first before starting or requesting provider onboarding.";
+  }
+
+  const status = item.provider_account?.status?.toLowerCase();
+  if (status && ["pending", "submitted", "under_review"].includes(status)) {
+    return "Your onboarding is in review. We will unlock live wallet actions after the provider approves the account.";
+  }
+
+  if (status === "active") {
+    return capability?.is_configured === false
+      ? "Connected for onboarding. Live sync, quote, transfer, and webhook features are not enabled yet for this provider."
+      : "This provider is connected and ready for the wallet features supported by its capability flags.";
+  }
+
+  if (status && ["rejected", "failed"].includes(status)) {
+    return "This provider onboarding needs attention. Contact support or retry when a new onboarding link becomes available.";
+  }
+
+  if (item.integration_request?.status?.toLowerCase() === "pending" || item.request_pending) {
+    return "Your request has been sent. You can come back here to check when a connect link becomes available.";
+  }
+
+  if (item.can_connect && item.link_available) {
+    return "This provider is available for onboarding now. Continue to the provider to complete the connection flow.";
+  }
+
+  if (item.can_request_connect) {
+    return "A manual enablement request can be sent from this screen for this provider.";
+  }
+
+  return "This provider is not available for your account yet.";
+};
+
+const getLinkTarget = (
+  onboarding: OnboardingState | null | undefined,
+  item: ProviderIntegrationItem,
+) => onboarding?.redirect_url || item.integration_link?.link_url || null;
+
 const AccountIntegrations = () => {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, onboarding, refreshSession } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [requestProvider, setRequestProvider] = useState<ProviderIntegrationItem | null>(null);
   const [requestNote, setRequestNote] = useState("Please enable this provider for my account.");
+  const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
+  const [handledCompletionKey, setHandledCompletionKey] = useState<string | null>(null);
 
-  const profile = user?.profile as Record<string, unknown> | null | undefined;
-  const requiredProfileFields = [
-    { label: "Full name", value: user?.name },
-    { label: "Email", value: user?.email },
-    { label: "Phone", value: user?.phone },
-    { label: "Profile type", value: profile?.user_type },
-    { label: "Country", value: user?.country ?? profile?.country_code },
-  ];
-  const missingFields = requiredProfileFields
-    .filter(({ value }) => !String(value ?? "").trim())
-    .map(({ label }) => label);
-  const hasRequiredProfileFields = missingFields.length === 0;
+  const isProfileComplete = onboarding?.profile_completed ?? false;
+  const selectedProviderStatus = onboarding?.selected_provider_account_status ?? null;
+
+  const providersQuery = useQuery({
+    queryKey: ["providers-reference"],
+    enabled: !!token,
+    queryFn: async () => {
+      const payload = await requestApi("/providers", {
+        method: "GET",
+        token: token as string,
+      });
+
+      return Array.isArray(payload?.data) ? (payload.data as ProviderCapability[]) : [];
+    },
+  });
 
   const integrationsQuery = useQuery({
     queryKey: ["provider-integrations", user?.id, token],
@@ -208,6 +287,62 @@ const AccountIntegrations = () => {
     },
   });
 
+  const providerCapabilities = useMemo(
+    () => new Map((providersQuery.data ?? []).map((provider) => [provider.code, provider])),
+    [providersQuery.data],
+  );
+
+  const refreshIntegrationState = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["provider-integrations", user?.id, token] }),
+      queryClient.invalidateQueries({ queryKey: ["providers-reference"] }),
+      refreshSession(),
+    ]);
+  };
+
+  const handleAuthError = async (message: string) => {
+    if (message.includes("401") || message.includes("403")) {
+      await logout();
+    }
+  };
+
+  const connectMutation = useMutation({
+    mutationFn: async (item: ProviderIntegrationItem) => {
+      return requestApi(`/user/users/${user?.id}/provider-accounts/${item.provider.code}/link`, {
+        method: "POST",
+        token: token as string,
+        body: {
+          force: false,
+        },
+      }) as Promise<LinkResponse>;
+    },
+    onSuccess: async (payload, item) => {
+      const nextMessage =
+        payload?.onboarding?.message || payload?.message || `${item.provider.name} onboarding started successfully.`;
+      setRuntimeMessage(nextMessage);
+      await refreshIntegrationState();
+
+      const targetUrl = getLinkTarget(payload?.onboarding, item);
+      if (targetUrl) {
+        openExternalUrl(targetUrl);
+      }
+
+      toast({
+        title: item.provider.name,
+        description: nextMessage,
+      });
+    },
+    onError: async (error) => {
+      const message = error instanceof Error ? error.message : "Unable to start provider onboarding.";
+      await handleAuthError(message);
+      toast({
+        variant: "destructive",
+        title: "Connect failed",
+        description: message,
+      });
+    },
+  });
+
   const requestConnectMutation = useMutation({
     mutationFn: async ({ providerCode, note }: { providerCode: string; note: string }) => {
       return requestApi(`/user/users/${user?.id}/provider-accounts/${providerCode}/request-connect`, {
@@ -218,20 +353,18 @@ const AccountIntegrations = () => {
         },
       });
     },
-    onSuccess: (payload) => {
+    onSuccess: async (payload) => {
       toast({
         title: "Request submitted",
         description: payload?.message || "Provider connection request submitted successfully.",
       });
       setRequestProvider(null);
       setRequestNote("Please enable this provider for my account.");
-      void queryClient.invalidateQueries({ queryKey: ["provider-integrations", user?.id, token] });
+      await refreshIntegrationState();
     },
     onError: async (error) => {
       const message = error instanceof Error ? error.message : "Unable to submit request.";
-      if (message.includes("401") || message.includes("403")) {
-        await logout();
-      }
+      await handleAuthError(message);
       toast({
         variant: "destructive",
         title: "Request failed",
@@ -240,35 +373,87 @@ const AccountIntegrations = () => {
     },
   });
 
+  const completionMutation = useMutation({
+    mutationFn: async ({
+      providerCode,
+      status,
+      externalCustomerId,
+      externalAccountId,
+      accountName,
+    }: {
+      providerCode: string;
+      status?: string | null;
+      externalCustomerId?: string | null;
+      externalAccountId?: string | null;
+      accountName?: string | null;
+    }) => {
+      return requestApi(`/user/users/${user?.id}/provider-accounts/${providerCode}/complete`, {
+        method: "POST",
+        token: token as string,
+        body: {
+          ...(status ? { status } : {}),
+          ...(externalCustomerId ? { external_customer_id: externalCustomerId } : {}),
+          ...(externalAccountId ? { external_account_id: externalAccountId } : {}),
+          ...(accountName ? { account_name: accountName } : {}),
+        },
+      });
+    },
+    onSuccess: async (payload) => {
+      toast({
+        title: "Onboarding updated",
+        description: payload?.message || "Provider onboarding completion was processed successfully.",
+      });
+      await refreshIntegrationState();
+    },
+    onError: async (error) => {
+      const message = error instanceof Error ? error.message : "Unable to complete provider onboarding.";
+      await handleAuthError(message);
+      toast({
+        variant: "destructive",
+        title: "Completion failed",
+        description: message,
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!user?.id || !token || completionMutation.isPending) {
+      return;
+    }
+
+    const providerCode = searchParams.get("provider") || searchParams.get("provider_code");
+    const status = searchParams.get("status");
+    const externalCustomerId = searchParams.get("external_customer_id");
+    const externalAccountId = searchParams.get("external_account_id");
+    const accountName = searchParams.get("account_name");
+    const completionKey = [
+      providerCode,
+      status,
+      externalCustomerId,
+      externalAccountId,
+      accountName,
+    ].join("|");
+
+    if (!providerCode || (!status && !externalCustomerId && !externalAccountId && !accountName)) {
+      return;
+    }
+
+    if (handledCompletionKey === completionKey) {
+      return;
+    }
+
+    setHandledCompletionKey(completionKey);
+
+    completionMutation.mutate({
+      providerCode,
+      status,
+      externalCustomerId,
+      externalAccountId,
+      accountName,
+    });
+  }, [completionMutation, handledCompletionKey, searchParams, token, user?.id]);
+
   const providerItems = integrationsQuery.data ?? [];
-  const blockedByProfile = useMemo(() => {
-    const message = integrationsQuery.error instanceof Error ? integrationsQuery.error.message : "";
-    return message.toLowerCase().includes("profile");
-  }, [integrationsQuery.error]);
-  const isProfileComplete = hasRequiredProfileFields && !blockedByProfile;
-
-  const openConnectLink = (item: ProviderIntegrationItem) => {
-    if (!isProfileComplete) {
-      toast({
-        variant: "destructive",
-        title: "Profile incomplete",
-        description: `Please complete your profile before connecting a provider. Missing: ${missingFields.join(", ")}.`,
-      });
-      return;
-    }
-
-    const url = item.integration_link?.link_url;
-    if (!url) {
-      toast({
-        variant: "destructive",
-        title: "Connect link unavailable",
-        description: "This provider is marked as connectable but no link URL was returned.",
-      });
-      return;
-    }
-
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
 
   return (
     <div className="bg-[#f8f8f6] px-7 py-10 dark:bg-[#161a20]">
@@ -277,17 +462,22 @@ const AccountIntegrations = () => {
           <div className="space-y-3">
             <h1 className="text-[3.2rem] font-bold tracking-[-0.04em] text-[#111111] dark:text-white">Integrations</h1>
             <p className="max-w-3xl text-[1.05rem] text-[#6c6c68] dark:text-gray-400">
-              Connect available providers, review connection status, and request enablement when a provider still needs manual activation for your account.
+              Review onboarding-ready providers, start a provider connection, and request access when a manual onboarding
+              link still needs to be assigned to your account.
             </p>
           </div>
 
           <Button
             variant="outline"
-            onClick={() => void integrationsQuery.refetch()}
-            disabled={integrationsQuery.isFetching}
+            onClick={() => void refreshIntegrationState()}
+            disabled={integrationsQuery.isFetching || providersQuery.isFetching}
             className="h-11 rounded-full border-[#d7d7d2] bg-white px-6 text-[1rem] font-semibold text-[#232323] hover:bg-[#f5f5f2] dark:border-white/10 dark:bg-[#1b2027] dark:text-white dark:hover:bg-white/10"
           >
-            {integrationsQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+            {integrationsQuery.isFetching || providersQuery.isFetching ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCcw className="mr-2 h-4 w-4" />
+            )}
             Refresh providers
           </Button>
         </div>
@@ -297,9 +487,9 @@ const AccountIntegrations = () => {
             <div className="flex items-start gap-3">
               <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
               <div className="space-y-1">
-                <p className="font-semibold">Complete your profile before requesting or connecting a provider.</p>
+                <p className="font-semibold">Complete your profile before connecting a provider.</p>
                 <p className="text-sm">
-                  Missing information: {missingFields.join(", ") || "profile completion is still pending on the backend"}. {" "}
+                  {onboarding?.message || "Profile completion is required before provider onboarding can continue."}{" "}
                   <Link to="/account/settings/profile" className="font-semibold underline underline-offset-4">
                     Update profile
                   </Link>
@@ -309,14 +499,35 @@ const AccountIntegrations = () => {
           </div>
         )}
 
-        {isProfileComplete && integrationsQuery.error && (
+        {(runtimeMessage || onboarding?.message) && (
+          <div className="mb-6 rounded-2xl border border-[#d7d7d2] bg-white px-5 py-4 text-[#232323] dark:border-white/10 dark:bg-[#1b2027] dark:text-white">
+            <div className="flex items-start gap-3">
+              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-[#4f46e5] dark:text-[#8b83ff]" />
+              <div className="space-y-1">
+                <p className="font-semibold">Current onboarding status</p>
+                <p className="text-sm text-[#5f5f5a] dark:text-gray-400">{runtimeMessage || onboarding?.message}</p>
+                {selectedProviderStatus && (
+                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#7a7a74] dark:text-gray-500">
+                    Selected provider status: {selectedProviderStatus}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(integrationsQuery.error || providersQuery.error) && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-900">
             <div className="flex items-start gap-3">
               <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="font-semibold">Unable to load integrations</p>
                 <p className="text-sm">
-                  {integrationsQuery.error instanceof Error ? integrationsQuery.error.message : "Something went wrong while loading provider accounts."}
+                  {integrationsQuery.error instanceof Error
+                    ? integrationsQuery.error.message
+                    : providersQuery.error instanceof Error
+                      ? providersQuery.error.message
+                      : "Something went wrong while loading provider data."}
                 </p>
               </div>
             </div>
@@ -325,9 +536,12 @@ const AccountIntegrations = () => {
 
         <div className="space-y-4">
           {providerItems.map((item) => {
+            const capability = getCapability(item, providerCapabilities);
             const badge = getProviderBadge(item);
-            const canOpenConnect = isProfileComplete && item.can_connect && !!item.integration_link?.link_url;
+            const providerStatus = item.provider_account?.status?.toLowerCase();
+            const canOpenConnect = isProfileComplete && item.can_connect && item.link_available;
             const canRequestConnect = isProfileComplete && item.can_request_connect && !item.request_pending;
+            const needsAttention = providerStatus === "rejected" || providerStatus === "failed";
 
             return (
               <Card
@@ -346,29 +560,69 @@ const AccountIntegrations = () => {
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${badge.className}`}>
                           {badge.label}
                         </span>
+                        {capability?.is_available_for_onboarding && (
+                          <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#4338ca] dark:bg-[#4f46e5]/15 dark:text-[#b6b1ff]">
+                            Onboarding enabled
+                          </span>
+                        )}
                       </div>
 
-                      <p className="max-w-3xl text-[1.02rem] leading-7 text-[#6f6f6b] dark:text-gray-400">{getProviderSummary(item, isProfileComplete)}</p>
+                      <p className="max-w-3xl text-[1.02rem] leading-7 text-[#6f6f6b] dark:text-gray-400">
+                        {getProviderSummary(item, isProfileComplete, capability)}
+                      </p>
 
                       <div className="flex flex-wrap gap-3 text-sm text-[#6f6f6b] dark:text-gray-400">
                         <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Code: {item.provider.code}</span>
                         <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Provider status: {item.provider.status}</span>
+                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
+                          {capability?.is_configured === false ? "Manual onboarding only" : "Live API features may be available"}
+                        </span>
                         {item.integration_request?.requested_at && (
                           <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
                             Requested: {new Date(item.integration_request.requested_at).toLocaleDateString()}
                           </span>
                         )}
                       </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {capability?.supports_data_sync && (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-[#f5f5f2] px-3 py-1 text-xs font-medium text-[#4b4b45] dark:bg-white/5 dark:text-gray-300">
+                            <Zap className="h-3.5 w-3.5" />
+                            Sync enabled
+                          </span>
+                        )}
+                        {capability?.supports_quotes && (
+                          <span className="rounded-full bg-[#f5f5f2] px-3 py-1 text-xs font-medium text-[#4b4b45] dark:bg-white/5 dark:text-gray-300">
+                            Quotes enabled
+                          </span>
+                        )}
+                        {capability?.supports_transfers && (
+                          <span className="rounded-full bg-[#f5f5f2] px-3 py-1 text-xs font-medium text-[#4b4b45] dark:bg-white/5 dark:text-gray-300">
+                            Transfers enabled
+                          </span>
+                        )}
+                        {capability?.is_configured === false && (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-medium text-[#c2410c] dark:bg-orange-500/10 dark:text-orange-300">
+                            <ShieldAlert className="h-3.5 w-3.5" />
+                            Live API not configured
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-stretch gap-3 sm:min-w-[220px]">
+                  <div className="flex flex-col items-stretch gap-3 sm:min-w-[240px]">
                     {canOpenConnect && (
                       <Button
                         className="h-11 rounded-full bg-[#4f46e5] px-7 text-[1rem] font-semibold text-white hover:bg-[#4338ca] dark:shadow-[0_12px_24px_rgba(79,70,229,0.22)]"
-                        onClick={() => openConnectLink(item)}
+                        onClick={() => connectMutation.mutate(item)}
+                        disabled={connectMutation.isPending}
                       >
-                        <ExternalLink className="mr-2 h-4 w-4" />
+                        {connectMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                        )}
                         {item.integration_link?.link_label || "Connect provider"}
                       </Button>
                     )}
@@ -376,14 +630,14 @@ const AccountIntegrations = () => {
                     {!canOpenConnect && item.can_request_connect && !item.request_pending && (
                       <Button
                         variant="outline"
-                        disabled={!canRequestConnect}
+                        disabled={!canRequestConnect || requestConnectMutation.isPending}
                         className="h-11 rounded-full border-[#4f46e5] px-7 text-[1rem] font-semibold text-[#4f46e5] hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#8b83ff] dark:text-[#b6b1ff] dark:hover:bg-[#4f46e5]/10"
                         onClick={() => {
                           if (!canRequestConnect) {
                             return;
                           }
                           setRequestProvider(item);
-                          setRequestNote("Please enable this provider for my account.");
+                          setRequestNote(item.integration_request?.note || "Please enable this provider for my account.");
                         }}
                       >
                         <SendHorizonal className="mr-2 h-4 w-4" />
@@ -391,7 +645,7 @@ const AccountIntegrations = () => {
                       </Button>
                     )}
 
-                    {!isProfileComplete && item.can_request_connect && !item.request_pending && (
+                    {!isProfileComplete && (item.can_connect || item.can_request_connect) && (
                       <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-400">
                         Complete profile to enable this action.
                       </p>
@@ -404,10 +658,25 @@ const AccountIntegrations = () => {
                       </Button>
                     )}
 
-                    {!canOpenConnect && !item.can_request_connect && !item.request_pending && item.provider_account && (
+                    {!canOpenConnect && item.provider_account?.status?.toLowerCase() === "active" && (
                       <div className="inline-flex items-center justify-center gap-2 rounded-full bg-[#ecfdf3] px-4 py-3 text-sm font-semibold text-[#15803d] dark:bg-green-500/10 dark:text-green-400">
                         <BadgeCheck className="h-4 w-4" />
-                        Linked: {item.provider_account.status}
+                        Connected
+                      </div>
+                    )}
+
+                    {needsAttention && (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                        Onboarding needs attention. Contact support or retry when a fresh connect link is available.
+                      </div>
+                    )}
+
+                    {!canOpenConnect && !item.request_pending && !item.provider_account && !item.can_request_connect && (
+                      <div className="rounded-2xl border border-dashed border-[#d7d7d2] px-4 py-3 text-sm text-[#6f6f6b] dark:border-white/10 dark:text-gray-400">
+                        <div className="inline-flex items-center gap-2">
+                          <Link2 className="h-4 w-4" />
+                          No connect link available yet.
+                        </div>
                       </div>
                     )}
                   </div>
@@ -416,7 +685,7 @@ const AccountIntegrations = () => {
             );
           })}
 
-          {integrationsQuery.isLoading && (
+          {(integrationsQuery.isLoading || providersQuery.isLoading) && (
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center gap-3 p-6 text-[#6f6f6b] dark:text-gray-400">
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -428,7 +697,7 @@ const AccountIntegrations = () => {
           {!integrationsQuery.isLoading && !integrationsQuery.error && providerItems.length === 0 && (
             <Card className="rounded-2xl border border-dashed border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="p-6 text-[#6f6f6b] dark:text-gray-400">
-                No active providers were returned for this account yet.
+                No onboarding-capable providers were returned for this account yet.
               </CardContent>
             </Card>
           )}

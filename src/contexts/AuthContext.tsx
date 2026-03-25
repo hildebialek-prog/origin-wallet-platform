@@ -33,6 +33,33 @@ export interface AuthUser {
   profile?: Record<string, unknown> | null;
 }
 
+export interface ProviderCapability {
+  id: number;
+  code: string;
+  name: string;
+  status: string;
+  is_available_for_onboarding?: boolean;
+  supports_beneficiaries?: boolean;
+  supports_data_sync?: boolean;
+  supports_quotes?: boolean;
+  supports_transfers?: boolean;
+  supports_webhooks?: boolean;
+  is_configured?: boolean;
+}
+
+export interface OnboardingState {
+  profile_completed: boolean;
+  selected_provider_code: string | null;
+  selected_provider_account_status: string | null;
+  provider_account_statuses: Record<string, unknown>;
+  next_action: string | null;
+  message: string | null;
+  redirect_url?: string | null;
+  status?: string | null;
+  action_type?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
 interface RegisterPayload {
   email: string;
   phone: string;
@@ -70,6 +97,8 @@ interface ResetPasswordPayload {
 interface StoredSession {
   user: AuthUser;
   token?: string | null;
+  onboarding?: OnboardingState | null;
+  providers?: ProviderCapability[];
 }
 
 interface AuthContextType {
@@ -77,7 +106,10 @@ interface AuthContextType {
   loading: boolean;
   authError: string | null;
   token: string | null;
+  onboarding: OnboardingState | null;
+  providers: ProviderCapability[];
   clearAuthError: () => void;
+  refreshSession: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthChallenge>;
   verifyLogin: (email: string, verificationCode: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<AuthChallenge>;
@@ -137,6 +169,31 @@ const extractChallenge = (payload: any): AuthChallenge => ({
   expiresInMinutes: payload?.expires_in_minutes ?? payload?.expiresInMinutes ?? null,
 });
 
+const extractOnboarding = (source: any): OnboardingState | null => {
+  const onboarding = source?.onboarding;
+  if (!onboarding) {
+    return null;
+  }
+
+  return {
+    profile_completed: Boolean(onboarding?.profile_completed),
+    selected_provider_code: onboarding?.selected_provider_code ?? null,
+    selected_provider_account_status: onboarding?.selected_provider_account_status ?? null,
+    provider_account_statuses: onboarding?.provider_account_statuses ?? {},
+    next_action: onboarding?.next_action ?? null,
+    message: onboarding?.message ?? null,
+    redirect_url: onboarding?.redirect_url ?? null,
+    status: onboarding?.status ?? null,
+    action_type: onboarding?.action_type ?? null,
+    metadata: onboarding?.metadata ?? null,
+  };
+};
+
+const extractProviders = (source: any): ProviderCapability[] => {
+  const providers = source?.providers;
+  return Array.isArray(providers) ? (providers as ProviderCapability[]) : [];
+};
+
 const extractSession = (payload: any): StoredSession => {
   const body = payload?.data ?? payload;
   const userSource = body?.user ?? body?.profile ?? body;
@@ -149,7 +206,12 @@ const extractSession = (payload: any): StoredSession => {
     throw new Error("Auth API response is missing user data");
   }
 
-  return { user, token };
+  return {
+    user,
+    token,
+    onboarding: extractOnboarding(body),
+    providers: extractProviders(body),
+  };
 };
 
 const saveSession = (session: StoredSession) => {
@@ -292,6 +354,8 @@ const requestApi = async (
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
+  const [providers, setProviders] = useState<ProviderCapability[]>([]);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -299,12 +363,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     saveSession(session);
     setUser(session.user);
     setToken(session.token ?? null);
+    setOnboarding(session.onboarding ?? null);
+    setProviders(session.providers ?? []);
     setAuthError(null);
   };
 
   const clearAuthError = useCallback(() => {
     setAuthError(null);
   }, []);
+
+  const refreshSession = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    const payload = await requestApi(endpointConfig.me, { method: "GET", token });
+    const refreshed = extractSession(payload);
+    applySession({
+      user: refreshed.user,
+      token: refreshed.token ?? token,
+      onboarding: refreshed.onboarding,
+      providers: refreshed.providers,
+    });
+  }, [token]);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -326,6 +407,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           applySession({
             user: refreshed.user,
             token: refreshed.token ?? parsed.token,
+            onboarding: refreshed.onboarding ?? parsed.onboarding ?? null,
+            providers: refreshed.providers?.length ? refreshed.providers : parsed.providers ?? [],
           });
         } catch {
           applySession(parsed);
@@ -445,6 +528,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: session.user.email ?? (email.trim() || user.email),
         },
         token: session.token ?? token,
+        onboarding: session.onboarding,
+        providers: session.providers?.length ? session.providers : providers,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update profile";
@@ -533,6 +618,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     clearSession();
     setUser(null);
     setToken(null);
+    setOnboarding(null);
+    setProviders([]);
     setAuthError(null);
 
     if (!currentToken || !apiBaseUrl) {
@@ -553,7 +640,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         authError,
         token,
+        onboarding,
+        providers,
         clearAuthError,
+        refreshSession,
         login,
         verifyLogin,
         register,
