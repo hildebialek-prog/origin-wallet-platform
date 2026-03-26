@@ -72,7 +72,7 @@ const Security = () => {
               { label: "System status", value: "Operational", color: "text-accent" },
               { label: "Encryption", value: "AES-256 / TLS 1.3", color: "text-accent" },
               { label: "Last security audit", value: "Q4 2025", color: "text-foreground" },
-              { label: "Uptime (30 days)", value: "99.97%", color: "text-accent" },
+              { label: "Monitoring", value: "Continuous", color: "text-accent" },
             ].map((item) => (
               <div key={item.label} className="bg-card rounded-2xl border border-border p-6 text-center">
                 <div className="text-sm text-muted-foreground mb-2">{item.label}</div>

@@ -2,11 +2,19 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Globe, Wallet, Building2, Send, Shield,
-  CreditCard, TrendingUp, Users, Star, ChevronDown, Play
+  ArrowRight,
+  Globe,
+  Wallet,
+  Building2,
+  Send,
+  Shield,
+  CreditCard,
+  TrendingUp,
+  Users,
+  ChevronDown,
+  Play,
 } from "lucide-react";
 
-// High-quality magazine-style images
 const heroBg = "/content/banner.jpg";
 const featureImg1 = "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=800&fit=crop";
 const featureImg2 = "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop";
@@ -20,45 +28,56 @@ const fadeUp = {
   transition: { duration: 0.7 },
 };
 
+const useCases = [
+  {
+    quote: "A simpler flow for freelancers and independent professionals receiving or sending money internationally.",
+    name: "Freelancers",
+    role: "Cross-border income and payouts",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
+  },
+  {
+    quote: "Operational tooling for businesses paying suppliers, contractors, and distributed teams across borders.",
+    name: "Growing Businesses",
+    role: "Supplier payments and treasury workflows",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+  },
+  {
+    quote: "A multi-currency experience for people and teams working across markets, currencies, and banking systems.",
+    name: "Global Teams",
+    role: "International operations",
+    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
+  },
+];
+
 const Index = () => {
   return (
     <div>
-      {/* ===== HERO MAGAZINE STYLE ===== */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Background Image */}
-        <div 
+        <div
           className="absolute inset-0 z-0"
-          style={{ 
-            backgroundImage: `url(${heroBg})`, 
-            backgroundSize: "cover", 
+          style={{
+            backgroundImage: `url(${heroBg})`,
+            backgroundSize: "cover",
             backgroundPosition: "center",
-          }} 
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/30 z-10" />
-        
-        {/* Magazine Date */}
-        <div className="absolute top-24 left-6 sm:left-12 z-20">
-          <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 text-white">
-            <div className="text-xs uppercase tracking-widest opacity-70">Published</div>
-            <div className="text-lg font-bold">March 2026</div>
-          </div>
-        </div>
 
         <div className="relative z-20 container-wide mx-auto px-4 sm:px-6 lg:px-8 py-32">
           <div className="max-w-4xl">
             <motion.div {...fadeUp}>
               <span className="inline-block px-4 py-1.5 bg-accent text-white text-sm font-semibold rounded-full mb-6">
-                Cover Story
+                Cross-Border Finance
               </span>
               <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.95] mb-8">
-                THE FUTURE
+                GLOBAL
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-yellow-400">
-                  OF MONEY
+                  MONEY MOVEMENT
                 </span>
               </h1>
               <p className="text-xl sm:text-2xl text-white/80 max-w-2xl leading-relaxed mb-10">
-                Discover how digital wallets and borderless payments are reshaping global finance in 2026 and beyond.
+                Modern tools for multi-currency wallets, international payments, and business operations across borders.
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link to="/contact">
@@ -68,17 +87,16 @@ const Index = () => {
                 </Link>
                 <Link to="/about">
                   <Button variant="hero-outline" size="lg" className="text-base px-8">
-                    Read Article
+                    Explore Platform
                   </Button>
                 </Link>
               </div>
             </motion.div>
           </div>
 
-          {/* Scroll Indicator */}
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ delay: 1 }}
             className="absolute bottom-8 left-1/2 -translate-x-1/2"
           >
@@ -90,60 +108,45 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ===== MAGAZINE FEATURE STORY ===== */}
       <section className="section-padding bg-surface-subtle">
         <div className="container-wide mx-auto">
           <motion.div {...fadeUp} className="grid lg:grid-cols-12 gap-6 items-start">
-            {/* Large Feature Image */}
             <div className="lg:col-span-7 relative group overflow-hidden rounded-2xl aspect-[16/10]">
-              <img 
-                src={featureImg1} 
-                alt="Global Finance" 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
+              <img src={featureImg1} alt="Global finance operations" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-8">
                 <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-xs font-semibold rounded mb-3">
-                  In-Depth
+                  Platform Overview
                 </span>
                 <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                  Breaking Down Borders: The New Era of International Payments
+                  Cross-border payments with clearer pricing and simpler operations
                 </h3>
                 <p className="text-white/80 max-w-lg">
-                  Traditional banking is fading. Discover how fintech is making money moves instant, transparent, and accessible to everyone.
+                  A practical platform experience for international transfers, wallets, and global business payments.
                 </p>
               </div>
             </div>
 
-            {/* Side Stories */}
             <div className="lg:col-span-5 space-y-4">
               <motion.div {...fadeUp} className="relative group overflow-hidden rounded-xl aspect-[16/9]">
-                <img 
-                  src={featureImg2} 
-                  alt="Business" 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+                <img src={featureImg2} alt="Business finance workflows" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-5">
                   <span className="inline-block px-2 py-1 bg-accent text-white text-xs font-semibold rounded mb-2">
                     Business
                   </span>
-                  <h4 className="text-lg font-bold text-white">Managing Multi-Currency in the Modern Age</h4>
+                  <h4 className="text-lg font-bold text-white">Operate across currencies with more visibility and control</h4>
                 </div>
               </motion.div>
 
               <motion.div {...fadeUp} className="relative group overflow-hidden rounded-xl aspect-[16/9]">
-                <img 
-                  src={featureImg3} 
-                  alt="Personal" 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+                <img src={featureImg3} alt="Personal finance use cases" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-5">
                   <span className="inline-block px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded mb-2">
                     Personal
                   </span>
-                  <h4 className="text-lg font-bold text-white">Your Guide to Smart International Transfers</h4>
+                  <h4 className="text-lg font-bold text-white">Move money internationally with a simpler user experience</h4>
                 </div>
               </motion.div>
             </div>
@@ -151,17 +154,16 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ===== STATS MAGAZINE STRIP ===== */}
       <section className="bg-primary text-primary-foreground py-12 md:py-16">
         <div className="container-wide mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: "170+", label: "Countries", icon: Globe },
-              { value: "50+", label: "Currencies", icon: Wallet },
-              { value: "4.9★", label: "Rating", icon: Star },
-              { value: "99.9%", label: "Uptime", icon: Shield },
+              { value: "Global", label: "Reach", icon: Globe },
+              { value: "Multi", label: "Currency", icon: Wallet },
+              { value: "Secure", label: "Platform", icon: Shield },
+              { value: "Business", label: "& Personal", icon: Users },
             ].map((stat, i) => (
-              <motion.div 
+              <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -180,59 +182,26 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ===== SERVICES MAGAZINE LAYOUT ===== */}
       <section className="section-padding bg-background">
         <div className="container-wide mx-auto">
-          {/* Section Header */}
           <motion.div {...fadeUp} className="mb-12">
             <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/10 text-accent rounded-full mb-4">
               What We Offer
             </span>
             <h2 className="text-4xl md:text-5xl font-black mb-4">Our Services</h2>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              Comprehensive financial solutions for the modern world
+              Cross-border finance tooling for modern individuals and businesses.
             </p>
           </motion.div>
 
-          {/* Services Grid - Magazine Style */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              {
-                icon: Send,
-                title: "International Transfers",
-                desc: "Send money globally with real exchange rates and minimal fees",
-                color: "bg-blue-500",
-              },
-              {
-                icon: Wallet,
-                title: "Multi-Currency Wallet",
-                desc: "Hold and manage 50+ currencies in one secure wallet",
-                color: "bg-green-500",
-              },
-              {
-                icon: Building2,
-                title: "Business Payments",
-                desc: "Streamline supplier payments and contractor payouts worldwide",
-                color: "bg-purple-500",
-              },
-              {
-                icon: CreditCard,
-                title: "Virtual Cards",
-                desc: "Create virtual cards for online transactions in any currency",
-                color: "bg-orange-500",
-              },
-              {
-                icon: TrendingUp,
-                title: "Rate Alerts",
-                desc: "Get notified when rates hit your target for better conversions",
-                color: "bg-pink-500",
-              },
-              {
-                icon: Shield,
-                title: "Bank-Grade Security",
-                desc: "256-bit encryption and advanced fraud protection",
-                color: "bg-indigo-500",
-              },
+              { icon: Send, title: "International Transfers", desc: "Move money across borders with clearer pricing and a guided transfer flow.", color: "bg-blue-500" },
+              { icon: Wallet, title: "Multi-Currency Wallet", desc: "Hold and manage multiple currencies in one secure wallet experience.", color: "bg-green-500" },
+              { icon: Building2, title: "Business Payments", desc: "Support supplier payments, treasury workflows, and distributed business operations.", color: "bg-purple-500" },
+              { icon: CreditCard, title: "Virtual Cards", desc: "Support digital spending workflows with clearer visibility and controls.", color: "bg-orange-500" },
+              { icon: TrendingUp, title: "FX Tools", desc: "Review rates and conversion details before confirming international transfers.", color: "bg-pink-500" },
+              { icon: Shield, title: "Security", desc: "Access controls, monitoring, and operational safeguards designed for fintech workflows.", color: "bg-indigo-500" },
             ].map((service, i) => (
               <motion.div
                 key={service.title}
@@ -256,23 +225,18 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ===== FULL WIDTH IMAGE BREAK ===== */}
       <section className="relative py-24 md:py-32 overflow-hidden">
         <div className="absolute inset-0">
-          <img 
-            src={ctaBg} 
-            alt="Background" 
-            className="w-full h-full object-cover"
-          />
+          <img src={ctaBg} alt="Global business background" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-primary/90" />
         </div>
         <div className="relative z-10 container-wide mx-auto px-4 text-center">
           <motion.div {...fadeUp}>
             <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
-              "Money Without Borders"
+              Build simpler global payment experiences
             </h2>
             <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
-              Our mission is to make international finance accessible, transparent, and fair for everyone, everywhere.
+              Origin Wallet is focused on clearer cross-border finance for individuals and businesses operating across currencies.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">
@@ -288,37 +252,17 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ===== TESTIMONIALS MAGAZINE ===== */}
       <section className="section-padding bg-surface-subtle">
         <div className="container-wide mx-auto">
           <motion.div {...fadeUp} className="text-center mb-12">
             <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/10 text-accent rounded-full mb-4">
-              Voices
+              Use Cases
             </span>
-            <h2 className="text-4xl md:text-5xl font-black">What People Say</h2>
+            <h2 className="text-4xl md:text-5xl font-black">Who It Is For</h2>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                quote: "Origin Wallet changed how I manage my freelance income from international clients.",
-                name: "Sarah Mitchell",
-                role: "Freelance Designer",
-                avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-              },
-              {
-                quote: "We've saved thousands in transfer fees since switching to Origin Wallet for supplier payments.",
-                name: "David Chen",
-                role: "CFO, Tech Startup",
-                avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-              },
-              {
-                quote: "The multi-currency wallet is perfect for my digital nomad lifestyle.",
-                name: "Minh Tran",
-                role: "Digital Nomad",
-                avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
-              },
-            ].map((testimonial, i) => (
+            {useCases.map((item, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 30 }}
@@ -329,17 +273,13 @@ const Index = () => {
               >
                 <div className="text-accent text-6xl font-serif absolute top-4 left-6 opacity-20">"</div>
                 <p className="text-foreground relative z-10 mb-6 leading-relaxed italic">
-                  {testimonial.quote}
+                  {item.quote}
                 </p>
                 <div className="flex items-center gap-3">
-                  <img 
-                    src={testimonial.avatar} 
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
+                  <img src={item.avatar} alt={item.name} className="w-12 h-12 rounded-full object-cover" />
                   <div>
-                    <div className="font-bold">{testimonial.name}</div>
-                    <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                    <div className="font-bold">{item.name}</div>
+                    <div className="text-sm text-muted-foreground">{item.role}</div>
                   </div>
                 </div>
               </motion.div>
@@ -348,7 +288,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ===== CTA MAGAZINE STYLE ===== */}
       <section className="section-padding bg-background">
         <div className="container-narrow mx-auto">
           <motion.div {...fadeUp} className="text-center">
@@ -359,12 +298,12 @@ const Index = () => {
               Ready to Go Global?
             </h2>
             <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-              Join thousands of users who trust Origin Wallet for their international money transfers.
+              Explore a more transparent way to manage international transfers and multi-currency operations.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">
                 <Button variant="hero" size="lg" className="text-base px-10">
-                  Create Free Account <ArrowRight className="w-4 h-4 ml-2" />
+                  Contact Our Team <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
               <Link to="/pricing">

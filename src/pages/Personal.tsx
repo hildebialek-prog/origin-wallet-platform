@@ -1,197 +1,146 @@
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Send, Wallet, ArrowRight, CheckCircle2, Globe, CreditCard, ChevronRight, ArrowDownToLine } from "lucide-react";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 30 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.5 },
-};
-
-const modules = [
-  {
-    id: "send",
-    icon: Send,
-    title: "Send money internationally",
-    desc: "Transfer money to 170+ countries with the real exchange rate and low, transparent fees. No hidden markups.",
-    benefits: [
-      "Real mid-market exchange rate",
-      "Low, upfront fees from 0.4%",
-      "1–2 business day delivery on most routes",
-      "Track your transfer in real time",
-    ],
-    steps: [
-      "Enter the amount and choose your currencies",
-      "Review the transparent fee breakdown",
-      "Fund your transfer by bank or card",
-      "Recipient gets the money in their account",
-    ],
-  },
-  {
-    id: "wallet",
-    icon: Wallet,
-    title: "Multi-currency wallet",
-    desc: "Hold, convert, and manage money in 50+ currencies. Convert between currencies at the real rate whenever you need to.",
-    benefits: [
-      "Hold 50+ currencies in one place",
-      "Convert at the mid-market rate",
-      "Receive money like a local in multiple currencies",
-      "No monthly fees on your wallet",
-    ],
-    steps: [
-      "Open your multi-currency wallet",
-      "Add money in any supported currency",
-      "Convert between currencies instantly",
-      "Spend or send from your balances",
-    ],
-  },
-  {
-    id: "receive",
-    icon: ArrowDownToLine,
-    title: "Receive money",
-    desc: "Get local account details so people and businesses can pay you as if you were a local — even when you're not.",
-    benefits: [
-      "Local account details in multiple currencies",
-      "Receive payments without conversion fees",
-      "Ideal for freelancers and remote workers",
-      "Funds land directly in your wallet",
-    ],
-    steps: [
-      "Get your local account details",
-      "Share them with whoever is paying you",
-      "Receive money directly into your wallet",
-      "Convert or hold in any currency",
-    ],
-  },
-  {
-    id: "spend",
-    icon: CreditCard,
-    title: "Spend globally",
-    desc: "Use your wallet balance to spend in any currency. Always get the real exchange rate — no conversion surprises.",
-    benefits: [
-      "Spend in any currency from your wallet",
-      "Real exchange rate at point of sale",
-      "No foreign transaction fees",
-      "Works online and in-store worldwide",
-    ],
-    steps: [
-      "Load your wallet with any currency",
-      "Spend directly from your balance",
-      "Automatic conversion at the real rate",
-      "Track all spending in your dashboard",
-    ],
-  },
-];
+import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { fadeUp, personalFeatures } from "@/pages/personal/personal-content";
 
 const Personal = () => {
   return (
     <div>
-      {/* Hero */}
       <section className="bg-hero text-primary-foreground section-padding">
-        <div className="container-wide mx-auto text-center">
-          <motion.div {...fadeUp}>
-            <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/20 text-accent rounded-full mb-4">
+        <div className="container-wide mx-auto">
+          <motion.div {...fadeUp} className="mx-auto max-w-4xl text-center">
+            <span className="mb-4 inline-block rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
               Personal
             </span>
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">
-              Your money, no borders
+            <h1 className="mb-5 text-4xl font-extrabold sm:text-5xl lg:text-6xl">
+              Personal money movement, shaped for cross-border life
             </h1>
-            <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto mb-8">
-              Send, receive, hold, and spend money in 50+ currencies — all with the real exchange rate and transparent fees.
+            <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-primary-foreground/72">
+              Explore the personal side of Origin Wallet across sending, wallet management,
+              and receiving flows. Each experience is designed to feel clearer, calmer, and
+              easier to navigate.
             </p>
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/contact">
-                <Button variant="hero" size="lg">Get started <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                <Button variant="hero" size="lg" className="w-full sm:w-auto">
+                  Get started
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
               </Link>
               <Link to="/pricing">
-                <Button variant="hero-outline" size="lg">See pricing</Button>
+                <Button variant="hero-outline" size="lg" className="w-full sm:w-auto">
+                  Compare pricing
+                </Button>
               </Link>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Modules */}
-      {modules.map((mod, idx) => (
-        <section key={mod.id} className={`section-padding ${idx % 2 === 0 ? "bg-background" : "bg-surface-subtle"}`}>
-          <div className="container-wide mx-auto">
-            <motion.div {...fadeUp} className="grid lg:grid-cols-2 gap-12 items-start">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-6">
-                  <mod.icon className="w-7 h-7 text-accent" />
-                </div>
-                <h2 className="text-3xl font-extrabold mb-4">{mod.title}</h2>
-                <p className="text-muted-foreground text-lg mb-6 leading-relaxed">{mod.desc}</p>
-
-                <h4 className="font-bold mb-3">Benefits</h4>
-                <ul className="space-y-2 mb-8">
-                  {mod.benefits.map((b) => (
-                    <li key={b} className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="flex gap-3">
-                  <Link to="/pricing"><Button variant="outline" size="sm">View fees</Button></Link>
-                  <Link to="/contact"><Button variant="hero" size="sm">Get started</Button></Link>
-                </div>
-              </div>
-
-              <div className="bg-card rounded-2xl border border-border p-8">
-                <h4 className="font-bold mb-4">How it works</h4>
-                <div className="space-y-4">
-                  {mod.steps.map((step, i) => (
-                    <div key={i} className="flex gap-4">
-                      <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 text-sm font-bold text-accent">
-                        {i + 1}
-                      </div>
-                      <p className="text-muted-foreground pt-1">{step}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      ))}
-
-      {/* FAQ */}
       <section className="section-padding bg-background">
-        <div className="container-tight mx-auto">
-          <h2 className="text-2xl font-extrabold mb-8 text-center">Common questions</h2>
-          <div className="space-y-3 max-w-2xl mx-auto">
-            {[
-              { q: "Is there a minimum transfer amount?", a: "The minimum depends on the currency pair. In most cases, you can send as little as $10 USD equivalent." },
-              { q: "How are exchange rates determined?", a: "We use the mid-market rate — the real exchange rate without any markup. This is the same rate you see on independent sources like Reuters." },
-              { q: "Can I cancel a transfer?", a: "You can cancel a transfer before it has been processed. Once conversion begins, cancellation may not be possible." },
-              { q: "What currencies can I hold?", a: "You can hold 50+ currencies in your multi-currency wallet. New currencies are added regularly." },
-            ].map((faq, i) => (
-              <details key={i} className="bg-card rounded-xl border border-border group">
-                <summary className="px-6 py-4 cursor-pointer font-medium flex items-center justify-between list-none">
-                  {faq.q}
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" />
-                </summary>
-                <div className="px-6 pb-4 text-muted-foreground text-sm leading-relaxed">{faq.a}</div>
-              </details>
-            ))}
+        <div className="container-wide mx-auto">
+          <motion.div
+            {...fadeUp}
+            className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+          >
+            <div className="max-w-2xl">
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-accent">
+                Explore Personal
+              </p>
+              <h2 className="text-3xl font-extrabold text-foreground sm:text-4xl">
+                Three focused journeys instead of one crowded page
+              </h2>
+            </div>
+            <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
+              Choose the flow that matches how you use money across borders, then go deeper
+              into the details, benefits, and common questions for that experience.
+            </p>
+          </motion.div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {personalFeatures.map((feature) => {
+              const Icon = feature.icon;
+
+              return (
+                <motion.article
+                  key={feature.id}
+                  {...fadeUp}
+                  className="group rounded-[28px] border border-border bg-card p-7 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_80px_-42px_rgba(15,23,42,0.75)]"
+                >
+                  <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10">
+                    <Icon className="h-7 w-7 text-accent" />
+                  </div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-accent/80">
+                    {feature.navLabel}
+                  </p>
+                  <h3 className="mb-3 text-2xl font-extrabold text-foreground">
+                    {feature.title}
+                  </h3>
+                  <p className="mb-6 text-base leading-relaxed text-muted-foreground">
+                    {feature.sectionDescription}
+                  </p>
+
+                  <div className="mb-7 space-y-3">
+                    {feature.benefits.slice(0, 3).map((benefit) => (
+                      <div key={benefit} className="flex items-start gap-3 text-sm text-foreground/85">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                        <span>{benefit}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Link
+                    to={`/personal/${feature.id}`}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-accent"
+                  >
+                    View this flow
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+                  </Link>
+                </motion.article>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="section-padding bg-hero text-primary-foreground text-center">
-        <div className="container-tight mx-auto">
-          <h2 className="text-3xl font-extrabold mb-4">Start moving money globally</h2>
-          <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto">
-            Join thousands using Origin Wallet for transparent international transfers.
-          </p>
-          <Link to="/contact">
-            <Button variant="hero" size="lg">Get started <ArrowRight className="w-4 h-4 ml-1" /></Button>
-          </Link>
+      <section className="section-padding bg-surface-subtle">
+        <div className="container-wide mx-auto grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <motion.div {...fadeUp}>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-accent">
+              Designed For Clarity
+            </p>
+            <h2 className="mb-4 text-3xl font-extrabold text-foreground sm:text-4xl">
+              A calmer way to present international personal finance
+            </h2>
+            <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              Instead of stacking every feature into one long marketing page, the personal
+              area now separates the experience into dedicated journeys for sending, holding,
+              and receiving money.
+            </p>
+          </motion.div>
+
+          <motion.div
+            {...fadeUp}
+            className="rounded-[28px] border border-border bg-background p-8 shadow-[0_20px_60px_-44px_rgba(15,23,42,0.6)]"
+          >
+            <h3 className="mb-5 text-xl font-extrabold text-foreground">What you can explore</h3>
+            <div className="space-y-4">
+              {personalFeatures.map((feature, index) => (
+                <div key={feature.id} className="flex gap-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">{feature.navLabel}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {feature.navDescription}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </section>
     </div>

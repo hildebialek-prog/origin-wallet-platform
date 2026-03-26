@@ -6,9 +6,10 @@ type Variant = "desktop" | "mobile";
 
 interface LanguageSelectorProps {
   variant?: Variant;
+  compact?: boolean;
 }
 
-const LanguageSelector = ({ variant = "desktop" }: LanguageSelectorProps) => {
+const LanguageSelector = ({ variant = "desktop", compact = false }: LanguageSelectorProps) => {
   const { currentLanguage, setLanguage, isTranslating } = useLanguage();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -39,9 +40,15 @@ const LanguageSelector = ({ variant = "desktop" }: LanguageSelectorProps) => {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm border bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
+        className={`inline-flex items-center justify-between gap-2 rounded-xl border bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
           isTranslating ? "opacity-70 cursor-wait" : ""
-        } ${isMobile ? "w-full shadow-sm" : ""}`}
+        } ${
+          isMobile
+            ? "w-full px-4 py-3 shadow-sm"
+            : compact
+              ? "min-w-[120px] px-3 py-2.5"
+              : "px-4 py-3"
+        }`}
       >
         <div className="flex items-center gap-3">
           {isTranslating ? (
@@ -49,12 +56,16 @@ const LanguageSelector = ({ variant = "desktop" }: LanguageSelectorProps) => {
           ) : (
             <span className="text-2xl">{current.flag}</span>
           )}
-          <div className="flex flex-col items-start">
-            <span className="font-semibold text-foreground">{current.name}</span>
-            <span className="text-xs text-muted-foreground">{current.nativeName}</span>
-          </div>
+          {compact && !isMobile ? (
+            <span className="font-semibold text-foreground">{current.code.toUpperCase()}</span>
+          ) : (
+            <div className="flex flex-col items-start">
+              <span className="font-semibold text-foreground">{current.name}</span>
+              <span className="text-xs text-muted-foreground">{current.nativeName}</span>
+            </div>
+          )}
         </div>
-        <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (

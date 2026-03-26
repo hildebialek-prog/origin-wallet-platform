@@ -9,7 +9,14 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Layout from "@/components/layout/Layout";
 import Index from "./pages/Index";
 import Personal from "./pages/Personal";
+import PersonalReceive from "./pages/personal/PersonalReceive";
+import PersonalSend from "./pages/personal/PersonalSend";
+import PersonalWallet from "./pages/personal/PersonalWallet";
 import Business from "./pages/Business";
+import BusinessApi from "./pages/business/BusinessApi";
+import BusinessBatchPayments from "./pages/business/BusinessBatchPayments";
+import BusinessReceive from "./pages/business/BusinessReceive";
+import BusinessSuppliers from "./pages/business/BusinessSuppliers";
 import Pricing from "./pages/Pricing";
 import Security from "./pages/Security";
 import Help from "./pages/Help";
@@ -49,7 +56,14 @@ const App = () => (
                 <Route element={<Layout />}>
                   <Route path="/" element={<Index />} />
                   <Route path="/personal" element={<Personal />} />
+                  <Route path="/personal/send" element={<PersonalSend />} />
+                  <Route path="/personal/wallet" element={<PersonalWallet />} />
+                  <Route path="/personal/receive" element={<PersonalReceive />} />
                   <Route path="/business" element={<Business />} />
+                  <Route path="/business/suppliers" element={<BusinessSuppliers />} />
+                  <Route path="/business/receive" element={<BusinessReceive />} />
+                  <Route path="/business/batch-payments" element={<BusinessBatchPayments />} />
+                  <Route path="/business/api" element={<BusinessApi />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/security" element={<Security />} />
                   <Route path="/help" element={<Help />} />

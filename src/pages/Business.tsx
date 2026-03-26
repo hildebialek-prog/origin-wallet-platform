@@ -1,149 +1,146 @@
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Building2, Send, Users, Code, Shield, ArrowRight, CheckCircle2, ChevronRight, BarChart3 } from "lucide-react";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 30 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.5 },
-};
-
-const modules = [
-  {
-    icon: Send,
-    title: "Pay suppliers globally",
-    desc: "Send payments to suppliers and contractors in 170+ countries. Transparent fees, real exchange rates, no surprises.",
-    useCases: ["Manufacturing payments", "Freelancer invoices", "Service provider settlements", "Recurring vendor payments"],
-    benefits: ["Save up to 6x vs traditional banks", "Pay in recipient's local currency", "Track all payments centrally", "Set up recurring payments"],
-    steps: ["Enter supplier details and amount", "Review transparent fee breakdown", "Confirm and send payment", "Supplier receives funds in 1–2 days"],
-  },
-  {
-    icon: BarChart3,
-    title: "Receive international payments",
-    desc: "Get paid by clients worldwide using local account details. Funds land in your multi-currency wallet without conversion fees.",
-    useCases: ["Client invoice payments", "Marketplace payouts", "International sales revenue", "Cross-border collections"],
-    benefits: ["Local account details in multiple currencies", "No incoming wire fees", "Automatic reconciliation", "Real-time notifications"],
-    steps: ["Get your local account details", "Share with clients or embed in invoices", "Receive funds without conversion", "Hold or convert when rates are favorable"],
-  },
-  {
-    icon: Users,
-    title: "Batch payments & payouts",
-    desc: "Pay hundreds of recipients in one go. Upload a file or use our API. Perfect for payroll, affiliate payouts, and refunds.",
-    useCases: ["International payroll", "Affiliate commissions", "Marketplace seller payouts", "Dividend distributions", "Mass refunds"],
-    benefits: ["Pay up to 1,000 recipients per batch", "Multiple currencies in one batch", "Detailed payment tracking", "Error handling and retry"],
-    steps: ["Prepare your payment file (CSV/Excel)", "Upload and validate recipients", "Review total cost and fees", "Confirm and process the batch"],
-  },
-  {
-    icon: Code,
-    title: "API & integrations",
-    desc: "Connect Origin Wallet to your systems. Automate payments, check rates, and manage transfers programmatically.",
-    useCases: ["ERP integration", "Accounting automation", "E-commerce payouts", "Custom payment workflows"],
-    benefits: ["RESTful API with comprehensive docs", "Webhooks for real-time updates", "Sandbox environment for testing", "Dedicated integration support"],
-    steps: ["Request API access", "Explore docs and test in sandbox", "Integrate with your systems", "Go live with production credentials"],
-  },
-  {
-    icon: Shield,
-    title: "Roles & permissions",
-    desc: "Control who can do what. Set up approval workflows, spending limits, and role-based access for your team.",
-    useCases: ["Multi-level approval flows", "Department budgets", "Audit compliance", "Team onboarding"],
-    benefits: ["Admin, approver, and viewer roles", "Custom approval thresholds", "Activity audit logs", "SSO integration support"],
-    steps: ["Invite team members", "Assign roles and permissions", "Set up approval workflows", "Monitor with audit logs"],
-  },
-];
+import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { businessFeatures, fadeUp } from "@/pages/business/business-content";
 
 const Business = () => {
   return (
     <div>
-      {/* Hero */}
       <section className="bg-hero text-primary-foreground section-padding">
-        <div className="container-wide mx-auto text-center">
-          <motion.div {...fadeUp}>
-            <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/20 text-accent rounded-full mb-4">
+        <div className="container-wide mx-auto">
+          <motion.div {...fadeUp} className="mx-auto max-w-4xl text-center">
+            <span className="mb-4 inline-block rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
               Business
             </span>
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">
-              Global payments, simplified
+            <h1 className="mb-5 text-4xl font-extrabold sm:text-5xl lg:text-6xl">
+              Business payments with clearer operational structure
             </h1>
-            <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto mb-8">
-              Pay suppliers, receive payments, and manage international finances — with full transparency and control.
+            <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-primary-foreground/72">
+              Explore dedicated business workflows for supplier payments, collections,
+              payout operations, and integration-led finance automation.
             </p>
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/contact">
-                <Button variant="hero" size="lg">Talk to sales <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                <Button variant="hero" size="lg" className="w-full sm:w-auto">
+                  Talk to sales
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
               </Link>
               <Link to="/pricing">
-                <Button variant="hero-outline" size="lg">See pricing</Button>
+                <Button variant="hero-outline" size="lg" className="w-full sm:w-auto">
+                  Compare pricing
+                </Button>
               </Link>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Modules */}
-      {modules.map((mod, idx) => (
-        <section key={mod.title} className={`section-padding ${idx % 2 === 0 ? "bg-background" : "bg-surface-subtle"}`}>
-          <div className="container-wide mx-auto">
-            <motion.div {...fadeUp} className="grid lg:grid-cols-2 gap-12 items-start">
-              <div className={idx % 2 === 1 ? "lg:order-2" : ""}>
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-                  <mod.icon className="w-7 h-7 text-primary" />
-                </div>
-                <h2 className="text-3xl font-extrabold mb-4">{mod.title}</h2>
-                <p className="text-muted-foreground text-lg mb-6 leading-relaxed">{mod.desc}</p>
+      <section className="section-padding bg-background">
+        <div className="container-wide mx-auto">
+          <motion.div
+            {...fadeUp}
+            className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+          >
+            <div className="max-w-2xl">
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-accent">
+                Explore Business
+              </p>
+              <h2 className="text-3xl font-extrabold text-foreground sm:text-4xl">
+                Four focused business journeys from one cleaner entry point
+              </h2>
+            </div>
+            <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
+              Each page is designed around a specific finance workflow, so the site feels
+              more intentional and easier to review for partnerships, commercial discussions,
+              and product discovery.
+            </p>
+          </motion.div>
 
-                <h4 className="font-bold text-sm uppercase tracking-wide text-muted-foreground mb-3">Use cases</h4>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {mod.useCases.map((uc) => (
-                    <span key={uc} className="px-3 py-1 text-xs font-medium bg-muted rounded-full text-muted-foreground">{uc}</span>
-                  ))}
-                </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {businessFeatures.map((feature) => {
+              const Icon = feature.icon;
 
-                <h4 className="font-bold mb-3">Benefits</h4>
-                <ul className="space-y-2 mb-6">
-                  {mod.benefits.map((b) => (
-                    <li key={b} className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
+              return (
+                <motion.article
+                  key={feature.id}
+                  {...fadeUp}
+                  className="group rounded-[28px] border border-border bg-card p-7 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_80px_-42px_rgba(15,23,42,0.75)]"
+                >
+                  <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <Icon className="h-7 w-7 text-primary" />
+                  </div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary/80">
+                    {feature.navLabel}
+                  </p>
+                  <h3 className="mb-3 text-2xl font-extrabold text-foreground">
+                    {feature.title}
+                  </h3>
+                  <p className="mb-6 text-base leading-relaxed text-muted-foreground">
+                    {feature.sectionDescription}
+                  </p>
 
-                <div className="flex gap-3">
-                  <Link to="/contact"><Button size="sm">Contact sales</Button></Link>
-                  <Link to="/pricing"><Button variant="outline" size="sm">View pricing</Button></Link>
-                </div>
-              </div>
-
-              <div className={`bg-card rounded-2xl border border-border p-8 ${idx % 2 === 1 ? "lg:order-1" : ""}`}>
-                <h4 className="font-bold mb-4">How it works</h4>
-                <div className="space-y-4">
-                  {mod.steps.map((step, i) => (
-                    <div key={i} className="flex gap-4">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-bold text-primary">
-                        {i + 1}
+                  <div className="mb-7 space-y-3">
+                    {feature.benefits.slice(0, 3).map((benefit) => (
+                      <div key={benefit} className="flex items-start gap-3 text-sm text-foreground/85">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                        <span>{benefit}</span>
                       </div>
-                      <p className="text-muted-foreground pt-1">{step}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      ))}
+                    ))}
+                  </div>
 
-      {/* CTA */}
-      <section className="section-padding bg-hero text-primary-foreground text-center">
-        <div className="container-tight mx-auto">
-          <h2 className="text-3xl font-extrabold mb-4">Ready to streamline your business payments?</h2>
-          <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto">
-            Talk to our team about how Origin Wallet can save you time and money on international payments.
-          </p>
-          <Link to="/contact">
-            <Button variant="hero" size="lg">Talk to sales <ArrowRight className="w-4 h-4 ml-1" /></Button>
-          </Link>
+                  <Link
+                    to={`/business/${feature.id}`}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary"
+                  >
+                    View this flow
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+                  </Link>
+                </motion.article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="section-padding bg-surface-subtle">
+        <div className="container-wide mx-auto grid gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
+          <motion.div {...fadeUp}>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
+              Built For Operational Teams
+            </p>
+            <h2 className="mb-4 text-3xl font-extrabold text-foreground sm:text-4xl">
+              A business section that reads more like a product map
+            </h2>
+            <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              The business area now separates outbound payments, inbound collections,
+              recipient-heavy payout flows, and integration capabilities into clearer pages
+              that are easier to understand and present.
+            </p>
+          </motion.div>
+
+          <motion.div
+            {...fadeUp}
+            className="rounded-[28px] border border-border bg-background p-8 shadow-[0_20px_60px_-44px_rgba(15,23,42,0.6)]"
+          >
+            <h3 className="mb-5 text-xl font-extrabold text-foreground">Business flow map</h3>
+            <div className="space-y-4">
+              {businessFeatures.map((feature, index) => (
+                <div key={feature.id} className="flex gap-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">{feature.navLabel}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {feature.navDescription}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </section>
     </div>

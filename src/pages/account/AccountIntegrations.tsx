@@ -10,7 +10,6 @@ import {
   Loader2,
   RefreshCcw,
   SendHorizonal,
-  ShieldAlert,
   Zap,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -220,9 +219,7 @@ const getProviderSummary = (
   }
 
   if (status === "active") {
-    return capability?.is_configured === false
-      ? "Connected for onboarding. Live sync, quote, transfer, and webhook features are not enabled yet for this provider."
-      : "This provider is connected and ready for the wallet features supported by its capability flags.";
+    return "This provider is connected and ready for the onboarding and wallet features available on your account.";
   }
 
   if (status && ["rejected", "failed"].includes(status)) {
@@ -574,9 +571,6 @@ const AccountIntegrations = () => {
                       <div className="flex flex-wrap gap-3 text-sm text-[#6f6f6b] dark:text-gray-400">
                         <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Code: {item.provider.code}</span>
                         <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Provider status: {item.provider.status}</span>
-                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
-                          {capability?.is_configured === false ? "Manual onboarding only" : "Live API features may be available"}
-                        </span>
                         {item.integration_request?.requested_at && (
                           <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
                             Requested: {new Date(item.integration_request.requested_at).toLocaleDateString()}
@@ -599,12 +593,6 @@ const AccountIntegrations = () => {
                         {capability?.supports_transfers && (
                           <span className="rounded-full bg-[#f5f5f2] px-3 py-1 text-xs font-medium text-[#4b4b45] dark:bg-white/5 dark:text-gray-300">
                             Transfers enabled
-                          </span>
-                        )}
-                        {capability?.is_configured === false && (
-                          <span className="inline-flex items-center gap-2 rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-medium text-[#c2410c] dark:bg-orange-500/10 dark:text-orange-300">
-                            <ShieldAlert className="h-3.5 w-3.5" />
-                            Live API not configured
                           </span>
                         )}
                       </div>

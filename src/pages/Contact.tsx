@@ -40,13 +40,12 @@ const Contact = () => {
 
   return (
     <div>
-      {/* Hero */}
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-tight mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">Get in touch</h1>
             <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto">
-              Questions about Origin Wallet? Want to get started? We'd love to hear from you.
+              Questions about Origin Wallet? Want to get started? We would love to hear from you.
             </p>
           </motion.div>
         </div>
@@ -55,7 +54,6 @@ const Contact = () => {
       <section className="section-padding bg-background">
         <div className="container-wide mx-auto">
           <div className="grid lg:grid-cols-5 gap-12">
-            {/* Form */}
             <div className="lg:col-span-3">
               <AnimatePresence mode="wait">
                 {submitted ? (
@@ -66,9 +64,9 @@ const Contact = () => {
                     className="bg-card rounded-2xl border border-border p-12 text-center"
                   >
                     <CheckCircle2 className="w-16 h-16 text-accent mx-auto mb-6" />
-                    <h2 className="text-2xl font-extrabold mb-3">Message sent!</h2>
+                    <h2 className="text-2xl font-extrabold mb-3">Message captured</h2>
                     <p className="text-muted-foreground mb-6">
-                      Thank you for reaching out. We'll get back to you within 24 hours.
+                      Thank you for reaching out. Our team will review your message and follow up using the contact details you provided.
                     </p>
                     <Button variant="hero" onClick={() => { setSubmitted(false); setForm({ name: "", email: "", company: "", subject: "", message: "" }); }}>
                       Send another message
@@ -124,32 +122,44 @@ const Contact = () => {
               </AnimatePresence>
             </div>
 
-            {/* Sidebar */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Brand */}
               <div className="bg-card rounded-2xl border border-border p-8">
                 <div className="flex items-center gap-2 font-extrabold text-lg mb-2">
                   <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center text-accent-foreground text-xs font-black">O</div>
                   ORIGIN WALLET
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">
-                  A platform by <strong>ORIGIN WALLET</strong>
+                  Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, a technology company based in Ha Noi, Viet Nam.
                 </p>
               </div>
 
-              {/* Map placeholder */}
               <div className="bg-card rounded-2xl border border-border p-8">
                 <div className="flex items-center gap-2 mb-3">
                   <MapPin className="w-5 h-5 text-accent" />
-                  <h3 className="font-bold">Location</h3>
+                  <h3 className="font-bold">Company details</h3>
                 </div>
-                <div className="bg-muted rounded-xl h-40 flex items-center justify-center text-muted-foreground text-sm">
-                  Map placeholder
+                <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+                  <p>
+                    <strong className="text-foreground">Legal entity:</strong> CONG TY CO PHAN CONG NGHE KHOI NGUYEN
+                  </p>
+                  <p>
+                    <strong className="text-foreground">International name:</strong> KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Tax ID:</strong> 0111409165
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Email:</strong> info@khoinguyentechnology.com
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Address:</strong> So 23 ngach 157/6 Duc Giang, To 18, Phuong Viet Hung, Ha Noi, Viet Nam
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Company website:</strong> khoinguyentechnology.com
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground mt-3">[Office address placeholder]</p>
               </div>
 
-              {/* Quick links */}
               <div className="bg-card rounded-2xl border border-border p-8">
                 <h3 className="font-bold mb-4">Quick links</h3>
                 <div className="space-y-3">
