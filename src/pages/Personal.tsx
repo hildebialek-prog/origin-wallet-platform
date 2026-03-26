@@ -19,8 +19,22 @@ const Personal = () => {
             <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-primary-foreground/72">
               Explore the personal side of Origin Wallet across sending, wallet management,
               and receiving flows. Each experience is designed to feel clearer, calmer, and
-              easier to navigate.
+              easier to navigate within a broader cross-border financial platform.
             </p>
+            <div className="mb-8 flex flex-wrap items-center justify-center gap-3 text-sm text-primary-foreground/80">
+              {[
+                "Consumer journeys",
+                "Cross-border transfers",
+                "Wallet and receive flows",
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-white/12 bg-white/5 px-4 py-2 backdrop-blur-sm"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/contact">
                 <Button variant="hero" size="lg" className="w-full sm:w-auto">
@@ -116,7 +130,8 @@ const Personal = () => {
             <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
               Instead of stacking every feature into one long marketing page, the personal
               area now separates the experience into dedicated journeys for sending, holding,
-              and receiving money.
+              and receiving money while still fitting into the platform's broader cross-border
+              operating story.
             </p>
           </motion.div>
 

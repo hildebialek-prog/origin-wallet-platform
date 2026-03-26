@@ -22,10 +22,10 @@ const sections = [
     title: "Terms of Service",
     content: [
       { heading: "1. Agreement", text: "By accessing or using Origin Wallet services, you agree to be bound by these Terms of Service. Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY. If you do not agree to these terms, please do not use our services." },
-      { heading: "2. Services", text: "Origin Wallet provides a technology platform for international money transfers and multi-currency management. Services described on our website are subject to availability and may vary by jurisdiction." },
+      { heading: "2. Services", text: "Origin Wallet provides a technology platform for cross-border payments, multi-currency workflows, and provider-connected financial operations. Services described on our website are subject to availability and may vary by jurisdiction." },
       { heading: "3. Eligibility", text: "You must be at least 18 years old and legally capable of entering into contracts to use our services. We may require identity verification depending on the services and amounts involved." },
       { heading: "4. User Responsibilities", text: "You are responsible for providing accurate information, maintaining the security of your account credentials, and complying with applicable laws. You must not use our services for illegal activities." },
-      { heading: "5. Fees and Pricing", text: "Our fees are displayed transparently before you confirm any transaction. Fees and exchange rates may vary depending on the currency pair, payment method, and transaction amount. All pricing shown on our website is illustrative and subject to change." },
+      { heading: "5. Fees and Pricing", text: "Fees, quotes, and exchange-rate outcomes may vary depending on the provider, workflow, corridor, payment method, and transaction amount. Pricing shown on our public website is illustrative unless explicitly stated otherwise." },
       { heading: "6. Transfers", text: "Transfer times are estimates and may vary. We are not responsible for delays caused by third-party financial institutions, compliance checks, or circumstances beyond our control." },
       { heading: "7. Limitation of Liability", text: "To the maximum extent permitted by law, the operator of the Origin Wallet platform shall not be liable for indirect, incidental, or consequential damages arising from the use of our services." },
       { heading: "8. Intellectual Property", text: "All content, trademarks, and intellectual property on the Origin Wallet platform are owned by or licensed to the platform operator." },
@@ -80,8 +80,9 @@ const Policies = () => {
       <section className="bg-hero text-primary-foreground section-padding pb-8">
         <div className="container-tight mx-auto text-center">
           <h1 className="text-4xl font-extrabold mb-2">Legal & Policies</h1>
-          <p className="text-primary-foreground/70">
-            Origin Wallet legal and policy information
+          <p className="mx-auto max-w-2xl leading-relaxed text-primary-foreground/70">
+            Legal, privacy, and operating terms for the Origin Wallet platform operated by KHOI
+            NGUYEN TECHNOLOGY JOINT STOCK COMPANY.
           </p>
         </div>
       </section>

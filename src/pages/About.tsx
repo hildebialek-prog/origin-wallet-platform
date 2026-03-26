@@ -60,9 +60,14 @@ const About = () => {
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-tight mx-auto text-center">
           <motion.div {...fadeUp}>
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">Our story</h1>
-            <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto">
-              Origin Wallet was built on a simple belief: moving money across borders should be more transparent, fair, and understandable.
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-accent">
+              About The Platform
+            </p>
+            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">Built as a clearer financial operations layer</h1>
+            <p className="text-primary-foreground/70 text-lg max-w-3xl mx-auto leading-relaxed">
+              Origin Wallet is being built as a multi-provider financial platform for managing
+              cross-border payments, balances, onboarding workflows, and operational visibility
+              through cleaner product flows and secure integrations.
             </p>
           </motion.div>
         </div>
@@ -75,13 +80,19 @@ const About = () => {
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div className="text-muted-foreground space-y-4 leading-relaxed text-lg">
                 <p>
-                  For decades, sending money internationally has been expensive, slow, and opaque. Traditional flows often hide complexity in pricing, timing, and operational steps.
+                  Cross-border money movement is still fragmented across different providers,
+                  disconnected operational tools, and opaque workflows. Teams often manage
+                  onboarding, balances, transfers, and exceptions across too many separate systems.
                 </p>
                 <p>
-                  We started Origin Wallet to improve that experience for both individuals and businesses managing money across borders.
+                  We started Origin Wallet to make those financial operations easier to understand
+                  and easier to run, whether the end experience is built for individuals,
+                  businesses, or integration-led platforms.
                 </p>
                 <p>
-                  Our name reflects a simple philosophy: go back to the <strong className="text-foreground">origin</strong> of fair finance and build from transparency first.
+                  Our approach is simple: connect provider capabilities into one clearer platform
+                  experience, then build product flows that improve transparency, usability, and
+                  control from the start.
                 </p>
               </div>
               <motion.div
@@ -109,10 +120,10 @@ const About = () => {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Target, title: "Transparency", desc: "Every fee, rate, and step should be clear before a customer decides." },
-              { icon: Heart, title: "Fairness", desc: "International finance should be easier to understand and less dependent on hidden complexity." },
-              { icon: Eye, title: "Simplicity", desc: "Cross-border workflows should feel straightforward for both users and operational teams." },
-              { icon: Users, title: "Accessibility", desc: "Built for individuals and businesses managing money across currencies and markets." },
+              { icon: Target, title: "Operational clarity", desc: "Teams should be able to understand provider flows, status, and next actions without guesswork." },
+              { icon: Heart, title: "Trust by design", desc: "Legal identity, security, and product behavior should feel credible before a transaction even starts." },
+              { icon: Eye, title: "Visibility", desc: "Balances, quotes, transfers, and onboarding states should be easier to review and communicate." },
+              { icon: Users, title: "Platform usability", desc: "Built to support users, operators, and partner-facing workflows across a shared financial stack." },
             ].map((v) => (
               <motion.div key={v.title} {...fadeUp} className="bg-card rounded-2xl border border-border p-8 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-5">
@@ -127,11 +138,97 @@ const About = () => {
       </section>
 
       <section className="section-padding bg-background">
+        <div className="container-wide mx-auto">
+          <motion.div {...fadeUp} className="mb-12 text-center">
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
+              How It Works
+            </p>
+            <h2 className="text-3xl font-extrabold text-foreground sm:text-4xl">
+              One platform layer across multiple provider workflows
+            </h2>
+          </motion.div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {[
+              {
+                title: "Connect providers",
+                desc: "Bring provider onboarding and connection journeys into one clearer platform entry point.",
+              },
+              {
+                title: "View balances and workflows",
+                desc: "See balances, status changes, and operational steps with better visibility across products and providers.",
+              },
+              {
+                title: "Move money with more structure",
+                desc: "Support quotes, transfers, beneficiaries, and finance actions through simpler guided flows.",
+              },
+            ].map((item, index) => (
+              <motion.div
+                key={item.title}
+                {...fadeUp}
+                transition={{ delay: index * 0.1 }}
+                className="rounded-[28px] border border-border bg-card p-7 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.45)]"
+              >
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  {index + 1}
+                </div>
+                <h3 className="mb-3 text-xl font-extrabold text-foreground">{item.title}</h3>
+                <p className="text-sm leading-7 text-muted-foreground">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section-padding bg-surface-subtle">
+        <div className="container-wide mx-auto grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+          <motion.div {...fadeUp}>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
+              Who We Serve
+            </p>
+            <h2 className="mb-4 text-3xl font-extrabold text-foreground sm:text-4xl">
+              Designed for operationally complex cross-border use cases
+            </h2>
+            <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              Origin Wallet is positioned around the needs of businesses and platforms that need
+              more than a simple end-user wallet. The focus is on structured financial workflows,
+              provider connectivity, and better operating visibility.
+            </p>
+          </motion.div>
+
+          <motion.div {...fadeUp} className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                title: "SMEs",
+                desc: "Cross-border operating teams handling supplier payments, collections, and treasury visibility.",
+              },
+              {
+                title: "eCommerce",
+                desc: "Platforms and merchants coordinating payouts, recipient management, and international money movement.",
+              },
+              {
+                title: "SaaS",
+                desc: "Integration-led products that need finance workflows, APIs, and clearer orchestration across providers.",
+              },
+            ].map((segment) => (
+              <div
+                key={segment.title}
+                className="rounded-[24px] border border-border bg-background p-6 shadow-[0_16px_50px_-38px_rgba(15,23,42,0.55)]"
+              >
+                <h3 className="mb-2 text-lg font-extrabold text-foreground">{segment.title}</h3>
+                <p className="text-sm leading-7 text-muted-foreground">{segment.desc}</p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="section-padding bg-background">
         <div className="container-tight mx-auto">
           <motion.div {...fadeUp} className="text-center mb-12">
             <h2 className="text-3xl font-extrabold mb-4">Global payment experience</h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Product directions built around cross-border transfers, wallets, and operational clarity.
+              Product directions built around cross-border transfers, provider connectivity, and operational clarity.
             </p>
           </motion.div>
 
@@ -149,22 +246,22 @@ const About = () => {
                     <CreditCard className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold">Wallet funding</h3>
-                    <p className="text-muted-foreground text-sm">Flexible entry points</p>
+                    <h3 className="text-xl font-bold">Provider-connected wallet flows</h3>
+                    <p className="text-muted-foreground text-sm">Flexible funding and balance layers</p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-blue-600" />
-                    <span>Guided funding and payment setup flows</span>
+                    <span>Guided funding and payment setup flows across provider journeys</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-blue-600" />
-                    <span>Support for secure customer onboarding experiences</span>
+                    <span>Support for secure onboarding and account connection experiences</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-blue-600" />
-                    <span>Designed for multi-currency payment experiences</span>
+                    <span>Designed for multi-currency balance and payment experiences</span>
                   </div>
                 </div>
               </div>
@@ -201,22 +298,22 @@ const About = () => {
                     <Banknote className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold">Bank transfers</h3>
-                    <p className="text-muted-foreground text-sm">Cross-border operations</p>
+                    <h3 className="text-xl font-bold">Structured transfer operations</h3>
+                    <p className="text-muted-foreground text-sm">Cross-border execution visibility</p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-green-600" />
-                    <span>International and local transfer experiences</span>
+                    <span>International and local transfer workflows with clearer status handling</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-green-600" />
-                    <span>Pricing and fee visibility before confirmation</span>
+                    <span>Pricing, fees, and review steps surfaced before confirmation</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-green-600" />
-                    <span>Status tracking throughout the transfer lifecycle</span>
+                    <span>Status tracking throughout the transfer and exception lifecycle</span>
                   </div>
                 </div>
               </div>
@@ -237,22 +334,22 @@ const About = () => {
                     <Smartphone className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold">Digital payment experience</h3>
-                    <p className="text-muted-foreground text-sm">Modern customer journeys</p>
+                    <h3 className="text-xl font-bold">Integration-ready product journeys</h3>
+                    <p className="text-muted-foreground text-sm">Modern customer and operator experiences</p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-purple-600" />
-                    <span>Modern digital payment experiences</span>
+                    <span>Modern digital payment experiences designed around product clarity</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-purple-600" />
-                    <span>Interface patterns for smooth customer onboarding</span>
+                    <span>Interface patterns for customer onboarding and provider connection flows</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-purple-600" />
-                    <span>Clearer mobile-first product flows</span>
+                    <span>Clearer product flows for operators, customers, and partner reviews</span>
                   </div>
                 </div>
               </div>

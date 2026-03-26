@@ -44,9 +44,24 @@ const Contact = () => {
         <div className="container-tight mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">Get in touch</h1>
-            <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto">
-              Questions about Origin Wallet? Want to get started? We would love to hear from you.
+            <p className="text-primary-foreground/70 text-lg max-w-2xl mx-auto leading-relaxed">
+              Contact us about Origin Wallet product flows, platform capabilities, partnership
+              conversations, or operational questions related to cross-border financial workflows.
             </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-primary-foreground/80">
+              {[
+                "Partnership enquiries",
+                "Product and workflow questions",
+                "Security and platform follow-up",
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-white/12 bg-white/5 px-4 py-2 backdrop-blur-sm"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
           </motion.div>
         </div>
       </section>
@@ -81,6 +96,10 @@ const Contact = () => {
                     className="bg-card rounded-2xl border border-border p-8 space-y-5"
                   >
                     <h2 className="text-xl font-bold mb-2">Send us a message</h2>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Use this form for partnership requests, product questions, or general
+                      platform enquiries.
+                    </p>
                     {[
                       { field: "name", label: "Name *", type: "text", placeholder: "Your full name" },
                       { field: "email", label: "Email *", type: "email", placeholder: "your@email.com" },
@@ -129,7 +148,9 @@ const Contact = () => {
                   ORIGIN WALLET
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, a technology company based in Ha Noi, Viet Nam.
+                  Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, a
+                  technology company based in Ha Noi, Viet Nam, building provider-connected
+                  financial workflows and cross-border product experiences.
                 </p>
               </div>
 
@@ -167,6 +188,7 @@ const Contact = () => {
                     { icon: HelpCircle, label: "Help center", href: "/help" },
                     { icon: MessageCircle, label: "FAQs", href: "/help" },
                     { icon: Shield, label: "Security", href: "/security" },
+                    { icon: MapPin, label: "Legal & policies", href: "/policies" },
                   ].map((link) => (
                     <Link key={link.label} to={link.href} className="flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground transition-colors">
                       <link.icon className="w-4 h-4" />

@@ -1,7 +1,16 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Shield, Lock, Eye, AlertTriangle, Server, CheckCircle2, ChevronRight, ArrowRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  Eye,
+  Lock,
+  Server,
+  Shield,
+} from "lucide-react";
 
 const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -13,132 +22,183 @@ const fadeUp = {
 const Security = () => {
   return (
     <div>
-      {/* Hero */}
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-wide mx-auto text-center">
           <motion.div {...fadeUp}>
-            <Shield className="w-16 h-16 text-accent mx-auto mb-6" />
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">
-              Security you can trust
+            <Shield className="mx-auto mb-6 h-16 w-16 text-accent" />
+            <h1 className="mb-4 text-4xl font-extrabold sm:text-5xl">
+              Security and control designed into the platform
             </h1>
-            <p className="text-primary-foreground/70 text-lg max-w-xl mx-auto">
-              Protecting your money and data is our top priority. Here's how we keep everything safe.
+            <p className="mx-auto max-w-3xl text-lg leading-relaxed text-primary-foreground/70">
+              Origin Wallet is being designed around secure product flows, access controls,
+              operational monitoring, and provider-aware compliance expectations for modern
+              financial operations.
             </p>
           </motion.div>
         </div>
       </section>
 
-      {/* Security Principles */}
       <section className="section-padding bg-background">
         <div className="container-wide mx-auto">
-          <motion.div {...fadeUp} className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold mb-4">Our security principles</h2>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              We follow industry best practices to keep your funds and personal information safe.
+          <motion.div {...fadeUp} className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-extrabold">Our security principles</h2>
+            <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+              The platform approach is built around secure handling of financial workflows,
+              role-based access, and clearer control points across provider-connected systems.
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { icon: Lock, title: "Encryption at rest & in transit", desc: "All data is encrypted using AES-256 encryption at rest and TLS 1.3 for data in transit. Your information is never stored in plain text." },
-              { icon: Eye, title: "Privacy by design", desc: "We collect only the data we need and give you full control over your information. We never sell your data to third parties." },
-              { icon: AlertTriangle, title: "Fraud prevention", desc: "Real-time monitoring systems watch for suspicious activity around the clock. Unusual transactions are flagged and reviewed immediately." },
-              { icon: Server, title: "Infrastructure security", desc: "Our systems run on enterprise-grade infrastructure with redundancy, regular backups, and disaster recovery procedures." },
-              { icon: Shield, title: "Access controls", desc: "Strict role-based access controls ensure only authorized personnel can access sensitive systems. All access is logged and audited." },
-              { icon: CheckCircle2, title: "Regular testing", desc: "We conduct regular security assessments and work with independent security researchers to identify and fix vulnerabilities." },
+              {
+                icon: Lock,
+                title: "Encryption at rest and in transit",
+                desc: "Sensitive information is intended to be protected through encrypted storage practices and secure transport.",
+              },
+              {
+                icon: Eye,
+                title: "Privacy by design",
+                desc: "We aim to collect only the operational data required for platform workflows, reviews, and regulated partner requirements.",
+              },
+              {
+                icon: AlertTriangle,
+                title: "Risk monitoring",
+                desc: "Operational monitoring and review states are designed to help identify unusual activity, exceptions, and workflow risks.",
+              },
+              {
+                icon: Server,
+                title: "Infrastructure security",
+                desc: "Platform services are designed around resilient infrastructure, environment separation, and controlled operational changes.",
+              },
+              {
+                icon: Shield,
+                title: "Access controls",
+                desc: "Role-based permissions, auditability, and restricted system access help protect sensitive operational workflows.",
+              },
+              {
+                icon: CheckCircle2,
+                title: "Review posture",
+                desc: "Security posture is strengthened through continuous review, hardening, and improvement of platform behavior over time.",
+              },
             ].map((item) => (
-              <motion.div key={item.title} {...fadeUp} className="bg-card rounded-2xl border border-border p-8">
-                <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-5">
-                  <item.icon className="w-6 h-6 text-accent" />
+              <motion.div
+                key={item.title}
+                {...fadeUp}
+                className="rounded-2xl border border-border bg-card p-8"
+              >
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
+                  <item.icon className="h-6 w-6 text-accent" />
                 </div>
-                <h3 className="text-lg font-bold mb-2">{item.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
+                <h3 className="mb-2 text-lg font-bold">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Trust Dashboard (Visual only) */}
       <section className="section-padding bg-surface-subtle">
         <div className="container-wide mx-auto">
-          <motion.div {...fadeUp} className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold mb-4">Trust dashboard</h2>
-            <p className="text-muted-foreground">Real-time overview of our security posture.</p>
+          <motion.div {...fadeUp} className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-extrabold">Trust dashboard</h2>
+            <p className="text-muted-foreground">
+              Snapshot of the platform security posture and operating model.
+            </p>
           </motion.div>
 
-          <motion.div {...fadeUp} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto">
+          <motion.div {...fadeUp} className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "System status", value: "Operational", color: "text-accent" },
+              { label: "System posture", value: "Operational controls", color: "text-accent" },
               { label: "Encryption", value: "AES-256 / TLS 1.3", color: "text-accent" },
-              { label: "Last security audit", value: "Q4 2025", color: "text-foreground" },
+              { label: "Access model", value: "Role-based controls", color: "text-foreground" },
               { label: "Monitoring", value: "Continuous", color: "text-accent" },
             ].map((item) => (
-              <div key={item.label} className="bg-card rounded-2xl border border-border p-6 text-center">
-                <div className="text-sm text-muted-foreground mb-2">{item.label}</div>
+              <div key={item.label} className="rounded-2xl border border-border bg-card p-6 text-center">
+                <div className="mb-2 text-sm text-muted-foreground">{item.label}</div>
                 <div className={`text-lg font-bold ${item.color}`}>{item.value}</div>
-                <div className="w-2 h-2 rounded-full bg-accent mx-auto mt-3" />
+                <div className="mx-auto mt-3 h-2 w-2 rounded-full bg-accent" />
               </div>
             ))}
           </motion.div>
         </div>
       </section>
 
-      {/* Compliance */}
       <section className="section-padding bg-background">
         <div className="container-tight mx-auto">
           <motion.div {...fadeUp}>
-            <h2 className="text-2xl font-extrabold mb-6 text-center">Compliance & verification</h2>
-            <div className="text-muted-foreground space-y-4 leading-relaxed max-w-2xl mx-auto">
+            <h2 className="mb-6 text-center text-2xl font-extrabold">
+              Compliance and verification
+            </h2>
+            <div className="mx-auto max-w-2xl space-y-4 leading-relaxed text-muted-foreground">
               <p>
-                Origin Wallet operates with a commitment to regulatory compliance. Depending on the services used and your jurisdiction, 
-                verification steps may apply as required by our partners and local regulations.
+                Origin Wallet is built with an awareness that financial workflows may require
+                provider-led verification, jurisdiction-specific checks, and ongoing review controls
+                depending on the service used.
               </p>
               <p>
-                We may ask you to verify your identity before processing certain transactions. This is a standard practice 
-                designed to prevent fraud, money laundering, and other financial crimes.
+                Verification, onboarding, and transaction review steps may apply before certain
+                financial actions are completed. These controls help support fraud prevention,
+                compliance expectations, and partner operating requirements.
               </p>
               <p>
-                Our compliance team continuously monitors regulatory developments to ensure our practices meet or exceed 
-                applicable requirements.
+                Compliance and security expectations can vary by provider, jurisdiction, and
+                product flow, which is why the platform is designed to surface operational states
+                more clearly.
               </p>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Security FAQ */}
       <section className="section-padding bg-surface-subtle">
         <div className="container-tight mx-auto">
-          <h2 className="text-2xl font-extrabold mb-8 text-center">Security FAQ</h2>
-          <div className="space-y-3 max-w-2xl mx-auto">
+          <h2 className="mb-8 text-center text-2xl font-extrabold">Security FAQ</h2>
+          <div className="mx-auto max-w-2xl space-y-3">
             {[
-              { q: "How is my data protected?", a: "All personal and financial data is encrypted using AES-256 at rest and TLS 1.3 in transit. We follow strict data handling procedures." },
-              { q: "What happens if there's a security incident?", a: "We have a dedicated incident response team. In the event of a security incident, affected users will be notified promptly with clear information and next steps." },
-              { q: "Do you share my data with third parties?", a: "We never sell your data. We share information only with trusted partners necessary to process your transactions, and only as required." },
-              { q: "How do I report a security concern?", a: "You can report security concerns through our contact page. We take all reports seriously and investigate promptly." },
+              {
+                q: "How is platform data protected?",
+                a: "Sensitive data is intended to be handled through encrypted transport, controlled storage practices, and role-based access restrictions.",
+              },
+              {
+                q: "What happens if there is a security incident?",
+                a: "Operational security events are expected to follow internal review, escalation, and response procedures appropriate to the severity of the issue.",
+              },
+              {
+                q: "Do you share data with third parties?",
+                a: "Platform workflows may require data sharing with trusted service providers and regulated partners where needed to support the financial operation.",
+              },
+              {
+                q: "How do I report a security concern?",
+                a: "Security concerns can be reported through our contact page so the appropriate team can review and respond.",
+              },
             ].map((faq, i) => (
-              <details key={i} className="bg-card rounded-xl border border-border group">
-                <summary className="px-6 py-4 cursor-pointer font-medium flex items-center justify-between list-none">
+              <details key={i} className="group rounded-xl border border-border bg-card">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 font-medium">
                   {faq.q}
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
                 </summary>
-                <div className="px-6 pb-4 text-muted-foreground text-sm leading-relaxed">{faq.a}</div>
+                <div className="px-6 pb-4 text-sm leading-relaxed text-muted-foreground">
+                  {faq.a}
+                </div>
               </details>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="section-padding bg-hero text-primary-foreground text-center">
+      <section className="bg-hero section-padding text-center text-primary-foreground">
         <div className="container-tight mx-auto">
-          <h2 className="text-3xl font-extrabold mb-4">Your security is our priority</h2>
-          <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto">
-            Have questions about how we protect your money and data? Get in touch.
+          <h2 className="mb-4 text-3xl font-extrabold">
+            Talk with us about platform security
+          </h2>
+          <p className="mx-auto mb-8 max-w-md text-primary-foreground/70">
+            If you need more detail on security posture, operational controls, or partner-readiness,
+            get in touch.
           </p>
           <Link to="/contact">
-            <Button variant="hero" size="lg">Contact us <ArrowRight className="w-4 h-4 ml-1" /></Button>
+            <Button variant="hero" size="lg">
+              Contact us <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
           </Link>
         </div>
       </section>

@@ -13,6 +13,9 @@ import {
   Users,
   ChevronDown,
   Play,
+  Layers3,
+  Network,
+  Workflow,
 } from "lucide-react";
 
 const heroBg = "/content/banner.jpg";
@@ -30,21 +33,21 @@ const fadeUp = {
 
 const useCases = [
   {
-    quote: "A simpler flow for freelancers and independent professionals receiving or sending money internationally.",
-    name: "Freelancers",
-    role: "Cross-border income and payouts",
+    quote: "A unified workflow for managing supplier payments, collections, balances, and international treasury operations in one platform layer.",
+    name: "SMEs",
+    role: "Cross-border operations and finance teams",
     avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
   },
   {
-    quote: "Operational tooling for businesses paying suppliers, contractors, and distributed teams across borders.",
-    name: "Growing Businesses",
-    role: "Supplier payments and treasury workflows",
+    quote: "Embedded payout and collection flows designed for platforms that need to move money across merchants, sellers, vendors, or partners.",
+    name: "eCommerce Platforms",
+    role: "Marketplace and payout orchestration",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
   },
   {
-    quote: "A multi-currency experience for people and teams working across markets, currencies, and banking systems.",
-    name: "Global Teams",
-    role: "International operations",
+    quote: "API-led financial operations for software teams building embedded finance, reconciliation, and provider-connected payment experiences.",
+    name: "SaaS Platforms",
+    role: "API and integration-led finance workflows",
     avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
   },
 ];
@@ -67,18 +70,32 @@ const Index = () => {
           <div className="max-w-4xl">
             <motion.div {...fadeUp}>
               <span className="inline-block px-4 py-1.5 bg-accent text-white text-sm font-semibold rounded-full mb-6">
-                Cross-Border Finance
+                Multi-Provider Financial Platform
               </span>
               <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.95] mb-8">
-                GLOBAL
+                UNIFIED
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-yellow-400">
-                  MONEY MOVEMENT
+                  GLOBAL PAYMENTS
                 </span>
               </h1>
               <p className="text-xl sm:text-2xl text-white/80 max-w-2xl leading-relaxed mb-10">
-                Modern tools for multi-currency wallets, international payments, and business operations across borders.
+                A unified platform for managing global payments, balances, and financial operations across multiple providers through clearer workflows and secure APIs.
               </p>
+              <div className="mb-10 flex flex-wrap gap-3 text-sm text-white/75">
+                {[
+                  "Multi-provider connectivity",
+                  "Secure API integrations",
+                  "Wallets, balances, and transfers",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/15 bg-white/8 px-4 py-2 backdrop-blur-sm"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
               <div className="flex flex-wrap gap-4">
                 <Link to="/contact">
                   <Button variant="hero" size="lg" className="text-base px-8">
@@ -154,6 +171,66 @@ const Index = () => {
         </div>
       </section>
 
+      <section className="section-padding bg-background">
+        <div className="container-wide mx-auto">
+          <motion.div {...fadeUp} className="mb-12 text-center">
+            <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/10 text-accent rounded-full mb-4">
+              How It Works
+            </span>
+            <h2 className="text-4xl md:text-5xl font-black mb-4">
+              Connect providers, manage operations, move money
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
+              Origin Wallet is designed to unify provider connectivity, operational visibility,
+              and cross-border money movement inside one platform flow.
+            </p>
+          </motion.div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {[
+              {
+                icon: Layers3,
+                step: "01",
+                title: "Connect providers",
+                desc: "Bring multiple global financial providers into one operating layer with provider-aware onboarding and integration flows.",
+              },
+              {
+                icon: Workflow,
+                step: "02",
+                title: "View balances and workflows",
+                desc: "Review balances, recipient activity, and operational payment steps through a clearer platform interface.",
+              },
+              {
+                icon: Network,
+                step: "03",
+                title: "Send and receive payments",
+                desc: "Support outbound and inbound money movement with structured workflows for teams, users, and embedded finance operations.",
+              },
+            ].map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.12 }}
+                className="rounded-[28px] border border-border bg-card p-7 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.55)]"
+              >
+                <div className="mb-5 flex items-center justify-between">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10">
+                    <item.icon className="h-7 w-7 text-accent" />
+                  </div>
+                  <span className="text-sm font-semibold tracking-[0.18em] text-muted-foreground">
+                    {item.step}
+                  </span>
+                </div>
+                <h3 className="mb-3 text-2xl font-extrabold">{item.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="bg-primary text-primary-foreground py-12 md:py-16">
         <div className="container-wide mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -196,12 +273,12 @@ const Index = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { icon: Send, title: "International Transfers", desc: "Move money across borders with clearer pricing and a guided transfer flow.", color: "bg-blue-500" },
-              { icon: Wallet, title: "Multi-Currency Wallet", desc: "Hold and manage multiple currencies in one secure wallet experience.", color: "bg-green-500" },
-              { icon: Building2, title: "Business Payments", desc: "Support supplier payments, treasury workflows, and distributed business operations.", color: "bg-purple-500" },
-              { icon: CreditCard, title: "Virtual Cards", desc: "Support digital spending workflows with clearer visibility and controls.", color: "bg-orange-500" },
-              { icon: TrendingUp, title: "FX Tools", desc: "Review rates and conversion details before confirming international transfers.", color: "bg-pink-500" },
-              { icon: Shield, title: "Security", desc: "Access controls, monitoring, and operational safeguards designed for fintech workflows.", color: "bg-indigo-500" },
+              { icon: Send, title: "International Transfers", desc: "Move money across borders with clearer pricing and a guided transfer flow.", color: "bg-blue-500", href: "/personal/send" },
+              { icon: Wallet, title: "Multi-Currency Wallet", desc: "Hold and manage multiple currencies in one secure wallet experience.", color: "bg-green-500", href: "/personal/wallet" },
+              { icon: Building2, title: "Business Payments", desc: "Support supplier payments, treasury workflows, and distributed business operations.", color: "bg-purple-500", href: "/business" },
+              { icon: CreditCard, title: "Virtual Cards", desc: "Support digital spending workflows with clearer visibility and controls.", color: "bg-orange-500", href: "/personal" },
+              { icon: TrendingUp, title: "FX Tools", desc: "Review rates and conversion details before confirming international transfers.", color: "bg-pink-500", href: "/pricing" },
+              { icon: Shield, title: "Provider Orchestration", desc: "Coordinate onboarding, balances, and payment workflows across multiple financial providers.", color: "bg-indigo-500", href: "/business/api" },
             ].map((service, i) => (
               <motion.div
                 key={service.title}
@@ -216,7 +293,7 @@ const Index = () => {
                 </div>
                 <h3 className="text-xl font-bold mb-2">{service.title}</h3>
                 <p className="text-muted-foreground leading-relaxed">{service.desc}</p>
-                <Link to="/pricing" className="inline-flex items-center gap-1 text-accent font-medium mt-4 hover:gap-2 transition-all">
+                <Link to={service.href} className="inline-flex items-center gap-1 text-accent font-medium mt-4 hover:gap-2 transition-all">
                   Learn more <ArrowRight className="w-4 h-4" />
                 </Link>
               </motion.div>
@@ -233,10 +310,10 @@ const Index = () => {
         <div className="relative z-10 container-wide mx-auto px-4 text-center">
           <motion.div {...fadeUp}>
             <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
-              Build simpler global payment experiences
+              Build unified financial operations across providers
             </h2>
             <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
-              Origin Wallet is focused on clearer cross-border finance for individuals and businesses operating across currencies.
+              Our platform integrates with multiple global financial providers via secure APIs to support cross-border wallets, balances, and payment workflows.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">
@@ -256,9 +333,9 @@ const Index = () => {
         <div className="container-wide mx-auto">
           <motion.div {...fadeUp} className="text-center mb-12">
             <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/10 text-accent rounded-full mb-4">
-              Use Cases
+              Who We Serve
             </span>
-            <h2 className="text-4xl md:text-5xl font-black">Who It Is For</h2>
+            <h2 className="text-4xl md:text-5xl font-black">Built for modern cross-border use cases</h2>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-6">

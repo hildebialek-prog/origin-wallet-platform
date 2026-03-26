@@ -167,20 +167,22 @@ export const businessFeatures: BusinessFeature[] = [
     navDescription: "Connect your systems",
     heroTitle: "Connect finance workflows into your systems",
     heroDescription:
-      "Show how business payment operations can connect to internal systems through integration-led flows, automation, and cleaner operational design.",
+      "Show how business payment operations can connect to internal systems through integration-led flows, provider connectivity, automation, and cleaner operational design.",
     sectionDescription:
-      "This page is aimed at businesses that want a more connected operating model across payments, reconciliation, internal tooling, or product-led finance workflows.",
+      "This page is aimed at businesses that want a more connected operating model across payments, reconciliation, internal tooling, or product-led finance workflows with a clearer multi-provider platform story.",
     useCases: [
       "ERP and finance tooling",
       "Internal operations platforms",
       "Marketplace payout orchestration",
       "Custom treasury workflows",
+      "Embedded finance product experiences",
     ],
     benefits: [
       "Better positioning for integration-led buyers",
       "A clearer automation story",
       "Designed for operational system connectivity",
       "Useful for product and engineering review",
+      "Stronger multi-provider platform positioning",
     ],
     steps: [
       "Review the relevant business workflow",

@@ -14,11 +14,12 @@ const Business = () => {
               Business
             </span>
             <h1 className="mb-5 text-4xl font-extrabold sm:text-5xl lg:text-6xl">
-              Business payments with clearer operational structure
+              Unified financial workflows across multiple providers
             </h1>
             <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-primary-foreground/72">
-              Explore dedicated business workflows for supplier payments, collections,
-              payout operations, and integration-led finance automation.
+              Explore business journeys built around supplier payments, collections, payout
+              operations, and integration-led financial workflows with clearer provider
+              orchestration and operational visibility.
             </p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/contact">
@@ -32,6 +33,20 @@ const Business = () => {
                   Compare pricing
                 </Button>
               </Link>
+            </div>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-primary-foreground/80">
+              {[
+                "Multi-provider connectivity",
+                "API-led finance workflows",
+                "Balances, payouts, and collections",
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-white/12 bg-white/5 px-4 py-2 backdrop-blur-sm"
+                >
+                  {item}
+                </span>
+              ))}
             </div>
           </motion.div>
         </div>
@@ -48,13 +63,12 @@ const Business = () => {
                 Explore Business
               </p>
               <h2 className="text-3xl font-extrabold text-foreground sm:text-4xl">
-                Four focused business journeys from one cleaner entry point
+                Four business journeys mapped to real operating workflows
               </h2>
             </div>
             <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
-              Each page is designed around a specific finance workflow, so the site feels
-              more intentional and easier to review for partnerships, commercial discussions,
-              and product discovery.
+              Each page is shaped around a specific business use case, so the platform reads
+              more like a finance operations product than a generic payment brochure.
             </p>
           </motion.div>
 
@@ -104,6 +118,98 @@ const Business = () => {
         </div>
       </section>
 
+      <section className="section-padding bg-background">
+        <div className="container-wide mx-auto grid gap-8 lg:grid-cols-[1fr_1.05fr] lg:items-center">
+          <motion.div {...fadeUp}>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
+              How It Works
+            </p>
+            <h2 className="mb-4 text-3xl font-extrabold text-foreground sm:text-4xl">
+              A clearer operating model for cross-border finance teams
+            </h2>
+            <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              The business experience is designed to connect provider onboarding, balance
+              visibility, payment execution, and finance workflow reviews into one cleaner
+              platform layer.
+            </p>
+          </motion.div>
+
+          <motion.div {...fadeUp} className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                step: "01",
+                title: "Connect providers",
+                desc: "Set up provider relationships and onboarding entry points from one business experience.",
+              },
+              {
+                step: "02",
+                title: "View balances and workflows",
+                desc: "Monitor balances, statuses, and operational steps with better visibility.",
+              },
+              {
+                step: "03",
+                title: "Send and receive payments",
+                desc: "Run payouts, collections, and recipient flows through structured finance journeys.",
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="rounded-[26px] border border-border bg-card p-6 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.45)]"
+              >
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  {item.step}
+                </div>
+                <h3 className="mb-2 text-lg font-extrabold text-foreground">{item.title}</h3>
+                <p className="text-sm leading-7 text-muted-foreground">{item.desc}</p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="section-padding bg-surface-subtle">
+        <div className="container-wide mx-auto grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+          <motion.div {...fadeUp}>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
+              Who We Serve
+            </p>
+            <h2 className="mb-4 text-3xl font-extrabold text-foreground sm:text-4xl">
+              Built for teams with real cross-border workflow complexity
+            </h2>
+            <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              The business platform is positioned for teams that need more than a basic wallet:
+              companies, platforms, and product-led operators coordinating payments across
+              multiple corridors, providers, and internal workflows.
+            </p>
+          </motion.div>
+
+          <motion.div {...fadeUp} className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                title: "SMEs",
+                desc: "Supplier payments, finance operations, and treasury visibility across markets.",
+              },
+              {
+                title: "eCommerce",
+                desc: "Merchant flows, payouts, and recipient management across international corridors.",
+              },
+              {
+                title: "SaaS",
+                desc: "Platform experiences that need API integrations and provider-connected finance workflows.",
+              },
+            ].map((segment) => (
+              <div
+                key={segment.title}
+                className="rounded-[24px] border border-border bg-background p-6 shadow-[0_16px_50px_-38px_rgba(15,23,42,0.55)]"
+              >
+                <h3 className="mb-2 text-lg font-extrabold text-foreground">{segment.title}</h3>
+                <p className="text-sm leading-7 text-muted-foreground">{segment.desc}</p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       <section className="section-padding bg-surface-subtle">
         <div className="container-wide mx-auto grid gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
           <motion.div {...fadeUp}>
@@ -111,12 +217,12 @@ const Business = () => {
               Built For Operational Teams
             </p>
             <h2 className="mb-4 text-3xl font-extrabold text-foreground sm:text-4xl">
-              A business section that reads more like a product map
+              A business section that now reads like a finance platform
             </h2>
             <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
               The business area now separates outbound payments, inbound collections,
-              recipient-heavy payout flows, and integration capabilities into clearer pages
-              that are easier to understand and present.
+              payout workflows, and integration capabilities into clearer journeys that are
+              easier to understand, present, and review with partners.
             </p>
           </motion.div>
 
