@@ -16,6 +16,7 @@ import {
   Layers3,
   Network,
   Workflow,
+  BadgeCheck,
 } from "lucide-react";
 
 const heroBg = "/content/banner.jpg";
@@ -23,6 +24,7 @@ const featureImg1 = "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w
 const featureImg2 = "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop";
 const featureImg3 = "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=600&fit=crop";
 const ctaBg = "https://images.unsplash.com/photo-1551434678-e076c223a692?w=1920&h=800&fit=crop";
+const currenxieLogo = "/logo/currenxie-logo.svg";
 
 const fadeUp = {
   initial: { opacity: 0, y: 40 },
@@ -52,6 +54,12 @@ const useCases = [
   },
 ];
 
+const currenxieAgencyPoints = [
+  "Highlight Currenxie-led onboarding and account support for interested customers.",
+  "Guide businesses through cross-border payment setup with a clearer consultation flow.",
+  "Create a stronger trust signal on the homepage for users evaluating provider access.",
+];
+
 const Index = () => {
   return (
     <div>
@@ -64,10 +72,10 @@ const Index = () => {
             backgroundPosition: "center",
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/30 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/88 via-black/70 to-black/45 z-10" />
 
         <div className="relative z-20 container-wide mx-auto px-4 sm:px-6 lg:px-8 py-32">
-          <div className="max-w-4xl">
+          <div className="max-w-4xl rounded-[32px] border border-white/10 bg-slate-950/32 p-6 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] backdrop-blur-md sm:p-8 lg:p-10">
             <motion.div {...fadeUp}>
               <span className="inline-block px-4 py-1.5 bg-accent text-white text-sm font-semibold rounded-full mb-6">
                 Multi-Provider Financial Platform
@@ -79,8 +87,12 @@ const Index = () => {
                   GLOBAL PAYMENTS
                 </span>
               </h1>
-              <p className="text-xl sm:text-2xl text-white/80 max-w-2xl leading-relaxed mb-10">
+              <p className="text-xl sm:text-2xl text-white/92 max-w-2xl leading-relaxed mb-10">
                 A unified platform for managing global payments, balances, and financial operations across multiple providers through clearer workflows and secure APIs.
+              </p>
+              <p className="mb-10 max-w-3xl text-base leading-8 text-white/78 sm:text-lg">
+                We are building an embedded finance orchestration layer that connects businesses to
+                multiple global financial providers through a unified product and API experience.
               </p>
               <div className="mb-10 flex flex-wrap gap-3 text-sm text-white/75">
                 {[
@@ -90,7 +102,7 @@ const Index = () => {
                 ].map((item) => (
                   <span
                     key={item}
-                    className="rounded-full border border-white/15 bg-white/8 px-4 py-2 backdrop-blur-sm"
+                    className="rounded-full border border-white/15 bg-white/10 px-4 py-2 backdrop-blur-sm"
                   >
                     {item}
                   </span>
@@ -99,12 +111,12 @@ const Index = () => {
               <div className="flex flex-wrap gap-4">
                 <Link to="/contact">
                   <Button variant="hero" size="lg" className="text-base px-8">
-                    <Play className="w-4 h-4 mr-2" /> Contact Us
+                    <Play className="w-4 h-4 mr-2" /> Request Access
                   </Button>
                 </Link>
-                <Link to="/about">
+                <Link to="/business/api">
                   <Button variant="hero-outline" size="lg" className="text-base px-8">
-                    Explore Platform
+                    Book Demo
                   </Button>
                 </Link>
               </div>
@@ -120,6 +132,86 @@ const Index = () => {
             <div className="flex flex-col items-center gap-2 text-white/60">
               <span className="text-xs uppercase tracking-widest">Scroll</span>
               <ChevronDown className="w-5 h-5 animate-bounce" />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="bg-background py-16 md:py-20">
+        <div className="container-wide mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            {...fadeUp}
+            className="grid gap-8 overflow-hidden rounded-[32px] border border-accent/15 bg-[linear-gradient(135deg,rgba(7,89,133,0.08),rgba(249,115,22,0.12))] p-8 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.65)] lg:grid-cols-[1.2fr_0.8fr] lg:p-10"
+          >
+            <div>
+              <div className="mb-5 inline-flex items-center gap-4 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
+                <div className="flex h-14 items-center justify-center rounded-xl bg-slate-950 px-4">
+                  <img
+                    src={currenxieLogo}
+                    alt="Currenxie logo"
+                    className="h-5 w-auto sm:h-6"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                    Featured Partner
+                  </p>
+                  <p className="text-lg font-bold text-foreground">Currenxie</p>
+                </div>
+              </div>
+              <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/15 bg-white/80 px-4 py-2 text-sm font-semibold text-accent backdrop-blur">
+                <BadgeCheck className="h-4 w-4" />
+                Currenxie Agency
+              </span>
+              <h2 className="max-w-3xl text-3xl font-black leading-tight text-foreground sm:text-4xl">
+                Origin Wallet is a Currenxie agency for cross-border payment support
+              </h2>
+              <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+                This homepage section helps visitors immediately understand that they can connect
+                with our team for Currenxie-related consultation, onboarding guidance, and
+                cross-border business payment support.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3 text-sm text-foreground/80">
+                <span className="rounded-full border border-border bg-background/80 px-4 py-2">
+                  Currenxie-focused consultation
+                </span>
+                <span className="rounded-full border border-border bg-background/80 px-4 py-2">
+                  Guided onboarding support
+                </span>
+                <span className="rounded-full border border-border bg-background/80 px-4 py-2">
+                  Cross-border business setup
+                </span>
+              </div>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link to="/contact">
+                  <Button variant="hero" size="lg">
+                    Contact our team <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link to="/about">
+                  <Button variant="outline" size="lg">
+                    Learn more
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-4 self-stretch">
+              {currenxieAgencyPoints.map((point, index) => (
+                <motion.div
+                  key={point}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.12 }}
+                  className="rounded-[24px] border border-white/60 bg-white/80 p-6 backdrop-blur"
+                >
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10">
+                    <Building2 className="h-5 w-5 text-accent" />
+                  </div>
+                  <p className="text-base leading-7 text-foreground">{point}</p>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         </div>
@@ -183,6 +275,10 @@ const Index = () => {
             <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
               Origin Wallet is designed to unify provider connectivity, operational visibility,
               and cross-border money movement inside one platform flow.
+            </p>
+            <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
+              Our platform is designed to drive cross-border transaction volume by simplifying
+              multi-provider financial operations for businesses and software-led teams.
             </p>
           </motion.div>
 
@@ -267,7 +363,8 @@ const Index = () => {
             </span>
             <h2 className="text-4xl md:text-5xl font-black mb-4">Our Services</h2>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              Cross-border finance tooling for modern individuals and businesses.
+              Cross-border finance tooling for modern individuals, businesses, and
+              integration-led platforms.
             </p>
           </motion.div>
 
@@ -315,13 +412,18 @@ const Index = () => {
             <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
               Our platform integrates with multiple global financial providers via secure APIs to support cross-border wallets, balances, and payment workflows.
             </p>
+            <p className="mx-auto mb-8 max-w-3xl text-sm leading-7 text-white/65">
+              Built to support provider-connected operating models, including integrations with
+              global financial partners, including providers such as Airwallex, Wise, and
+              Currenxie where capabilities and environment readiness are available.
+            </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">
-                <Button variant="hero" size="lg">Get Started</Button>
+                <Button variant="hero" size="lg">Request Access</Button>
               </Link>
-              <Link to="/about">
+              <Link to="/business/api">
                 <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-primary">
-                  Our Story
+                  Book Demo
                 </Button>
               </Link>
             </div>
@@ -375,17 +477,18 @@ const Index = () => {
               Ready to Go Global?
             </h2>
             <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-              Explore a more transparent way to manage international transfers and multi-currency operations.
+              Explore a more transparent way to manage cross-border payments, balances, and
+              provider-connected financial workflows.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">
                 <Button variant="hero" size="lg" className="text-base px-10">
-                  Contact Our Team <ArrowRight className="w-4 h-4 ml-2" />
+                  Request Access <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              <Link to="/pricing">
+              <Link to="/business/api">
                 <Button variant="outline" size="lg" className="text-base px-10">
-                  View Pricing
+                  Book Demo
                 </Button>
               </Link>
             </div>

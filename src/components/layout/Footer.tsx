@@ -39,7 +39,8 @@ const Footer = () => {
               </span>
             </div>
             <p className="max-w-xs text-sm leading-relaxed text-primary-foreground/70">
-              Cross-border wallet and payment experiences for individuals and businesses.
+              Embedded finance and cross-border payment workflows for businesses, operators, and
+              integration-led platforms.
             </p>
           </div>
 
@@ -81,8 +82,11 @@ const Footer = () => {
                 >
                   info@khoinguyentechnology.com
                 </a>
-                . Origin Wallet is a financial technology platform. Service availability,
-                regulatory treatment, and scope may vary by jurisdiction.
+                . Origin Wallet is a financial technology platform focused on provider-connected
+                cross-border payment workflows. Service availability, regulatory treatment, and
+                scope may vary by jurisdiction. The platform is currently onboarding early users
+                and expanding provider integrations, including support for providers such as
+                Airwallex, Wise, and Currenxie where available.
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">

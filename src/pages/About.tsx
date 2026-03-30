@@ -481,6 +481,12 @@ const About = () => {
               <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">
                 Origin Wallet is a cross-border finance experience built by <span className="font-semibold text-white">KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</span>, focused on transparent product flows, operational clarity, and modern digital financial experiences.
               </p>
+              <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-slate-400 md:text-base">
+                We are currently onboarding early users and expanding provider integrations to
+                support a stronger multi-provider financial operations platform over time,
+                including workflows designed around providers such as Airwallex, Wise, and
+                Currenxie where available.
+              </p>
             </div>
 
             <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
