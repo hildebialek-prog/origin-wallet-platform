@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import Seo from "@/components/Seo";
 import {
   ArrowRight,
   Globe,
@@ -61,8 +62,41 @@ const currenxieAgencyPoints = [
 ];
 
 const Index = () => {
+  const seoSchema = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "Origin Wallet",
+      url: "https://khoinguyenoriginwallet.com/",
+      logo: "https://khoinguyenoriginwallet.com/logo/logo.jpg",
+      image: "https://khoinguyenoriginwallet.com/content/banner.jpg",
+      description:
+        "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, and provider-connected business payment operations.",
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "Origin Wallet",
+      url: "https://khoinguyenoriginwallet.com/",
+      description:
+        "Origin Wallet helps businesses and individuals manage global payments, balances, and multi-provider financial workflows.",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: "https://khoinguyenoriginwallet.com/?q={search_term_string}",
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ];
+
   return (
     <div>
+      <Seo
+        title="Origin Wallet | Global Payments, Multi-Currency Wallet & Business Transfers"
+        description="Origin Wallet is a global payments platform for multi-currency wallets, international transfers, business payments, and provider-connected financial operations."
+        path="/"
+        image="/content/banner.jpg"
+        schema={seoSchema}
+      />
       <section className="relative min-h-screen flex items-center overflow-hidden">
         <div
           className="absolute inset-0 z-0"
@@ -78,21 +112,21 @@ const Index = () => {
           <div className="max-w-4xl rounded-[32px] border border-white/10 bg-slate-950/32 p-6 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] backdrop-blur-md sm:p-8 lg:p-10">
             <motion.div {...fadeUp}>
               <span className="inline-block px-4 py-1.5 bg-accent text-white text-sm font-semibold rounded-full mb-6">
-                Multi-Provider Financial Platform
+                Origin Wallet Global Payments Platform
               </span>
               <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.95] mb-8">
-                UNIFIED
+                ORIGIN WALLET
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-yellow-400">
                   GLOBAL PAYMENTS
                 </span>
               </h1>
               <p className="text-xl sm:text-2xl text-white/92 max-w-2xl leading-relaxed mb-10">
-                A unified platform for managing global payments, balances, and financial operations across multiple providers through clearer workflows and secure APIs.
+                Origin Wallet helps businesses and individuals manage global payments, balances, international transfers, and multi-provider financial operations through clearer workflows and secure APIs.
               </p>
               <p className="mb-10 max-w-3xl text-base leading-8 text-white/78 sm:text-lg">
-                We are building an embedded finance orchestration layer that connects businesses to
-                multiple global financial providers through a unified product and API experience.
+                Origin Wallet is building an embedded finance orchestration layer that connects businesses to
+                multiple global financial providers through a unified product, wallet, and API experience.
               </p>
               <div className="mb-10 flex flex-wrap gap-3 text-sm text-white/75">
                 {[
@@ -270,11 +304,11 @@ const Index = () => {
               How It Works
             </span>
             <h2 className="text-4xl md:text-5xl font-black mb-4">
-              Connect providers, manage operations, move money
+              Why choose Origin Wallet for global payments
             </h2>
             <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
               Origin Wallet is designed to unify provider connectivity, operational visibility,
-              and cross-border money movement inside one platform flow.
+              multi-currency wallet management, and cross-border money movement inside one platform flow.
             </p>
             <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
               Our platform is designed to drive cross-border transaction volume by simplifying
@@ -361,9 +395,9 @@ const Index = () => {
             <span className="inline-block px-3 py-1 text-xs font-semibold bg-accent/10 text-accent rounded-full mb-4">
               What We Offer
             </span>
-            <h2 className="text-4xl md:text-5xl font-black mb-4">Our Services</h2>
+            <h2 className="text-4xl md:text-5xl font-black mb-4">Origin Wallet Services</h2>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              Cross-border finance tooling for modern individuals, businesses, and
+              Origin Wallet provides cross-border finance tooling for modern individuals, businesses, and
               integration-led platforms.
             </p>
           </motion.div>
@@ -490,6 +524,20 @@ const Index = () => {
                 <Button variant="outline" size="lg" className="text-base px-10">
                   Book Demo
                 </Button>
+              </Link>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
+              <Link to="/business" className="hover:text-foreground hover:underline">
+                Origin Wallet Business
+              </Link>
+              <Link to="/personal" className="hover:text-foreground hover:underline">
+                Origin Wallet Personal
+              </Link>
+              <Link to="/pricing" className="hover:text-foreground hover:underline">
+                Origin Wallet Pricing
+              </Link>
+              <Link to="/help" className="hover:text-foreground hover:underline">
+                Origin Wallet Help Center
               </Link>
             </div>
           </motion.div>

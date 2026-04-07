@@ -2,11 +2,18 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 import { businessFeatures, fadeUp } from "@/pages/business/business-content";
 
 const Business = () => {
   return (
     <div>
+      <Seo
+        title="Origin Wallet Business | Global Business Payments & Provider Workflows"
+        description="Origin Wallet Business supports supplier payments, collections, payout operations, and API-led financial workflows across multiple providers."
+        path="/business"
+        image="/content/banner.jpg"
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-wide mx-auto">
           <motion.div {...fadeUp} className="mx-auto max-w-4xl text-center">

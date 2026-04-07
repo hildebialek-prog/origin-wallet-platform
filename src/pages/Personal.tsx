@@ -2,11 +2,18 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 import { fadeUp, personalFeatures } from "@/pages/personal/personal-content";
 
 const Personal = () => {
   return (
     <div>
+      <Seo
+        title="Origin Wallet Personal | International Transfers, Wallet & Receive Money"
+        description="Explore Origin Wallet personal features for international transfers, multi-currency wallet management, and receiving money across borders."
+        path="/personal"
+        image="/content/banner.jpg"
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-wide mx-auto">
           <motion.div {...fadeUp} className="mx-auto max-w-4xl text-center">

@@ -12,6 +12,7 @@ import {
   Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 import { toast } from "@/components/ui/use-toast";
 import {
   ContactSubmissionError,
@@ -36,6 +37,29 @@ const emptyForm = {
 };
 
 const Contact = () => {
+  const contactSchemaData = {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    name: "Contact Origin Wallet",
+    url: "https://khoinguyenoriginwallet.com/contact",
+    description:
+      "Contact Origin Wallet for product enquiries, partnerships, support, security follow-up, and cross-border payment workflow discussions.",
+    mainEntity: {
+      "@type": "Organization",
+      name: "Origin Wallet",
+      email: "info@khoinguyentechnology.com",
+      url: "https://khoinguyenoriginwallet.com/",
+      contactPoint: [
+        {
+          "@type": "ContactPoint",
+          contactType: "customer support",
+          email: "info@khoinguyentechnology.com",
+          availableLanguage: ["en", "vi"],
+        },
+      ],
+    },
+  };
+
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -110,6 +134,13 @@ const Contact = () => {
 
   return (
     <div>
+      <Seo
+        title="Contact Origin Wallet | Sales, Partnerships & Support"
+        description="Contact Origin Wallet for product enquiries, partnerships, support, security follow-up, and cross-border payment workflow discussions."
+        path="/contact"
+        image="/content/banner.jpg"
+        schema={contactSchemaData}
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-tight mx-auto text-center">
           <motion.div
@@ -311,6 +342,20 @@ const Contact = () => {
                       {link.label}
                     </Link>
                   ))}
+                </div>
+                <div className="mt-6 border-t border-border pt-4 text-sm text-muted-foreground">
+                  See also:{" "}
+                  <Link to="/business" className="text-foreground hover:underline">
+                    business payments
+                  </Link>
+                  {", "}
+                  <Link to="/pricing" className="text-foreground hover:underline">
+                    pricing visibility
+                  </Link>
+                  {", "}
+                  <Link to="/security" className="text-foreground hover:underline">
+                    platform security
+                  </Link>
                 </div>
               </div>
             </div>

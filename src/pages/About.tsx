@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 import {
   Target,
   Heart,
@@ -57,6 +58,12 @@ const featureToneClasses = {
 const About = () => {
   return (
     <div>
+      <Seo
+        title="About Origin Wallet | Cross-Border Payments Platform & Company Information"
+        description="Learn about Origin Wallet, our cross-border payments platform, mission, product direction, and company operating information."
+        path="/about"
+        image="/content/content1.jpg"
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-tight mx-auto text-center">
           <motion.div {...fadeUp}>

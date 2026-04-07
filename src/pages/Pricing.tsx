@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CurrencyCalculator from "@/components/CurrencyCalculator";
+import Seo from "@/components/Seo";
 import useExchangeRates from "@/hooks/useExchangeRates";
 
 const fadeUp = {
@@ -27,8 +28,39 @@ const corridorExamples = [
   { from: "AUD", to: "GBP", amount: 1000 },
 ];
 
+const pricingFaqs = [
+  {
+    q: "What is shown on this page?",
+    a: "This page shows illustrative pricing views based on live reference rates. It is designed to demonstrate how pricing visibility works inside the platform.",
+  },
+  {
+    q: "Do fees vary by corridor?",
+    a: "Yes. Final fees and quote outcomes can vary depending on the provider, corridor, transfer type, amount, and timing.",
+  },
+  {
+    q: "Are these final provider quotes?",
+    a: "No. Final provider quotes are determined at execution time inside the authenticated transfer workflow.",
+  },
+  {
+    q: "How does Origin Wallet make money?",
+    a: "Commercial models may vary by workflow, provider setup, and product configuration. The platform is designed to surface pricing clearly rather than obscure it.",
+  },
+];
+
 const Pricing = () => {
   const { loading, lastUpdated, getCorridorData, refreshRates } = useExchangeRates();
+  const pricingSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: pricingFaqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.a,
+      },
+    })),
+  };
 
   const formatLiveTimestamp = (value: string | null) => {
     if (!value) return "Loading...";
@@ -43,6 +75,13 @@ const Pricing = () => {
 
   return (
     <div>
+      <Seo
+        title="Origin Wallet Pricing | Global Payment Fees, Rates & Transfer Visibility"
+        description="Review Origin Wallet pricing visibility, illustrative exchange rates, transfer fees, and global payment workflow economics."
+        path="/pricing"
+        image="/content/banner.jpg"
+        schema={pricingSchema}
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-wide mx-auto text-center">
           <motion.div {...fadeUp}>
@@ -270,24 +309,7 @@ const Pricing = () => {
         <div className="container-tight mx-auto">
           <h2 className="mb-8 text-center text-2xl font-extrabold">Pricing FAQ</h2>
           <div className="mx-auto max-w-2xl space-y-3">
-            {[
-              {
-                q: "What is shown on this page?",
-                a: "This page shows illustrative pricing views based on live reference rates. It is designed to demonstrate how pricing visibility works inside the platform.",
-              },
-              {
-                q: "Do fees vary by corridor?",
-                a: "Yes. Final fees and quote outcomes can vary depending on the provider, corridor, transfer type, amount, and timing.",
-              },
-              {
-                q: "Are these final provider quotes?",
-                a: "No. Final provider quotes are determined at execution time inside the authenticated transfer workflow.",
-              },
-              {
-                q: "How does Origin Wallet make money?",
-                a: "Commercial models may vary by workflow, provider setup, and product configuration. The platform is designed to surface pricing clearly rather than obscure it.",
-              },
-            ].map((faq, i) => (
+            {pricingFaqs.map((faq, i) => (
               <details key={i} className="group rounded-xl border border-border bg-card">
                 <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 font-medium">
                   {faq.q}
@@ -321,6 +343,17 @@ const Pricing = () => {
               Get started <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-primary-foreground/75">
+            <Link to="/business" className="hover:text-white hover:underline">
+              Explore business payments
+            </Link>
+            <Link to="/personal" className="hover:text-white hover:underline">
+              Explore personal transfers
+            </Link>
+            <Link to="/help" className="hover:text-white hover:underline">
+              Read pricing FAQs
+            </Link>
+          </div>
         </div>
       </section>
     </div>

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { ArrowDownToLine, ArrowRight, CheckCircle2, ChevronRight, Send, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 
 export const fadeUp = {
   initial: { opacity: 0, y: 30 },
@@ -180,13 +181,71 @@ export const PersonalFeaturePage = ({
 }) => {
   const Icon = feature.icon;
   const heroMeta = personalHeroMeta[feature.id];
+  const path = `/personal/${feature.id}`;
+  const seoSchema = [
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: feature.faqs.map((faq) => ({
+        "@type": "Question",
+        name: faq.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: faq.a,
+        },
+      })),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Origin Wallet",
+          item: "https://khoinguyenoriginwallet.com/",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Personal",
+          item: "https://khoinguyenoriginwallet.com/personal",
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: feature.navLabel,
+          item: `https://khoinguyenoriginwallet.com${path}`,
+        },
+      ],
+    },
+  ];
 
   return (
     <div>
+      <Seo
+        title={`Origin Wallet ${feature.navLabel} | ${feature.heroTitle}`}
+        description={`Origin Wallet ${feature.navLabel.toLowerCase()} experience: ${feature.heroDescription}`}
+        path={path}
+        image="/content/banner.jpg"
+        schema={seoSchema}
+        pageName={`Origin Wallet ${feature.navLabel}`}
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-wide mx-auto">
           <motion.div {...fadeUp} className="grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
             <div>
+              <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-primary-foreground/60">
+                <Link to="/" className="hover:text-white">
+                  Origin Wallet
+                </Link>
+                <span>/</span>
+                <Link to="/personal" className="hover:text-white">
+                  Personal
+                </Link>
+                <span>/</span>
+                <span className="text-primary-foreground">{feature.navLabel}</span>
+              </nav>
               <span className="mb-4 inline-block rounded-full bg-accent/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
                 Personal
               </span>
@@ -276,6 +335,17 @@ export const PersonalFeaturePage = ({
                 <Link to="/pricing"><Button variant="outline" size="sm">View fees</Button></Link>
                 <Link to="/contact"><Button variant="hero" size="sm">Get started</Button></Link>
               </div>
+              <div className="mt-5 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <Link to="/personal" className="hover:text-foreground hover:underline">
+                  All personal features
+                </Link>
+                <Link to="/help" className="hover:text-foreground hover:underline">
+                  Help center
+                </Link>
+                <Link to="/security" className="hover:text-foreground hover:underline">
+                  Security
+                </Link>
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -350,6 +420,14 @@ export const PersonalFeaturePage = ({
           <Link to="/contact">
             <Button variant="hero" size="lg">Contact our team <ArrowRight className="w-4 h-4 ml-1" /></Button>
           </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-primary-foreground/75">
+            <Link to="/personal" className="hover:text-white hover:underline">
+              Origin Wallet Personal
+            </Link>
+            <Link to="/pricing" className="hover:text-white hover:underline">
+              Pricing visibility
+            </Link>
+          </div>
         </div>
       </section>
     </div>

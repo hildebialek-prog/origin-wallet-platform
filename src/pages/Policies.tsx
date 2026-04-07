@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import Seo from "@/components/Seo";
 
 const sections = [
   {
@@ -73,6 +74,12 @@ const Policies = () => {
 
   return (
     <div>
+      <Seo
+        title="Origin Wallet Legal & Policies | Privacy Policy, Terms & Disclaimer"
+        description="Review Origin Wallet legal information, privacy policy, terms of service, disclaimer, and platform operating details."
+        path="/policies"
+        image="/content/banner.jpg"
+      />
       <div className="fixed top-16 left-0 right-0 z-40 h-0.5 bg-border">
         <div className="h-full bg-accent transition-all duration-150" style={{ width: `${scrollProgress}%` }} />
       </div>

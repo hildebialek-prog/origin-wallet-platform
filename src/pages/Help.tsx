@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 import { helpCategories } from "@/data/help-center";
 
 const fadeUp = {
@@ -15,6 +16,20 @@ const fadeUp = {
 
 const Help = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const helpSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: helpCategories.flatMap((category) =>
+      category.articles.map((article) => ({
+        "@type": "Question",
+        name: article.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: article.a,
+        },
+      })),
+    ),
+  };
 
   const filteredCategories = helpCategories
     .map((category) => ({
@@ -29,6 +44,13 @@ const Help = () => {
 
   return (
     <div>
+      <Seo
+        title="Origin Wallet Help Center | FAQs, Support Articles & Answers"
+        description="Browse the Origin Wallet help center for FAQs, support articles, and answers about transfers, wallets, balances, onboarding, and platform usage."
+        path="/help"
+        image="/content/banner.jpg"
+        schema={helpSchema}
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-tight mx-auto text-center">
           <motion.div {...fadeUp}>
@@ -114,9 +136,17 @@ const Help = () => {
         <div className="container-tight mx-auto">
           <h2 className="mb-4 text-2xl font-extrabold">Still need help?</h2>
           <p className="mb-6 text-muted-foreground">Our support team is here for you.</p>
-          <Link to="/contact">
-            <Button variant="hero">Contact support</Button>
-          </Link>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link to="/contact">
+              <Button variant="hero">Contact support</Button>
+            </Link>
+            <Link to="/security">
+              <Button variant="outline">Security information</Button>
+            </Link>
+            <Link to="/pricing">
+              <Button variant="outline">Pricing FAQ</Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

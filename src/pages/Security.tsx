@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import Seo from "@/components/Seo";
 import {
   AlertTriangle,
   ArrowRight,
@@ -19,9 +20,48 @@ const fadeUp = {
   transition: { duration: 0.5 },
 };
 
+const securityFaqs = [
+  {
+    q: "How is platform data protected?",
+    a: "Sensitive data is intended to be handled through encrypted transport, controlled storage practices, and role-based access restrictions.",
+  },
+  {
+    q: "What happens if there is a security incident?",
+    a: "Operational security events are expected to follow internal review, escalation, and response procedures appropriate to the severity of the issue.",
+  },
+  {
+    q: "Do you share data with third parties?",
+    a: "Platform workflows may require data sharing with trusted service providers and regulated partners where needed to support the financial operation.",
+  },
+  {
+    q: "How do I report a security concern?",
+    a: "Security concerns can be reported through our contact page so the appropriate team can review and respond.",
+  },
+];
+
 const Security = () => {
+  const securitySchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: securityFaqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.a,
+      },
+    })),
+  };
+
   return (
     <div>
+      <Seo
+        title="Origin Wallet Security | Platform Controls, Protection & Trust"
+        description="Read about Origin Wallet security, platform controls, access management, encryption posture, and provider-aware operational safeguards."
+        path="/security"
+        image="/content/banner.jpg"
+        schema={securitySchema}
+      />
       <section className="bg-hero text-primary-foreground section-padding">
         <div className="container-wide mx-auto text-center">
           <motion.div {...fadeUp}>
@@ -154,24 +194,7 @@ const Security = () => {
         <div className="container-tight mx-auto">
           <h2 className="mb-8 text-center text-2xl font-extrabold">Security FAQ</h2>
           <div className="mx-auto max-w-2xl space-y-3">
-            {[
-              {
-                q: "How is platform data protected?",
-                a: "Sensitive data is intended to be handled through encrypted transport, controlled storage practices, and role-based access restrictions.",
-              },
-              {
-                q: "What happens if there is a security incident?",
-                a: "Operational security events are expected to follow internal review, escalation, and response procedures appropriate to the severity of the issue.",
-              },
-              {
-                q: "Do you share data with third parties?",
-                a: "Platform workflows may require data sharing with trusted service providers and regulated partners where needed to support the financial operation.",
-              },
-              {
-                q: "How do I report a security concern?",
-                a: "Security concerns can be reported through our contact page so the appropriate team can review and respond.",
-              },
-            ].map((faq, i) => (
+            {securityFaqs.map((faq, i) => (
               <details key={i} className="group rounded-xl border border-border bg-card">
                 <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 font-medium">
                   {faq.q}
@@ -200,6 +223,14 @@ const Security = () => {
               Contact us <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-primary-foreground/75">
+            <Link to="/policies" className="hover:text-white hover:underline">
+              Legal & policies
+            </Link>
+            <Link to="/help" className="hover:text-white hover:underline">
+              Help center
+            </Link>
+          </div>
         </div>
       </section>
     </div>
