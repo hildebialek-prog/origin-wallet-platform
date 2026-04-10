@@ -26,7 +26,7 @@ const featureImg2 = "https://images.unsplash.com/photo-1460925895917-afdab827c52
 const featureImg3 = "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=600&fit=crop";
 const ctaBg = "https://images.unsplash.com/photo-1551434678-e076c223a692?w=1920&h=800&fit=crop";
 const currenxieLogo = "/logo/currenxie-logo.svg";
-
+const airwallexLogo = "/logo/airwallex-logo.png";
 const fadeUp = {
   initial: { opacity: 0, y: 40 },
   whileInView: { opacity: 1, y: 0 },
@@ -55,10 +55,71 @@ const useCases = [
   },
 ];
 
-const currenxieAgencyPoints = [
-  "Highlight Currenxie-led onboarding and account support for interested customers.",
-  "Guide businesses through cross-border payment setup with a clearer consultation flow.",
-  "Create a stronger trust signal on the homepage for users evaluating provider access.",
+const partnerHighlights = [
+  {
+    id: "currenxie",
+    label: "Featured Partner",
+    name: "Currenxie",
+    badge: "Currenxie Agency",
+    title: "Origin Wallet is a Currenxie agency for cross-border payment support",
+    description:
+      "Connect with Origin Wallet for Currenxie-related consultation, guided onboarding, and clearer cross-border business payment support.",
+    tags: [
+      "Currenxie-focused consultation",
+      "Guided onboarding support",
+      "Cross-border business setup",
+    ],
+    points: [
+      "Highlight Currenxie-led onboarding and account support for interested customers.",
+      "Guide businesses through cross-border payment setup with a clearer consultation flow.",
+      "Create a stronger trust signal on the homepage for users evaluating provider access.",
+    ],
+    accentClassName: "text-accent",
+    iconWrapClassName: "border border-[#10162B] bg-[#0B1022] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+    badgeWrapClassName:
+      "inline-flex items-center gap-4 rounded-[26px] border border-white/70 bg-white/92 px-5 py-4 shadow-sm backdrop-blur",
+    logoSlotClassName: "min-h-[78px] min-w-[310px] rounded-[20px] px-5",
+    textWrapClassName: "pr-3",
+    logo: (
+      <img
+        src={currenxieLogo}
+        alt="Currenxie logo"
+        className="h-9 w-auto"
+      />
+    ),
+  },
+  {
+    id: "airwallex",
+    label: "Strategic Partner",
+    name: "Airwallex",
+    badge: "Partner Master Account",
+    title: "Origin Wallet operates with an Airwallex partner master account model",
+    description:
+      "Access Airwallex through Origin Wallet with partner-led onboarding, account coordination, and support for cross-border payment workflows.",
+    tags: [
+      "Master account oversight",
+      "Partner-led onboarding",
+      "Business payment coordination",
+    ],
+    points: [
+      "Explain that Origin Wallet supports customer activation under a partner-managed Airwallex setup.",
+      "Clarify the master account role for onboarding coordination, account structure, and operational guidance.",
+      "Strengthen homepage credibility for businesses evaluating partner-assisted Airwallex access.",
+    ],
+    accentClassName: "text-sky-600",
+    iconWrapClassName: "border border-slate-200 bg-white",
+    badgeWrapClassName:
+      "inline-flex items-center gap-4 rounded-[26px] border border-white/70 bg-white/88 px-5 py-4 shadow-sm backdrop-blur",
+    logoSlotClassName: "min-h-16 min-w-[232px] rounded-[18px] px-5",
+    textWrapClassName: "",
+    logo: (
+      <img
+        src={airwallexLogo}
+        alt="Airwallex logo"
+        className="h-7 w-auto sm:h-8"
+      />
+    ),
+  },
 ];
 
 const Index = () => {
@@ -67,16 +128,22 @@ const Index = () => {
       "@context": "https://schema.org",
       "@type": "Organization",
       name: "Origin Wallet",
+      alternateName: ["Origin Wallet Global Payments", "KHOI NGUYEN Origin Wallet"],
       url: "https://khoinguyenoriginwallet.com/",
       logo: "https://khoinguyenoriginwallet.com/logo/logo.jpg",
       image: "https://khoinguyenoriginwallet.com/content/banner.jpg",
       description:
         "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, and provider-connected business payment operations.",
+      parentOrganization: {
+        "@type": "Organization",
+        name: "KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY",
+      },
     },
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
       name: "Origin Wallet",
+      alternateName: "Origin Wallet Global Payments",
       url: "https://khoinguyenoriginwallet.com/",
       description:
         "Origin Wallet helps businesses and individuals manage global payments, balances, and multi-provider financial workflows.",
@@ -91,11 +158,12 @@ const Index = () => {
   return (
     <div>
       <Seo
-        title="Origin Wallet | Global Payments, Multi-Currency Wallet & Business Transfers"
-        description="Origin Wallet is a global payments platform for multi-currency wallets, international transfers, business payments, and provider-connected financial operations."
+        title="Origin Wallet | Global Payments Platform by KHOI NGUYEN TECHNOLOGY"
+        description="Origin Wallet is a global payments platform by KHOI NGUYEN TECHNOLOGY for multi-currency wallets, international transfers, business payments, and provider-connected financial operations."
         path="/"
         image="/content/banner.jpg"
         schema={seoSchema}
+        pageName="Origin Wallet"
       />
       <section className="relative min-h-screen flex items-center overflow-hidden">
         <div
@@ -127,6 +195,10 @@ const Index = () => {
               <p className="mb-10 max-w-3xl text-base leading-8 text-white/78 sm:text-lg">
                 Origin Wallet is building an embedded finance orchestration layer that connects businesses to
                 multiple global financial providers through a unified product, wallet, and API experience.
+              </p>
+              <p className="mb-10 max-w-3xl text-sm leading-7 text-white/70">
+                Operated by <span className="font-semibold text-white">KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</span>,
+                Origin Wallet focuses on global payments, multi-currency workflows, and provider-connected financial operations.
               </p>
               <div className="mb-10 flex flex-wrap gap-3 text-sm text-white/75">
                 {[
@@ -173,81 +245,80 @@ const Index = () => {
 
       <section className="bg-background py-16 md:py-20">
         <div className="container-wide mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            {...fadeUp}
-            className="grid gap-8 overflow-hidden rounded-[32px] border border-accent/15 bg-[linear-gradient(135deg,rgba(7,89,133,0.08),rgba(249,115,22,0.12))] p-8 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.65)] lg:grid-cols-[1.2fr_0.8fr] lg:p-10"
-          >
-            <div>
-              <div className="mb-5 inline-flex items-center gap-4 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
-                <div className="flex h-14 items-center justify-center rounded-xl bg-slate-950 px-4">
-                  <img
-                    src={currenxieLogo}
-                    alt="Currenxie logo"
-                    className="h-5 w-auto sm:h-6"
-                  />
-                </div>
+          <div className="grid gap-8">
+            {partnerHighlights.map((partner, partnerIndex) => (
+              <motion.div
+                key={partner.id}
+                {...fadeUp}
+                transition={{ duration: 0.7, delay: partnerIndex * 0.08 }}
+                className="grid gap-8 overflow-hidden rounded-[32px] border border-accent/15 bg-[linear-gradient(135deg,rgba(7,89,133,0.08),rgba(249,115,22,0.12))] p-8 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.65)] lg:grid-cols-[1.2fr_0.8fr] lg:p-10"
+              >
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                    Featured Partner
-                  </p>
-                  <p className="text-lg font-bold text-foreground">Currenxie</p>
-                </div>
-              </div>
-              <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/15 bg-white/80 px-4 py-2 text-sm font-semibold text-accent backdrop-blur">
-                <BadgeCheck className="h-4 w-4" />
-                Currenxie Agency
-              </span>
-              <h2 className="max-w-3xl text-3xl font-black leading-tight text-foreground sm:text-4xl">
-                Origin Wallet is a Currenxie agency for cross-border payment support
-              </h2>
-              <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                This homepage section helps visitors immediately understand that they can connect
-                with our team for Currenxie-related consultation, onboarding guidance, and
-                cross-border business payment support.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3 text-sm text-foreground/80">
-                <span className="rounded-full border border-border bg-background/80 px-4 py-2">
-                  Currenxie-focused consultation
-                </span>
-                <span className="rounded-full border border-border bg-background/80 px-4 py-2">
-                  Guided onboarding support
-                </span>
-                <span className="rounded-full border border-border bg-background/80 px-4 py-2">
-                  Cross-border business setup
-                </span>
-              </div>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link to="/contact">
-                  <Button variant="hero" size="lg">
-                    Contact our team <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link to="/about">
-                  <Button variant="outline" size="lg">
-                    Learn more
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid gap-4 self-stretch">
-              {currenxieAgencyPoints.map((point, index) => (
-                <motion.div
-                  key={point}
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.12 }}
-                  className="rounded-[24px] border border-white/60 bg-white/80 p-6 backdrop-blur"
-                >
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10">
-                    <Building2 className="h-5 w-5 text-accent" />
+                  <div className={`mb-5 ${partner.badgeWrapClassName}`}>
+                    <div className={`flex items-center justify-center ${partner.logoSlotClassName} ${partner.iconWrapClassName}`}>
+                      {partner.logo}
+                    </div>
+                    <div className={partner.textWrapClassName}>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                        {partner.label}
+                      </p>
+                      <p className="text-lg font-bold text-foreground">{partner.name}</p>
+                    </div>
                   </div>
-                  <p className="text-base leading-7 text-foreground">{point}</p>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
+                  <span className={`mb-4 inline-flex items-center gap-2 rounded-full border border-accent/15 bg-white/80 px-4 py-2 text-sm font-semibold backdrop-blur ${partner.accentClassName}`}>
+                    <BadgeCheck className="h-4 w-4" />
+                    {partner.badge}
+                  </span>
+                  <h2 className="max-w-3xl text-3xl font-black leading-tight text-foreground sm:text-4xl">
+                    {partner.title}
+                  </h2>
+                  <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+                    {partner.description}
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3 text-sm text-foreground/80">
+                    {partner.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-border bg-background/80 px-4 py-2"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    <Link to="/contact">
+                      <Button variant="hero" size="lg">
+                        Contact our team <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Link to="/about">
+                      <Button variant="outline" size="lg">
+                        Learn more
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 self-stretch">
+                  {partner.points.map((point, index) => (
+                    <motion.div
+                      key={point}
+                      initial={{ opacity: 0, y: 24 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.12 }}
+                      className="rounded-[24px] border border-white/60 bg-white/80 p-6 backdrop-blur"
+                    >
+                      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10">
+                        <Building2 className={`h-5 w-5 ${partner.accentClassName}`} />
+                      </div>
+                      <p className="text-base leading-7 text-foreground">{point}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 

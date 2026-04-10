@@ -47,6 +47,8 @@ const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [availabilityMessage, setAvailabilityMessage] = useState("");
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const showDebugInfo = import.meta.env.DEV || isLocalhostOrigin();
 
   useEffect(() => {
     let mounted = true;
@@ -126,6 +128,22 @@ const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => 
         </div>
       )}
       <div ref={containerRef} className={loading || !!availabilityMessage ? "hidden" : "flex justify-center"} />
+      {showDebugInfo && (
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+          <div>
+            <span className="font-semibold text-slate-700">Google OAuth debug</span>
+          </div>
+          <div>
+            Origin: <span className="font-mono">{currentOrigin || "unknown"}</span>
+          </div>
+          <div>
+            Client ID: <span className="font-mono break-all">{googleClientId}</span>
+          </div>
+          <div>
+            Localhost allowed: <span className="font-mono">{allowGoogleOnLocalhost ? "true" : "false"}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
