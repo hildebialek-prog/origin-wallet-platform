@@ -45,6 +45,15 @@ const hideOverlay = () => {
   document.documentElement.style.overflow = "";
 };
 
+const shouldRunDevtoolsDetection = () => {
+  const isTouchDevice =
+    window.matchMedia("(pointer: coarse)").matches ||
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0;
+
+  return !isTouchDevice;
+};
+
 export const setupRuntimeProtection = () => {
   if (!import.meta.env.PROD) {
     return;
@@ -86,6 +95,11 @@ export const setupRuntimeProtection = () => {
 
     hideOverlay();
   };
+
+  if (!shouldRunDevtoolsDetection()) {
+    hideOverlay();
+    return;
+  }
 
   window.setInterval(detectDevtools, 1000);
   detectDevtools();

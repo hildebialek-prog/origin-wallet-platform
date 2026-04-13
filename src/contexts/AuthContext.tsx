@@ -101,6 +101,8 @@ interface StoredSession {
   providers?: ProviderCapability[];
 }
 
+type JsonRecord = Record<string, unknown>;
+
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
@@ -134,24 +136,64 @@ const buildApiUrl = (path: string) => {
   return path.startsWith("http") ? path : `${apiBaseUrl}${path}`;
 };
 
-const toAuthUser = (source: any, payload?: any): AuthUser => ({
-  id: String(source?.id ?? source?._id ?? source?.userId ?? source?.sub ?? source?.email ?? ""),
-  email: source?.email ?? null,
-  name: source?.full_name ?? source?.fullName ?? source?.name ?? source?.displayName ?? null,
-  picture: source?.picture ?? source?.avatar ?? source?.photoURL ?? null,
-  providerId: source?.providerId ?? source?.provider ?? null,
-  phone: source?.phone ?? source?.phoneNumber ?? null,
-  company:
-    source?.company ??
-    source?.companyName ??
-    source?.profile?.company_name ??
-    source?.profile?.companyName ??
-    null,
-  country: source?.country ?? source?.profile?.country_code ?? source?.profile?.countryCode ?? null,
-  providerCode:
-    payload?.onboarding?.selected_provider_code ?? payload?.providers?.[0]?.code ?? source?.provider_code ?? null,
-  profile: source?.profile ?? null,
-});
+const asRecord = (value: unknown): JsonRecord => ((typeof value === "object" && value !== null ? value : {}) as JsonRecord);
+
+const toAuthUser = (source: unknown, payload?: unknown): AuthUser => {
+  const sourceRecord = asRecord(source);
+  const payloadRecord = asRecord(payload);
+  const sourceProfile = asRecord(sourceRecord.profile);
+  const payloadOnboarding = asRecord(payloadRecord.onboarding);
+  const payloadProviders = Array.isArray(payloadRecord.providers) ? payloadRecord.providers : [];
+  const firstProvider = asRecord(payloadProviders[0]);
+
+  return {
+    id: String(
+      sourceRecord.id ??
+        sourceRecord._id ??
+        sourceRecord.userId ??
+        sourceRecord.sub ??
+        sourceRecord.email ??
+        "",
+    ),
+    email: (sourceRecord.email as string | null | undefined) ?? null,
+    name:
+      (sourceRecord.full_name as string | null | undefined) ??
+      (sourceRecord.fullName as string | null | undefined) ??
+      (sourceRecord.name as string | null | undefined) ??
+      (sourceRecord.displayName as string | null | undefined) ??
+      null,
+    picture:
+      (sourceRecord.picture as string | null | undefined) ??
+      (sourceRecord.avatar as string | null | undefined) ??
+      (sourceRecord.photoURL as string | null | undefined) ??
+      null,
+    providerId:
+      (sourceRecord.providerId as string | null | undefined) ??
+      (sourceRecord.provider as string | null | undefined) ??
+      null,
+    phone:
+      (sourceRecord.phone as string | null | undefined) ??
+      (sourceRecord.phoneNumber as string | null | undefined) ??
+      null,
+    company:
+      (sourceRecord.company as string | null | undefined) ??
+      (sourceRecord.companyName as string | null | undefined) ??
+      (sourceProfile.company_name as string | null | undefined) ??
+      (sourceProfile.companyName as string | null | undefined) ??
+      null,
+    country:
+      (sourceRecord.country as string | null | undefined) ??
+      (sourceProfile.country_code as string | null | undefined) ??
+      (sourceProfile.countryCode as string | null | undefined) ??
+      null,
+    providerCode:
+      (payloadOnboarding.selected_provider_code as string | null | undefined) ??
+      (firstProvider.code as string | null | undefined) ??
+      (sourceRecord.provider_code as string | null | undefined) ??
+      null,
+    profile: sourceProfile,
+  };
+};
 
 const getResponseError = async (response: Response) => {
   try {
@@ -163,42 +205,61 @@ const getResponseError = async (response: Response) => {
   }
 };
 
-const extractChallenge = (payload: any): AuthChallenge => ({
-  message: payload?.message ?? "Verification code sent.",
-  email: payload?.email ?? "",
-  expiresInMinutes: payload?.expires_in_minutes ?? payload?.expiresInMinutes ?? null,
-});
+const extractChallenge = (payload: unknown): AuthChallenge => {
+  const record = asRecord(payload);
 
-const extractOnboarding = (source: any): OnboardingState | null => {
-  const onboarding = source?.onboarding;
+  return {
+    message: (record.message as string | undefined) ?? "Verification code sent.",
+    email: (record.email as string | undefined) ?? "",
+    expiresInMinutes:
+      (record.expires_in_minutes as number | null | undefined) ??
+      (record.expiresInMinutes as number | null | undefined) ??
+      null,
+  };
+};
+
+const extractOnboarding = (source: unknown): OnboardingState | null => {
+  const sourceRecord = asRecord(source);
+  const onboarding = sourceRecord.onboarding;
   if (!onboarding) {
     return null;
   }
 
+  const onboardingRecord = asRecord(onboarding);
+
   return {
-    profile_completed: Boolean(onboarding?.profile_completed),
-    selected_provider_code: onboarding?.selected_provider_code ?? null,
-    selected_provider_account_status: onboarding?.selected_provider_account_status ?? null,
-    provider_account_statuses: onboarding?.provider_account_statuses ?? {},
-    next_action: onboarding?.next_action ?? null,
-    message: onboarding?.message ?? null,
-    redirect_url: onboarding?.redirect_url ?? null,
-    status: onboarding?.status ?? null,
-    action_type: onboarding?.action_type ?? null,
-    metadata: onboarding?.metadata ?? null,
+    profile_completed: Boolean(onboardingRecord.profile_completed),
+    selected_provider_code: (onboardingRecord.selected_provider_code as string | null | undefined) ?? null,
+    selected_provider_account_status:
+      (onboardingRecord.selected_provider_account_status as string | null | undefined) ?? null,
+    provider_account_statuses:
+      (onboardingRecord.provider_account_statuses as Record<string, unknown> | undefined) ?? {},
+    next_action: (onboardingRecord.next_action as string | null | undefined) ?? null,
+    message: (onboardingRecord.message as string | null | undefined) ?? null,
+    redirect_url: (onboardingRecord.redirect_url as string | null | undefined) ?? null,
+    status: (onboardingRecord.status as string | null | undefined) ?? null,
+    action_type: (onboardingRecord.action_type as string | null | undefined) ?? null,
+    metadata: (onboardingRecord.metadata as Record<string, unknown> | null | undefined) ?? null,
   };
 };
 
-const extractProviders = (source: any): ProviderCapability[] => {
-  const providers = source?.providers;
+const extractProviders = (source: unknown): ProviderCapability[] => {
+  const sourceRecord = asRecord(source);
+  const providers = sourceRecord.providers;
   return Array.isArray(providers) ? (providers as ProviderCapability[]) : [];
 };
 
-const extractSession = (payload: any): StoredSession => {
-  const body = payload?.data ?? payload;
-  const userSource = body?.user ?? body?.profile ?? body;
+const extractSession = (payload: unknown): StoredSession => {
+  const payloadRecord = asRecord(payload);
+  const body = asRecord(payloadRecord.data ?? payloadRecord);
+  const userSource = body.user ?? body.profile ?? body;
   const token =
-    body?.token ?? body?.accessToken ?? body?.access_token ?? body?.jwt ?? body?.data?.token ?? null;
+    (body.token as string | null | undefined) ??
+    (body.accessToken as string | null | undefined) ??
+    (body.access_token as string | null | undefined) ??
+    (body.jwt as string | null | undefined) ??
+    (asRecord(body.data).token as string | null | undefined) ??
+    null;
 
   const user = toAuthUser(userSource, body);
 
@@ -227,7 +288,7 @@ const loadGoogleIdentityScript = () => {
     return Promise.reject(new Error("Google sign-in is only available in the browser"));
   }
 
-  if ((window.google?.accounts as any)?.id) {
+  if (window.google?.accounts?.id) {
     return Promise.resolve();
   }
 
@@ -264,7 +325,7 @@ const requestGoogleIdToken = async () => {
   await loadGoogleIdentityScript();
 
   return new Promise<string>((resolve, reject) => {
-    const googleId = (window.google?.accounts as any)?.id;
+    const googleId = window.google?.accounts?.id;
     if (!googleId) {
       reject(new Error("Google sign-in is not available"));
       return;

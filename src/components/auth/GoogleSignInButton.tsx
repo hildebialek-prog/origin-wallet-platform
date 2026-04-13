@@ -14,7 +14,7 @@ const isLocalhostOrigin = () => {
 
 const loadGoogleScript = () =>
   new Promise<void>((resolve, reject) => {
-    if ((window.google?.accounts as any)?.id) {
+    if (window.google?.accounts?.id) {
       resolve();
       return;
     }
@@ -66,7 +66,7 @@ const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => 
           return;
         }
 
-        const googleId = (window.google?.accounts as any)?.id;
+        const googleId = window.google?.accounts?.id;
         if (!googleId) {
           throw new Error("Google sign-in is not available");
         }

@@ -3,6 +3,87 @@
   publish = "dist"
 
 [[redirects]]
+  from = "https://www.khoinguyenoriginwallet.com/*"
+  to = "https://khoinguyenoriginwallet.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/personal"
+  to = "/personal/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/personal/send"
+  to = "/personal/send/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/personal/wallet"
+  to = "/personal/wallet/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/personal/receive"
+  to = "/personal/receive/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/business"
+  to = "/business/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/business/suppliers"
+  to = "/business/suppliers/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/business/receive"
+  to = "/business/receive/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/business/batch-payments"
+  to = "/business/batch-payments/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/business/api"
+  to = "/business/api/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/pricing"
+  to = "/pricing/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/security"
+  to = "/security/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/help"
+  to = "/help/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/about"
+  to = "/about/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/contact"
+  to = "/contact/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/policies"
+  to = "/policies/index.html"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
