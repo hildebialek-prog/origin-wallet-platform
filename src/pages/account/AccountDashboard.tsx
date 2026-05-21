@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { getKycProfile, type KycProfile } from "@/services/kycService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -8,6 +10,8 @@ import {
   ChevronRight,
   CheckCircle2,
   Circle,
+  Clock3,
+  ShieldCheck,
   Plus,
   Wallet,
   Building,
@@ -48,18 +52,76 @@ const QUICK_ACTIONS = [
 
 const RECENT_ACTIVITY: Array<{ date: string; text: string }> = [];
 
-const SETUP_STEPS = [
-  { done: true, label: "Virtual account requested" },
-  { done: true, label: "Add funds to your account" },
-  { done: false, label: "Add a beneficiary", href: "/account/beneficiaries" },
-  { done: false, label: "Make a transfer", disabled: true },
-];
-
 const VIRTUAL_ACCOUNTS: Array<{ name: string; country: string; flag: string; currencies: string }> = [];
 
+const getStatusClassName = (status?: string | null) => {
+  const normalized = String(status ?? "").toLowerCase();
+
+  if (["verified", "approved", "active"].includes(normalized)) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
+  }
+
+  if (["rejected", "failed", "suspended"].includes(normalized)) {
+    return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300";
+  }
+
+  if (["pending", "submitted", "under_review", "needs_more_info"].includes(normalized)) {
+    return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
+  }
+
+  return "border-gray-200 bg-gray-50 text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300";
+};
+
+const formatStatus = (status?: string | null) => (status ? status.replace(/_/g, " ") : "not started");
+
+const getKycSetupSteps = (profile: KycProfile | null, accountStatus?: string | null) => {
+  const profileStatus = profile?.status?.toLowerCase() ?? "";
+  const documentsSubmitted = (profile?.documents?.length ?? 0) > 0;
+  const reviewDone = ["verified", "rejected"].includes(profileStatus);
+
+  return [
+    { done: Boolean(accountStatus), label: "Account created" },
+    { done: true, label: "Email verified" },
+    {
+      done: Boolean(profile),
+      label: profile?.applicant_type === "business" ? "KYB type selected" : "KYC type selected",
+      href: "/account/kyc",
+    },
+    {
+      done: documentsSubmitted,
+      label: "Documents submitted",
+      href: "/account/kyc",
+    },
+    {
+      done: reviewDone,
+      label:
+        profileStatus === "verified"
+          ? "Internal review approved"
+          : profileStatus === "rejected"
+            ? "Review needs attention"
+            : "Internal review pending",
+      href: "/account/kyc",
+    },
+    {
+      done: profileStatus === "verified",
+      label: "Provider onboarding",
+      href: "/account/integrations",
+      disabled: profileStatus !== "verified",
+    },
+  ];
+};
+
 const AccountDashboard = () => {
-  const { user } = useAuth();
+  const { user, token, onboarding } = useAuth();
   const displayName = user?.name || user?.email?.split("@")[0] || "Account";
+  const kycQuery = useQuery({
+    queryKey: ["kyc-profile", user?.id, token],
+    enabled: !!user?.id && !!token,
+    queryFn: async () => getKycProfile({ userId: user?.id as string, token: token as string }),
+  });
+  const kycProfile = kycQuery.data?.kyc_profile ?? null;
+  const kycStatus = kycProfile?.status ?? user?.kycStatus ?? "pending";
+  const setupSteps = getKycSetupSteps(kycProfile, user?.status);
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
@@ -198,11 +260,35 @@ const AccountDashboard = () => {
           <div className="space-y-6">
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
-                <CardTitle className="text-base font-semibold dark:text-white">Set up your account</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold dark:text-white">
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                  Account status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                <StatusRow label="Account" value={formatStatus(user?.status || "pending")} status={user?.status || "pending"} />
+                <StatusRow label="KYC/KYB" value={formatStatus(kycStatus)} status={kycStatus} />
+                <StatusRow
+                  label="Provider"
+                  value={formatStatus(onboarding?.selected_provider_account_status || "not_started")}
+                  status={onboarding?.selected_provider_account_status || "not_started"}
+                />
+                {kycQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <Clock3 className="h-4 w-4" />
+                    Loading verification status...
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold dark:text-white">KYC/KYB steps</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <ul className="space-y-3">
-                  {SETUP_STEPS.map((step, index) => (
+                  {setupSteps.map((step, index) => (
                     <li key={index} className="flex items-center gap-3">
                       {step.done ? (
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
@@ -231,6 +317,14 @@ const AccountDashboard = () => {
                     </li>
                   ))}
                 </ul>
+                <Button
+                  asChild
+                  className="mt-5 w-full rounded-full bg-green-600 text-white hover:bg-green-700"
+                >
+                  <Link to="/account/kyc">
+                    {kycProfile ? "Review KYC/KYB profile" : "Start KYC/KYB"}
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
 
@@ -260,5 +354,14 @@ const AccountDashboard = () => {
     </div>
   );
 };
+
+const StatusRow = ({ label, status, value }: { label: string; status?: string | null; value: string }) => (
+  <div className="flex items-center justify-between gap-3">
+    <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+    <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusClassName(status)}`}>
+      {value}
+    </span>
+  </div>
+);
 
 export default AccountDashboard;

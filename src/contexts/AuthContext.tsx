@@ -1,8 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-const googleClientId =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  "251785792812-mpjegenufvk3ujl1tsq4sjd1n0k1bf0l.apps.googleusercontent.com";
+const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
 const authStorageKey = "origin-wallet-auth-session";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -20,12 +18,31 @@ const endpointConfig = {
   updatePassword: import.meta.env.VITE_AUTH_UPDATE_PASSWORD_PATH || "/auth/update-password",
 };
 
+const decodeGoogleTokenAudience = (idToken: string) => {
+  try {
+    const payloadSegment = idToken.split(".")[1];
+    if (!payloadSegment) {
+      return null;
+    }
+
+    const base64 = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded)) as { aud?: unknown };
+
+    return typeof payload.aud === "string" ? payload.aud : null;
+  } catch {
+    return null;
+  }
+};
+
 export interface AuthUser {
   id: string;
   email: string | null;
   name: string | null;
   picture: string | null;
   providerId: string | null;
+  status?: string | null;
+  kycStatus?: string | null;
   phone?: string | null;
   company?: string | null;
   country?: string | null;
@@ -170,6 +187,11 @@ const toAuthUser = (source: unknown, payload?: unknown): AuthUser => {
     providerId:
       (sourceRecord.providerId as string | null | undefined) ??
       (sourceRecord.provider as string | null | undefined) ??
+      null,
+    status: (sourceRecord.status as string | null | undefined) ?? null,
+    kycStatus:
+      (sourceRecord.kyc_status as string | null | undefined) ??
+      (sourceRecord.kycStatus as string | null | undefined) ??
       null,
     phone:
       (sourceRecord.phone as string | null | undefined) ??
@@ -322,6 +344,10 @@ const loadGoogleIdentityScript = () => {
 };
 
 const requestGoogleIdToken = async () => {
+  if (!googleClientId) {
+    throw new Error("Google sign-in is unavailable because VITE_GOOGLE_CLIENT_ID is missing.");
+  }
+
   await loadGoogleIdentityScript();
 
   return new Promise<string>((resolve, reject) => {
@@ -624,8 +650,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signInWithGoogle = async (providedIdToken?: string) => {
+    let idToken = providedIdToken ?? "";
+
     try {
-      const idToken = providedIdToken ?? (await requestGoogleIdToken());
+      if (!googleClientId) {
+        throw new Error("Google sign-in is unavailable because VITE_GOOGLE_CLIENT_ID is missing.");
+      }
+
+      idToken = providedIdToken ?? (await requestGoogleIdToken());
       const payload = await requestApi(endpointConfig.google, {
         body: {
           id_token: idToken,
@@ -633,9 +665,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       applySession(extractSession(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to sign in with Google";
+      let message = error instanceof Error ? error.message : "Unable to sign in with Google";
+
+      if (message.toLowerCase().includes("audience")) {
+        const tokenAudience = decodeGoogleTokenAudience(idToken);
+
+        if (tokenAudience) {
+          message = `${message} Token aud: ${tokenAudience}. Frontend client ID: ${googleClientId}.`;
+        }
+      }
+
       setAuthError(message);
-      throw error;
+      throw new Error(message);
     }
   };
 

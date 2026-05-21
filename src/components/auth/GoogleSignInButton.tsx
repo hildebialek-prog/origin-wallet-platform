@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-const googleClientId =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  "251785792812-mpjegenufvk3ujl1tsq4sjd1n0k1bf0l.apps.googleusercontent.com";
+const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
 const allowGoogleOnLocalhost = import.meta.env.VITE_ENABLE_GOOGLE_AUTH_ON_LOCALHOST === "true";
 
 const isLocalhostOrigin = () => {
@@ -45,15 +43,36 @@ interface GoogleSignInButtonProps {
 const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => {
   const { signInWithGoogle } = useAuth();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  const signInWithGoogleRef = useRef(signInWithGoogle);
   const [loading, setLoading] = useState(true);
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const showDebugInfo = import.meta.env.DEV || isLocalhostOrigin();
 
   useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  useEffect(() => {
+    signInWithGoogleRef.current = signInWithGoogle;
+  }, [signInWithGoogle]);
+
+  useEffect(() => {
     let mounted = true;
 
     const renderGoogleButton = async () => {
+      if (!googleClientId) {
+        setAvailabilityMessage("Google sign-in is unavailable because VITE_GOOGLE_CLIENT_ID is missing.");
+        setLoading(false);
+        return;
+      }
+
       if (isLocalhostOrigin() && !allowGoogleOnLocalhost) {
         setAvailabilityMessage("Google sign-in is hidden on localhost until the OAuth origin is whitelisted.");
         setLoading(false);
@@ -75,15 +94,15 @@ const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => 
           client_id: googleClientId,
           callback: async (response: { credential?: string }) => {
             if (!response.credential) {
-              onError("Google did not return an ID token.");
+              onErrorRef.current("Google did not return an ID token.");
               return;
             }
 
             try {
-              await signInWithGoogle(response.credential);
-              onSuccess();
+              await signInWithGoogleRef.current(response.credential);
+              onSuccessRef.current();
             } catch (error) {
-              onError(error instanceof Error ? error.message : "Unable to sign in with Google.");
+              onErrorRef.current(error instanceof Error ? error.message : "Unable to sign in with Google.");
             }
           },
           auto_select: false,
@@ -103,7 +122,7 @@ const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => 
         setLoading(false);
       } catch (error) {
         setLoading(false);
-        onError(error instanceof Error ? error.message : "Unable to load Google sign-in.");
+        onErrorRef.current(error instanceof Error ? error.message : "Unable to load Google sign-in.");
       }
     };
 
@@ -112,7 +131,7 @@ const GoogleSignInButton = ({ onSuccess, onError }: GoogleSignInButtonProps) => 
     return () => {
       mounted = false;
     };
-  }, [onError, onSuccess, signInWithGoogle]);
+  }, []);
 
   return (
     <div className="w-full">

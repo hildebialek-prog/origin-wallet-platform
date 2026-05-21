@@ -16,6 +16,7 @@ import {
   ChevronDown,
   User,
   ArrowUpDown,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HelpChatbot from "@/components/help/HelpChatbot";
@@ -36,6 +37,7 @@ const navItems = [
   { to: "/account/beneficiaries", label: "Beneficiaries", icon: Users },
   { to: "/account/team", label: "Team", icon: UsersRound },
   { to: "/account/integrations", label: "Integrations", icon: Plug },
+  { to: "/account/kyc", label: "KYC/KYB", icon: ShieldCheck },
 ];
 
 const AccountLayout = () => {
