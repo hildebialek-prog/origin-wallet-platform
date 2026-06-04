@@ -35,6 +35,7 @@ import AccountVirtualAccounts from "./pages/account/AccountVirtualAccounts";
 import AccountBeneficiaries from "./pages/account/AccountBeneficiaries";
 import AccountTeam from "./pages/account/AccountTeam";
 import AccountIntegrations from "./pages/account/AccountIntegrations";
+import AccountFxOrders from "./pages/account/AccountFxOrders";
 import AccountKyc from "./pages/account/AccountKyc";
 import AccountSettings from "./pages/account/AccountSettings";
 import AccountVirtualAccountRequest from "./pages/account/AccountVirtualAccountRequest";
@@ -84,6 +85,7 @@ const App = () => (
                   <Route path="beneficiaries" element={<AccountBeneficiaries />} />
                   <Route path="team" element={<AccountTeam />} />
                   <Route path="integrations" element={<AccountIntegrations />} />
+                  <Route path="fx-orders" element={<AccountFxOrders />} />
                   <Route path="kyc" element={<AccountKyc />} />
                   <Route path="settings">
                     <Route index element={<AccountSettings />} />

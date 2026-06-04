@@ -11,6 +11,7 @@ import {
   UsersRound,
   Plug,
   LogOut,
+  ClipboardList,
   Globe,
   Settings,
   ChevronDown,
@@ -37,6 +38,7 @@ const navItems = [
   { to: "/account/beneficiaries", label: "Beneficiaries", icon: Users },
   { to: "/account/team", label: "Team", icon: UsersRound },
   { to: "/account/integrations", label: "Integrations", icon: Plug },
+  { to: "/account/fx-orders", label: "FX Orders", icon: ClipboardList },
   { to: "/account/kyc", label: "KYC/KYB", icon: ShieldCheck },
 ];
 
@@ -123,9 +125,11 @@ const AccountLayout = () => {
       <main className="flex-1 min-w-0 bg-[#f8f8f6] dark:bg-[#161a20]">
         <div className="h-1 bg-gradient-to-r from-green-400 via-emerald-300 to-green-400" />
         <header className="sticky top-0 z-20 flex items-center justify-end gap-3 border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-[#1b2027]/95">
-          <Button className="gap-2 rounded-full bg-green-500 px-5 text-white hover:bg-green-600">
-            <ArrowUpDown className="w-4 h-4" />
-            Move funds
+          <Button asChild className="gap-2 rounded-full bg-green-500 px-5 text-white hover:bg-green-600">
+            <Link to="/account/fx-orders">
+              <ArrowUpDown className="w-4 h-4" />
+              Move funds
+            </Link>
           </Button>
 
           <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
