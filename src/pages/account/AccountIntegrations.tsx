@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
-  Building2,
   CircleAlert,
   Clock3,
   ExternalLink,
@@ -26,105 +25,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth, type OnboardingState, type ProviderCapability } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
-
-interface IntegrationProvider {
-  id: number;
-  code: string;
-  name: string;
-  status: string;
-}
-
-interface ProviderAccount {
-  id: number;
-  status: string;
-  external_customer_id?: string | null;
-  external_account_id?: string | null;
-  account_name?: string | null;
-}
-
-interface IntegrationLink {
-  id: number;
-  link_url: string;
-  link_label?: string | null;
-  is_active: boolean;
-}
-
-interface IntegrationRequest {
-  id: number;
-  status: string;
-  note?: string | null;
-  requested_at?: string | null;
-}
-
-interface ProviderIntegrationItem {
-  provider: IntegrationProvider;
-  provider_account: ProviderAccount | null;
-  integration_link: IntegrationLink | null;
-  integration_request: IntegrationRequest | null;
-  link_available: boolean;
-  can_connect: boolean;
-  can_request_connect: boolean;
-  request_pending: boolean;
-}
-
-interface LinkResponse {
-  message?: string;
-  provider_account?: ProviderAccount | null;
-  onboarding?: OnboardingState | null;
-}
-
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-
-const buildApiUrl = (path: string) => {
-  if (!apiBaseUrl) {
-    throw new Error("Missing VITE_API_BASE_URL");
-  }
-
-  return `${apiBaseUrl}${path}`;
-};
-
-const getResponseError = async (response: Response) => {
-  try {
-    const data = await response.json();
-    const fieldErrors = data?.errors ? Object.values(data.errors).flat().join(" ") : "";
-    return data?.message || fieldErrors || `Request failed with status ${response.status}`;
-  } catch {
-    return `Request failed with status ${response.status}`;
-  }
-};
-
-const requestApi = async (
-  path: string,
-  {
-    method = "GET",
-    token,
-    body,
-  }: {
-    method?: "GET" | "POST";
-    token: string;
-    body?: Record<string, unknown>;
-  },
-) => {
-  const response = await fetch(buildApiUrl(path), {
-    method,
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  if (!response.ok) {
-    throw new Error(await getResponseError(response));
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
-};
+import { ProviderLogo } from "@/components/account/ProviderLogo";
+import {
+  completeProviderAccount,
+  getProviderIntegrations,
+  getProviderReference,
+  linkProviderAccount,
+  requestProviderConnect,
+  type LinkResponse,
+  type ProviderIntegrationItem,
+} from "@/services/providerAccountService";
 
 const openExternalUrl = (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
@@ -261,27 +171,13 @@ const AccountIntegrations = () => {
   const providersQuery = useQuery({
     queryKey: ["providers-reference"],
     enabled: !!token,
-    queryFn: async () => {
-      const payload = await requestApi("/providers", {
-        method: "GET",
-        token: token as string,
-      });
-
-      return Array.isArray(payload?.data) ? (payload.data as ProviderCapability[]) : [];
-    },
+    queryFn: async () => getProviderReference({ token: token as string }),
   });
 
   const integrationsQuery = useQuery({
     queryKey: ["provider-integrations", user?.id, token],
     enabled: !!user?.id && !!token,
-    queryFn: async () => {
-      const payload = await requestApi(`/user/users/${user?.id}/provider-accounts`, {
-        method: "GET",
-        token: token as string,
-      });
-
-      return Array.isArray(payload?.data) ? (payload.data as ProviderIntegrationItem[]) : [];
-    },
+    queryFn: async () => getProviderIntegrations({ userId: user?.id as string, token: token as string }),
   });
 
   const providerCapabilities = useMemo(
@@ -305,12 +201,11 @@ const AccountIntegrations = () => {
 
   const connectMutation = useMutation({
     mutationFn: async (item: ProviderIntegrationItem) => {
-      return requestApi(`/user/users/${user?.id}/provider-accounts/${item.provider.code}/link`, {
-        method: "POST",
+      return linkProviderAccount({
+        userId: user?.id as string,
         token: token as string,
-        body: {
-          force: false,
-        },
+        providerCode: item.provider.code,
+        force: false,
       }) as Promise<LinkResponse>;
     },
     onSuccess: async (payload, item) => {
@@ -342,12 +237,11 @@ const AccountIntegrations = () => {
 
   const requestConnectMutation = useMutation({
     mutationFn: async ({ providerCode, note }: { providerCode: string; note: string }) => {
-      return requestApi(`/user/users/${user?.id}/provider-accounts/${providerCode}/request-connect`, {
-        method: "POST",
+      return requestProviderConnect({
+        userId: user?.id as string,
         token: token as string,
-        body: {
-          note,
-        },
+        providerCode,
+        note,
       });
     },
     onSuccess: async (payload) => {
@@ -384,15 +278,14 @@ const AccountIntegrations = () => {
       externalAccountId?: string | null;
       accountName?: string | null;
     }) => {
-      return requestApi(`/user/users/${user?.id}/provider-accounts/${providerCode}/complete`, {
-        method: "POST",
+      return completeProviderAccount({
+        userId: user?.id as string,
         token: token as string,
-        body: {
-          ...(status ? { status } : {}),
-          ...(externalCustomerId ? { external_customer_id: externalCustomerId } : {}),
-          ...(externalAccountId ? { external_account_id: externalAccountId } : {}),
-          ...(accountName ? { account_name: accountName } : {}),
-        },
+        providerCode,
+        status,
+        externalCustomerId,
+        externalAccountId,
+        accountName,
       });
     },
     onSuccess: async (payload) => {
@@ -547,9 +440,7 @@ const AccountIntegrations = () => {
               >
                 <CardContent className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex min-w-0 items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#4f46e5]/10 text-[#4f46e5] dark:bg-[#4f46e5]/15 dark:text-[#8b83ff]">
-                      <Building2 className="h-5 w-5" />
-                    </div>
+                    <ProviderLogo provider={item.provider} />
 
                     <div className="min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-3">

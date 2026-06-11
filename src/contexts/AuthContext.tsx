@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { apiBaseUrl, requestApi } from "@/services/apiClient";
 
 const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
 const authStorageKey = "origin-wallet-auth-session";
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const endpointConfig = {
   login: import.meta.env.VITE_AUTH_LOGIN_PATH || "/auth/login",
   loginVerify: import.meta.env.VITE_AUTH_LOGIN_VERIFY_PATH || "/auth/login/verify",
@@ -54,6 +54,7 @@ export interface ProviderCapability {
   id: number;
   code: string;
   name: string;
+  logo_url?: string | null;
   status: string;
   is_available_for_onboarding?: boolean;
   supports_beneficiaries?: boolean;
@@ -145,14 +146,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 let googleScriptPromise: Promise<void> | null = null;
 
-const buildApiUrl = (path: string) => {
-  if (!apiBaseUrl) {
-    throw new Error("Missing VITE_API_BASE_URL");
-  }
-
-  return path.startsWith("http") ? path : `${apiBaseUrl}${path}`;
-};
-
 const asRecord = (value: unknown): JsonRecord => ((typeof value === "object" && value !== null ? value : {}) as JsonRecord);
 
 const toAuthUser = (source: unknown, payload?: unknown): AuthUser => {
@@ -215,16 +208,6 @@ const toAuthUser = (source: unknown, payload?: unknown): AuthUser => {
       null,
     profile: sourceProfile,
   };
-};
-
-const getResponseError = async (response: Response) => {
-  try {
-    const data = await response.json();
-    const fieldErrors = data?.errors ? Object.values(data.errors).flat().join(" ") : "";
-    return data?.message || fieldErrors || `Request failed with status ${response.status}`;
-  } catch {
-    return `Request failed with status ${response.status}`;
-  }
 };
 
 const extractChallenge = (payload: unknown): AuthChallenge => {
@@ -394,50 +377,6 @@ const requestGoogleIdToken = async () => {
   });
 };
 
-const requestApi = async (
-  path: string,
-  {
-    method = "POST",
-    body,
-    token,
-  }: {
-    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-    body?: Record<string, unknown>;
-    token?: string | null;
-  } = {},
-) => {
-  const url = buildApiUrl(path);
-  let response: Response;
-
-  try {
-    response = await fetch(url, {
-      method,
-      headers: {
-        Accept: "application/json",
-        ...(body ? { "Content-Type": "application/json" } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error(`Cannot connect to auth API at ${url}`);
-    }
-
-    throw error;
-  }
-
-  if (!response.ok) {
-    throw new Error(await getResponseError(response));
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -514,6 +453,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     try {
       const payload = await requestApi(endpointConfig.login, {
+        method: "POST",
         body: {
           email,
           password,
@@ -530,6 +470,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyLogin = async (email: string, verificationCode: string) => {
     try {
       const payload = await requestApi(endpointConfig.loginVerify, {
+        method: "POST",
         body: {
           email,
           verification_code: verificationCode,
@@ -546,6 +487,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async ({ email, phone, fullName, password, passwordConfirmation }: RegisterPayload) => {
     try {
       const payload = await requestApi(endpointConfig.register, {
+        method: "POST",
         body: {
           email,
           phone,
@@ -565,6 +507,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyRegister = async (email: string, verificationCode: string) => {
     try {
       const payload = await requestApi(endpointConfig.registerVerify, {
+        method: "POST",
         body: {
           email,
           verification_code: verificationCode,
@@ -659,6 +602,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       idToken = providedIdToken ?? (await requestGoogleIdToken());
       const payload = await requestApi(endpointConfig.google, {
+        method: "POST",
         body: {
           id_token: idToken,
         },
@@ -683,6 +627,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const requestPasswordReset = async (email: string) => {
     try {
       const payload = await requestApi(endpointConfig.forgotPassword, {
+        method: "POST",
         body: {
           email,
         },
@@ -697,7 +642,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async ({ email, verificationCode, password, passwordConfirmation }: ResetPasswordPayload) => {
     try {
-      const payload = await requestApi(endpointConfig.resetPassword, {
+      const payload = await requestApi<{ message?: string }>(endpointConfig.resetPassword, {
+        method: "POST",
         body: {
           email,
           verification_code: verificationCode,
@@ -729,7 +675,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      await requestApi(endpointConfig.logout, { body: {}, token: currentToken });
+      await requestApi(endpointConfig.logout, { method: "POST", body: {}, token: currentToken });
     } catch (error) {
       console.warn("Logout API request failed:", error);
     }

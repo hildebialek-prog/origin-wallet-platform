@@ -1,3 +1,5 @@
+import { requestApi } from "@/services/apiClient";
+
 export interface KycDocumentPayload {
   type: string;
   file_url: string;
@@ -92,7 +94,9 @@ export type IdentityCaptureType =
   | "proof_of_address"
   | "selfie_liveness"
   | "business_registration"
+  | "certificate_of_incorporation"
   | "proof_of_business_address"
+  | "account_opening_application_form"
   | "ownership_structure";
 
 export interface IdentityVerificationSession {
@@ -132,57 +136,29 @@ export interface IdentityVerificationUploadResponse {
   artifact: IdentityVerificationArtifact;
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+export type BusinessRegistryVerificationStatus = "verified" | "invalid" | "unavailable" | "error";
 
-const buildApiUrl = (path: string) => {
-  if (!apiBaseUrl) {
-    throw new Error("Missing VITE_API_BASE_URL");
-  }
+export interface BusinessRegistryVerificationResult {
+  status: BusinessRegistryVerificationStatus;
+  source: string;
+  message: string;
+  checked_at: string;
+  identifier?: string | null;
+  business_name?: string | null;
+  registry_status?: string | null;
+  address?: string | null;
+  name_match?: boolean | null;
+  source_url?: string | null;
+  registration_url?: string | null;
+  raw?: Record<string, unknown> | null;
+}
 
-  return path.startsWith("http") ? path : `${apiBaseUrl}${path}`;
-};
-
-const getResponseError = async (response: Response) => {
-  try {
-    const data = await response.json();
-    const fieldErrors = data?.errors ? Object.values(data.errors).flat().join(" ") : "";
-    return data?.message || fieldErrors || `Request failed with status ${response.status}`;
-  } catch {
-    return `Request failed with status ${response.status}`;
-  }
-};
-
-const requestKycApi = async <TResponse>(
-  path: string,
-  {
-    method = "GET",
-    body,
-    token,
-  }: {
-    method?: "GET" | "POST" | "PUT";
-    body?: Record<string, unknown>;
-    token: string;
-  },
-): Promise<TResponse> => {
-  const response = await fetch(buildApiUrl(path), {
-    method,
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  if (!response.ok) {
-    throw new Error(await getResponseError(response));
-  }
-
-  return response.json() as Promise<TResponse>;
-};
+export interface BusinessRegistryVerificationResponse {
+  data: BusinessRegistryVerificationResult;
+}
 
 export const getKycProfile = (params: { token: string; userId: string | number }) =>
-  requestKycApi<KycSubmissionResponse>(`/user/users/${params.userId}/kyc-profile`, {
+  requestApi<KycSubmissionResponse>(`/user/users/${params.userId}/kyc-profile`, {
     token: params.token,
   });
 
@@ -191,10 +167,29 @@ export const submitKycProfile = (params: {
   userId: string | number;
   payload: KycSubmissionPayload;
 }) =>
-  requestKycApi<KycSubmissionResponse>(`/user/users/${params.userId}/kyc-profile`, {
+  requestApi<KycSubmissionResponse>(`/user/users/${params.userId}/kyc-profile`, {
     method: "PUT",
     token: params.token,
     body: params.payload as unknown as Record<string, unknown>,
+  });
+
+export const verifyBusinessRegistry = (params: {
+  token: string;
+  userId: string | number;
+  countryCode: string;
+  businessRegistrationNumber?: string | null;
+  taxId?: string | null;
+  businessName?: string | null;
+}) =>
+  requestApi<BusinessRegistryVerificationResponse>(`/user/users/${params.userId}/kyc-profile/business-registry/verify`, {
+    method: "POST",
+    token: params.token,
+    body: {
+      country_code: params.countryCode.toUpperCase(),
+      business_registration_number: params.businessRegistrationNumber ?? null,
+      tax_id: params.taxId ?? null,
+      business_name: params.businessName ?? null,
+    },
   });
 
 export const startIdentityVerificationSession = (params: {
@@ -202,7 +197,7 @@ export const startIdentityVerificationSession = (params: {
   userId: string | number;
   subjectType: IdentityVerificationSubject;
 }) =>
-  requestKycApi<IdentityVerificationSessionResponse>(
+  requestApi<IdentityVerificationSessionResponse>(
     `/user/users/${params.userId}/identity-verification-sessions`,
     {
       method: "POST",
@@ -224,23 +219,14 @@ export const uploadIdentityVerificationFile = async (params: {
   formData.append("capture_type", params.captureType);
   formData.append("file", params.file);
 
-  const response = await fetch(
-    buildApiUrl(`/user/users/${params.userId}/identity-verification-sessions/${params.sessionId}/uploads`),
+  return requestApi<IdentityVerificationUploadResponse>(
+    `/user/users/${params.userId}/identity-verification-sessions/${params.sessionId}/uploads`,
     {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${params.token}`,
-      },
+      token: params.token,
       body: formData,
     },
   );
-
-  if (!response.ok) {
-    throw new Error(await getResponseError(response));
-  }
-
-  return response.json() as Promise<IdentityVerificationUploadResponse>;
 };
 
 export const completeIdentityVerificationSession = (params: {
@@ -249,7 +235,7 @@ export const completeIdentityVerificationSession = (params: {
   sessionId: string | number;
   payload?: Record<string, unknown>;
 }) =>
-  requestKycApi<IdentityVerificationSessionResponse>(
+  requestApi<IdentityVerificationSessionResponse>(
     `/user/users/${params.userId}/identity-verification-sessions/${params.sessionId}/complete`,
     {
       method: "POST",

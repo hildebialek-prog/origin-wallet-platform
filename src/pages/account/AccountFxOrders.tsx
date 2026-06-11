@@ -11,6 +11,7 @@ import {
   SendHorizonal,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ProviderLogo } from "@/components/account/ProviderLogo";
 import {
   createFxOrder,
   getFxOrders,
@@ -268,7 +269,15 @@ const AccountFxOrders = () => {
                   <SelectContent>
                     {providers.map((provider) => (
                       <SelectItem key={provider.id} value={String(provider.id)}>
-                        {provider.name}
+                        <div className="flex items-center gap-2">
+                          <ProviderLogo
+                            provider={provider}
+                            className="h-6 w-6 rounded-md"
+                            imageClassName="p-0.5"
+                            fallbackClassName="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                          />
+                          <span>{provider.name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -327,7 +336,17 @@ const AccountFxOrders = () => {
                 <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                   <div>
                     <p className="text-[#6c6c68] dark:text-gray-400">Provider</p>
-                    <p className="font-semibold text-[#111111] dark:text-white">{selectedProvider?.name || "-"}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      {selectedProvider ? (
+                        <ProviderLogo
+                          provider={selectedProvider}
+                          className="h-7 w-7 rounded-lg"
+                          imageClassName="p-0.5"
+                          fallbackClassName="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                        />
+                      ) : null}
+                      <p className="font-semibold text-[#111111] dark:text-white">{selectedProvider?.name || "-"}</p>
+                    </div>
                   </div>
                   <div>
                     <p className="text-[#6c6c68] dark:text-gray-400">Quote status</p>
@@ -450,9 +469,21 @@ const OrderRow = ({
       <p className="mt-1 text-xs text-[#6b6b6b] dark:text-gray-400">{formatDate(order.created_at)}</p>
     </div>
 
-    <div>
-      <p className="font-semibold text-[#202020] dark:text-white">{order.provider?.name || `Provider #${order.provider_id}`}</p>
-      <p className="mt-1 text-xs text-[#6b6b6b] dark:text-gray-400">{order.provider?.code || "Provider platform"}</p>
+    <div className="flex min-w-0 items-center gap-2">
+      <ProviderLogo
+        provider={order.provider}
+        className="h-8 w-8 rounded-lg"
+        imageClassName="p-0.5"
+        fallbackClassName="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+      />
+      <div className="min-w-0">
+        <p className="truncate font-semibold text-[#202020] dark:text-white">
+          {order.provider?.name || `Provider #${order.provider_id}`}
+        </p>
+        <p className="mt-1 truncate text-xs text-[#6b6b6b] dark:text-gray-400">
+          {order.provider?.code || "Provider platform"}
+        </p>
+      </div>
     </div>
 
     <div>

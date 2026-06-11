@@ -53,14 +53,26 @@ type BusinessForm = {
   businessName: string;
   businessRegistration: string;
   taxId: string;
+  businessActivityType: string;
+  exportingRegions: string;
+  tradeType: string;
+  mainProduct: string;
   industry: string;
   businessActivity: string;
   website: string;
   sourceOfFunds: string;
   expectedMonthlyVolume: string;
   registrationDocumentUrl: string;
+  certificateOfIncorporationUrl: string;
   businessAddressProofUrl: string;
+  accountOpeningFormUrl: string;
   ownershipStructureUrl: string;
+  tradeAttachmentUrl: string;
+  agentName: string;
+  agentAddress: string;
+  agentIdentityUrl: string;
+  historicalTradeMaterialsUrl: string;
+  historicalTradeComment: string;
 };
 
 type PersonForm = {
@@ -99,6 +111,41 @@ type CaptureArtifactMap = Record<string, IdentityVerificationArtifact>;
 
 const stepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
 
+const businessActivityOptions = [
+  { label: "Foreign trade export business", value: "foreign_trade_export" },
+  { label: "Foreign trade import business", value: "foreign_trade_import" },
+  { label: "Import and export business", value: "foreign_trade_import_export" },
+];
+
+const tradeTypeOptions = [
+  { label: "Goods Trade", value: "goods_trade" },
+  { label: "Service Trade", value: "service_trade" },
+  { label: "Goods Trade + Service Trade", value: "goods_service_trade" },
+];
+
+const mainProductOptions = [
+  "Electrical Products and Accessories",
+  "Electronic Components, Modules, and Accessories",
+  "Beauty, Cosmetics, and Personal Care",
+  "Kitchen and Bathroom Products",
+  "Lighting and Illumination Devices",
+  "Daily Necessities, Gardening Tools",
+  "Automobiles",
+  "Automotive Parts, Motorcycles and Their Parts",
+  "Clothing, Bags, Handbags, Shoes, Textiles, Leather Products, and Accessories",
+  "Toys, Hobby Items",
+  "Forest Products",
+  "Energy",
+  "Fine Art, Antiques, Precious Metals, Jewelry, Jade, Gemstones",
+  "Logistics, transportation agent",
+  "Consulting, Planning, Investment, and Other Services",
+  "Tea",
+  "Wine, fresh seafood",
+  "Ship export",
+  "Ship material supply",
+  "Others",
+].map((value) => ({ label: value, value }));
+
 const defaultProfileForm = (name = ""): ProfileForm => ({
   legalName: name,
   dateOfBirth: "",
@@ -127,14 +174,26 @@ const defaultBusinessForm = (): BusinessForm => ({
   businessName: "",
   businessRegistration: "",
   taxId: "",
+  businessActivityType: "foreign_trade_export",
+  exportingRegions: "",
+  tradeType: "goods_trade",
+  mainProduct: "Electrical Products and Accessories",
   industry: "",
   businessActivity: "",
   website: "",
   sourceOfFunds: "",
   expectedMonthlyVolume: "",
   registrationDocumentUrl: "",
+  certificateOfIncorporationUrl: "",
   businessAddressProofUrl: "",
+  accountOpeningFormUrl: "",
   ownershipStructureUrl: "",
+  tradeAttachmentUrl: "",
+  agentName: "",
+  agentAddress: "",
+  agentIdentityUrl: "",
+  historicalTradeMaterialsUrl: "",
+  historicalTradeComment: "",
 });
 
 const defaultPersonForm = (): PersonForm => ({
@@ -338,6 +397,10 @@ const AccountKyc = () => {
         businessForm.businessName,
         businessForm.businessRegistration,
         businessForm.taxId,
+        businessForm.businessActivityType,
+        businessForm.exportingRegions,
+        businessForm.tradeType,
+        businessForm.mainProduct,
         businessForm.industry,
         businessForm.businessActivity,
         businessForm.sourceOfFunds,
@@ -384,7 +447,9 @@ const AccountKyc = () => {
 
       return requiredFilled([
         businessForm.registrationDocumentUrl,
+        businessForm.certificateOfIncorporationUrl,
         businessForm.businessAddressProofUrl,
+        businessForm.accountOpeningFormUrl,
         businessForm.ownershipStructureUrl,
         representativeForm.idDocumentNumber,
         representativeForm.idExpiresAt,
@@ -530,6 +595,25 @@ const AccountKyc = () => {
         business_industry: applicantType === "business" ? businessForm.industry.trim() : null,
         business_activity: applicantType === "business" ? businessForm.businessActivity.trim() : null,
         business_website: applicantType === "business" ? businessForm.website.trim() || null : null,
+        business_activity_type: applicantType === "business" ? businessForm.businessActivityType.trim() : null,
+        exporting_regions:
+          applicantType === "business"
+            ? businessForm.exportingRegions
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean)
+            : [],
+        trade_type: applicantType === "business" ? businessForm.tradeType.trim() : null,
+        main_product: applicantType === "business" ? businessForm.mainProduct.trim() : null,
+        historical_trade_comment:
+          applicantType === "business" ? businessForm.historicalTradeComment.trim() || null : null,
+        agent:
+          applicantType === "business" && (businessForm.agentName.trim() || businessForm.agentAddress.trim())
+            ? {
+                name: businessForm.agentName.trim() || null,
+                address: businessForm.agentAddress.trim() || null,
+              }
+            : null,
         identity_verification_sessions: Object.fromEntries(
           Object.entries(captureSessions).map(([subject, session]) => [subject, session?.external_session_id]),
         ),
@@ -574,14 +658,26 @@ const AccountKyc = () => {
       businessName: nextProfile.business_name ?? "",
       businessRegistration: nextProfile.business_registration_number ?? "",
       taxId: nextProfile.tax_id ?? "",
+      businessActivityType: stringifyMetadata(metadata.business_activity_type) || "foreign_trade_export",
+      exportingRegions: stringifyMetadata(metadata.exporting_regions),
+      tradeType: stringifyMetadata(metadata.trade_type) || "goods_trade",
+      mainProduct: stringifyMetadata(metadata.main_product) || "Electrical Products and Accessories",
       industry: stringifyMetadata(metadata.business_industry),
       businessActivity: stringifyMetadata(metadata.business_activity),
       website: stringifyMetadata(metadata.business_website),
       sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
       expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
       registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration"]),
+      certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
       businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
+      accountOpeningFormUrl: findDocumentUrl(profileDocs, ["account_opening_application_form"]),
       ownershipStructureUrl: findDocumentUrl(profileDocs, ["ownership_structure"]),
+      tradeAttachmentUrl: findDocumentUrl(profileDocs, ["foreign_trade_attachment"]),
+      agentName: stringifyMetadata(asMetadataRecord(metadata.agent).name),
+      agentAddress: stringifyMetadata(asMetadataRecord(metadata.agent).address),
+      agentIdentityUrl: findDocumentUrl(profileDocs, ["agent_identity_document"]),
+      historicalTradeMaterialsUrl: findDocumentUrl(profileDocs, ["historical_trade_materials"]),
+      historicalTradeComment: stringifyMetadata(metadata.historical_trade_comment),
     });
     setRepresentativeForm({
       ...defaultPersonForm(),
@@ -700,6 +796,34 @@ const AccountKyc = () => {
                       <Field label="Tax ID" value={businessForm.taxId} onChange={(value) => updateBusiness("taxId", value)} />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
+                      <SelectField
+                        label="Foreign trade business type"
+                        value={businessForm.businessActivityType}
+                        onChange={(value) => updateBusiness("businessActivityType", value)}
+                        options={businessActivityOptions}
+                      />
+                      <SelectField
+                        label="Trade type"
+                        value={businessForm.tradeType}
+                        onChange={(value) => updateBusiness("tradeType", value)}
+                        options={tradeTypeOptions}
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field
+                        label="Exporting countries/regions"
+                        value={businessForm.exportingRegions}
+                        onChange={(value) => updateBusiness("exportingRegions", value)}
+                        placeholder="Hong Kong, Vietnam, Singapore"
+                      />
+                      <SelectField
+                        label="Main product"
+                        value={businessForm.mainProduct}
+                        onChange={(value) => updateBusiness("mainProduct", value)}
+                        options={mainProductOptions}
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Industry" value={businessForm.industry} onChange={(value) => updateBusiness("industry", value)} />
                       <Field label="Business website" value={businessForm.website} onChange={(value) => updateBusiness("website", value)} />
                     </div>
@@ -707,6 +831,10 @@ const AccountKyc = () => {
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Business source of funds" value={businessForm.sourceOfFunds} onChange={(value) => updateBusiness("sourceOfFunds", value)} />
                       <Field label="Expected monthly volume" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="Agent name (optional)" value={businessForm.agentName} onChange={(value) => updateBusiness("agentName", value)} />
+                      <Field label="Agent address (optional)" value={businessForm.agentAddress} onChange={(value) => updateBusiness("agentAddress", value)} />
                     </div>
                     <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} />
                     <PersonDetails title="Beneficial owner / UBO" form={beneficialOwnerForm} onChange={updateBeneficialOwner} includeOwnership />
@@ -786,6 +914,18 @@ const AccountKyc = () => {
                           }
                         />
                         <FieldWithUpload
+                          label="Certificate of Incorporation (CI)"
+                          value={businessForm.certificateOfIncorporationUrl}
+                          onChange={(value) => updateBusiness("certificateOfIncorporationUrl", value)}
+                          uploadLabel="Upload certificate of incorporation"
+                          uploading={uploadingCapture === "business:certificate_of_incorporation"}
+                          onFile={(file) =>
+                            uploadCapture("business", "certificate_of_incorporation", file, (artifact) =>
+                              updateBusiness("certificateOfIncorporationUrl", artifact.file_url),
+                            )
+                          }
+                        />
+                        <FieldWithUpload
                           label="Proof of business address"
                           value={businessForm.businessAddressProofUrl}
                           onChange={(value) => updateBusiness("businessAddressProofUrl", value)}
@@ -794,6 +934,18 @@ const AccountKyc = () => {
                           onFile={(file) =>
                             uploadCapture("business", "proof_of_business_address", file, (artifact) =>
                               updateBusiness("businessAddressProofUrl", artifact.file_url),
+                            )
+                          }
+                        />
+                        <FieldWithUpload
+                          label="Hand-held account opening application form"
+                          value={businessForm.accountOpeningFormUrl}
+                          onChange={(value) => updateBusiness("accountOpeningFormUrl", value)}
+                          uploadLabel="Upload hand-held account opening form photo"
+                          uploading={uploadingCapture === "business:account_opening_application_form"}
+                          onFile={(file) =>
+                            uploadCapture("business", "account_opening_application_form", file, (artifact) =>
+                              updateBusiness("accountOpeningFormUrl", artifact.file_url),
                             )
                           }
                         />
@@ -808,6 +960,26 @@ const AccountKyc = () => {
                               updateBusiness("ownershipStructureUrl", artifact.file_url),
                             )
                           }
+                        />
+                        <Field
+                          label="Foreign trade attachment URL (optional)"
+                          value={businessForm.tradeAttachmentUrl}
+                          onChange={(value) => updateBusiness("tradeAttachmentUrl", value)}
+                        />
+                        <Field
+                          label="Agent ID document URL (optional)"
+                          value={businessForm.agentIdentityUrl}
+                          onChange={(value) => updateBusiness("agentIdentityUrl", value)}
+                        />
+                        <Field
+                          label="Historical trade materials URL (optional)"
+                          value={businessForm.historicalTradeMaterialsUrl}
+                          onChange={(value) => updateBusiness("historicalTradeMaterialsUrl", value)}
+                        />
+                        <Field
+                          label="Historical trade material comment (optional)"
+                          value={businessForm.historicalTradeComment}
+                          onChange={(value) => updateBusiness("historicalTradeComment", value)}
                         />
                       </div>
                     </div>
@@ -908,8 +1080,21 @@ const AccountKyc = () => {
                   {applicantType === "business" ? (
                     <>
                       <SummaryRow label="Business name" value={businessForm.businessName || "-"} />
+                      <SummaryRow label="Trade type" value={businessForm.tradeType || "-"} />
+                      <SummaryRow label="Main product" value={businessForm.mainProduct || "-"} />
+                      <SummaryRow label="Exporting regions" value={businessForm.exportingRegions || "-"} />
                       <SummaryRow label="Representative" value={representativeForm.legalName || "-"} />
                       <SummaryRow label="Beneficial owner" value={beneficialOwnerForm.legalName || "-"} />
+                      <SummaryRow
+                        label="Company materials"
+                        value={[
+                          businessForm.registrationDocumentUrl && "BR",
+                          businessForm.certificateOfIncorporationUrl && "CI",
+                          businessForm.businessAddressProofUrl && "Address proof",
+                          businessForm.ownershipStructureUrl && "Ownership",
+                          businessForm.accountOpeningFormUrl && "Opening form",
+                        ].filter(Boolean).join(", ") || "-"}
+                      />
                     </>
                   ) : null}
                   <SummaryRow label="Address" value={[profileForm.addressLine1, profileForm.city, profileForm.state, profileForm.postalCode, profileForm.countryCode].filter(Boolean).join(", ") || "-"} />
@@ -994,26 +1179,58 @@ const buildBusinessDocuments = (
   form: BusinessForm,
   countryCode: string,
   evidence: (captureType: IdentityCaptureType) => Partial<KycDocumentPayload>,
-): KycDocumentPayload[] => [
-  {
-    type: "business_registration",
-    file_url: form.registrationDocumentUrl.trim(),
-    issuing_country_code: countryCode.trim().toUpperCase() || null,
-    ...evidence("business_registration"),
-  },
-  {
-    type: "proof_of_business_address",
-    file_url: form.businessAddressProofUrl.trim(),
-    issuing_country_code: countryCode.trim().toUpperCase() || null,
-    ...evidence("proof_of_business_address"),
-  },
-  {
-    type: "ownership_structure",
-    file_url: form.ownershipStructureUrl.trim(),
-    issuing_country_code: countryCode.trim().toUpperCase() || null,
-    ...evidence("ownership_structure"),
-  },
-];
+): KycDocumentPayload[] => {
+  const issuingCountryCode = countryCode.trim().toUpperCase() || null;
+  const documents: KycDocumentPayload[] = [
+    {
+      type: "business_registration",
+      file_url: form.registrationDocumentUrl.trim(),
+      issuing_country_code: issuingCountryCode,
+      ...evidence("business_registration"),
+    },
+    {
+      type: "certificate_of_incorporation",
+      file_url: form.certificateOfIncorporationUrl.trim(),
+      issuing_country_code: issuingCountryCode,
+      ...evidence("certificate_of_incorporation"),
+    },
+    {
+      type: "proof_of_business_address",
+      file_url: form.businessAddressProofUrl.trim(),
+      issuing_country_code: issuingCountryCode,
+      ...evidence("proof_of_business_address"),
+    },
+    {
+      type: "account_opening_application_form",
+      file_url: form.accountOpeningFormUrl.trim(),
+      issuing_country_code: issuingCountryCode,
+      metadata: { requirement: "handheld_form_photo" },
+      ...evidence("account_opening_application_form"),
+    },
+    {
+      type: "ownership_structure",
+      file_url: form.ownershipStructureUrl.trim(),
+      issuing_country_code: issuingCountryCode,
+      ...evidence("ownership_structure"),
+    },
+  ];
+
+  [
+    { type: "foreign_trade_attachment", fileUrl: form.tradeAttachmentUrl.trim() },
+    { type: "agent_identity_document", fileUrl: form.agentIdentityUrl.trim() },
+    { type: "historical_trade_materials", fileUrl: form.historicalTradeMaterialsUrl.trim() },
+  ].forEach((document) => {
+    if (!document.fileUrl) return;
+
+    documents.push({
+      type: document.type,
+      file_url: document.fileUrl,
+      issuing_country_code: issuingCountryCode,
+    });
+  });
+
+  return documents;
+};
 
 const buildPersonDocuments = (
   form: ProfileForm | PersonForm,
@@ -1099,6 +1316,9 @@ const findDocumentUrl = (documents: KycDocumentPayload[], types: string[]) =>
   documents.find((document) => types.includes(document.type.toLowerCase()))?.file_url ?? "";
 
 const stringifyMetadata = (value: unknown) => (value === undefined || value === null ? "" : String(value));
+
+const asMetadataRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 
 const StepIndicator = ({ currentStep, labels }: { currentStep: number; labels: string[] }) => (
   <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">

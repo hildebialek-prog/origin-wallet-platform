@@ -1,3 +1,5 @@
+import { ApiRequestError, requestApi } from "@/services/apiClient";
+
 export interface ContactFormRequest {
   name: string;
   email: string;
@@ -19,16 +21,6 @@ export interface ContactValidationErrorResponse {
   errors?: Record<string, string[]>;
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-
-const buildApiUrl = (path: string) => {
-  if (!apiBaseUrl) {
-    throw new Error("Missing VITE_API_BASE_URL");
-  }
-
-  return path.startsWith("http") ? path : `${apiBaseUrl}${path}`;
-};
-
 export class ContactSubmissionError extends Error {
   status: number;
   errors?: Record<string, string[]>;
@@ -44,40 +36,20 @@ export class ContactSubmissionError extends Error {
 export const submitContactMessage = async (
   payload: ContactFormRequest,
 ): Promise<ContactFormSuccessResponse> => {
-  let response: Response;
-
   try {
-    response = await fetch(buildApiUrl("/contact"), {
+    return await requestApi<ContactFormSuccessResponse>("/contact", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
+      body: payload as unknown as Record<string, unknown>,
     });
   } catch (error) {
-    if (error instanceof TypeError) {
-      throw new ContactSubmissionError("Send message failed, please try again.", 0);
+    if (error instanceof ApiRequestError) {
+      throw new ContactSubmissionError(
+        error.message || "Send message failed, please try again.",
+        error.status,
+        error.errors,
+      );
     }
 
     throw error;
   }
-
-  if (!response.ok) {
-    let errorPayload: ContactValidationErrorResponse | null = null;
-
-    try {
-      errorPayload = (await response.json()) as ContactValidationErrorResponse;
-    } catch {
-      errorPayload = null;
-    }
-
-    throw new ContactSubmissionError(
-      errorPayload?.message || "Send message failed, please try again.",
-      response.status,
-      errorPayload?.errors,
-    );
-  }
-
-  return (await response.json()) as ContactFormSuccessResponse;
 };

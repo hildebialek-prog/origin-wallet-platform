@@ -1,7 +1,10 @@
+import { requestApi } from "@/services/apiClient";
+
 export interface ProviderSummary {
   id: number;
   code: string;
   name: string;
+  logo_url?: string | null;
   status: string;
   is_available_for_onboarding?: boolean;
   supports_quotes?: boolean;
@@ -64,55 +67,6 @@ export interface ProviderRateResponse {
     refreshed_at: string;
   };
 }
-
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-
-const buildApiUrl = (path: string) => {
-  if (!apiBaseUrl) {
-    throw new Error("Missing VITE_API_BASE_URL");
-  }
-
-  return path.startsWith("http") ? path : `${apiBaseUrl}${path}`;
-};
-
-const getResponseError = async (response: Response) => {
-  try {
-    const data = await response.json();
-    const fieldErrors = data?.errors ? Object.values(data.errors).flat().join(" ") : "";
-    return data?.message || fieldErrors || `Request failed with status ${response.status}`;
-  } catch {
-    return `Request failed with status ${response.status}`;
-  }
-};
-
-const requestApi = async <TResponse>(
-  path: string,
-  {
-    method = "GET",
-    body,
-    token,
-  }: {
-    method?: "GET" | "POST";
-    body?: Record<string, unknown>;
-    token?: string | null;
-  } = {},
-): Promise<TResponse> => {
-  const response = await fetch(buildApiUrl(path), {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  if (!response.ok) {
-    throw new Error(await getResponseError(response));
-  }
-
-  return response.json() as Promise<TResponse>;
-};
 
 export const getProviders = () => requestApi<{ data: ProviderSummary[] }>("/providers");
 
