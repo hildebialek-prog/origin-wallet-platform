@@ -82,6 +82,18 @@ export interface KycSubmissionResponse {
   kyc_submission?: KycProfile | null;
 }
 
+export type KycDocumentSubjectType =
+  | "applicant"
+  | "business"
+  | "authorized_representative"
+  | "beneficial_owner"
+  | "agent";
+
+export interface KycDocumentUploadResponse {
+  message?: string;
+  document: KycDocumentPayload;
+}
+
 export type IdentityVerificationSubject =
   | "applicant"
   | "business"
@@ -172,6 +184,42 @@ export const submitKycProfile = (params: {
     token: params.token,
     body: params.payload as unknown as Record<string, unknown>,
   });
+
+export const uploadKycDocument = async (params: {
+  token: string;
+  userId: string | number;
+  type: string;
+  file: File;
+  subjectType?: KycDocumentSubjectType;
+  side?: string | null;
+  issuingCountryCode?: string | null;
+  documentNumber?: string | null;
+  issuedAt?: string | null;
+  expiresAt?: string | null;
+  metadata?: Record<string, unknown>;
+}): Promise<KycDocumentUploadResponse> => {
+  const formData = new FormData();
+  formData.append("type", params.type);
+  formData.append("file", params.file);
+
+  if (params.subjectType) formData.append("subject_type", params.subjectType);
+  if (params.side) formData.append("side", params.side);
+  if (params.issuingCountryCode) formData.append("issuing_country_code", params.issuingCountryCode.toUpperCase());
+  if (params.documentNumber) formData.append("document_number", params.documentNumber);
+  if (params.issuedAt) formData.append("issued_at", params.issuedAt);
+  if (params.expiresAt) formData.append("expires_at", params.expiresAt);
+
+  Object.entries(params.metadata ?? {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    formData.append(`metadata[${key}]`, typeof value === "object" ? JSON.stringify(value) : String(value));
+  });
+
+  return requestApi<KycDocumentUploadResponse>(`/user/users/${params.userId}/kyc-profile/documents`, {
+    method: "POST",
+    token: params.token,
+    body: formData,
+  });
+};
 
 export const verifyBusinessRegistry = (params: {
   token: string;

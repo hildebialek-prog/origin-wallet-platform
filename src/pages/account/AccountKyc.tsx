@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,12 +7,14 @@ import {
   getKycProfile,
   startIdentityVerificationSession,
   submitKycProfile,
+  uploadKycDocument,
   uploadIdentityVerificationFile,
   type IdentityCaptureType,
   type IdentityVerificationArtifact,
   type IdentityVerificationSession,
   type IdentityVerificationSubject,
   type KycDocumentPayload,
+  type KycDocumentSubjectType,
   type KycProfile,
   type KycSubmissionPayload,
 } from "@/services/kycService";
@@ -108,8 +110,27 @@ type DocumentFieldKey =
 
 type CaptureSessionMap = Partial<Record<IdentityVerificationSubject, IdentityVerificationSession>>;
 type CaptureArtifactMap = Record<string, IdentityVerificationArtifact>;
+type UploadedDocumentMap = Record<string, KycDocumentPayload>;
+
+type KycDraft = {
+  version: number;
+  step: number;
+  applicantType: ApplicantType;
+  profileForm: ProfileForm;
+  businessForm: BusinessForm;
+  representativeForm: PersonForm;
+  beneficialOwnerForm: PersonForm;
+  captureSessions: CaptureSessionMap;
+  captureArtifacts: CaptureArtifactMap;
+  uploadedDocuments: UploadedDocumentMap;
+  verificationConsent: boolean;
+  savedAt: string;
+};
 
 const stepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
+const kycDraftVersion = 1;
+const kycDraftKey = (userId: string | number) => `origin-wallet-kyc-draft:${userId}`;
+const lockedKycStatuses = new Set(["approved", "verified", "submitted", "under_review"]);
 
 const businessActivityOptions = [
   { label: "Foreign trade export business", value: "foreign_trade_export" },
@@ -256,10 +277,15 @@ const AccountKyc = () => {
   const [beneficialOwnerForm, setBeneficialOwnerForm] = useState<PersonForm>(() => defaultPersonForm());
   const [captureSessions, setCaptureSessions] = useState<CaptureSessionMap>({});
   const [captureArtifacts, setCaptureArtifacts] = useState<CaptureArtifactMap>({});
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocumentMap>({});
   const [uploadingCapture, setUploadingCapture] = useState("");
+  const [uploadingDocument, setUploadingDocument] = useState("");
   const [verificationConsent, setVerificationConsent] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
   const [message, setMessage] = useState("");
   const [formError, setFormError] = useState("");
+  const draftHydratedRef = useRef(false);
+  const draftStorageKey = useMemo(() => (user?.id ? kycDraftKey(user.id) : ""), [user?.id]);
 
   const kycQuery = useQuery({
     queryKey: ["kyc-profile", user?.id, token],
@@ -269,14 +295,216 @@ const AccountKyc = () => {
 
   const profile = kycQuery.data?.kyc_profile ?? null;
 
+  const applyDraft = useCallback((draft: KycDraft) => {
+    setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 0), stepLabels.length - 1) : 0);
+    setApplicantType(draft.applicantType === "business" ? "business" : "individual");
+    setProfileForm({ ...defaultProfileForm(user?.name ?? ""), ...(draft.profileForm ?? {}) });
+    setBusinessForm({ ...defaultBusinessForm(), ...(draft.businessForm ?? {}) });
+    setRepresentativeForm({ ...defaultPersonForm(), ...(draft.representativeForm ?? {}) });
+    setBeneficialOwnerForm({ ...defaultPersonForm(), ...(draft.beneficialOwnerForm ?? {}) });
+    setCaptureSessions(draft.captureSessions ?? {});
+    setCaptureArtifacts(draft.captureArtifacts ?? {});
+    setUploadedDocuments(draft.uploadedDocuments ?? {});
+    setVerificationConsent(Boolean(draft.verificationConsent));
+  }, [user?.name]);
+
+  const hydrateProfile = useCallback((nextProfile: KycProfile) => {
+    const profileDocs = nextProfile.documents ?? [];
+    const representative = nextProfile.related_persons?.find((person) =>
+      ["authorized_representative", "director"].includes(person.relationship_type.toLowerCase()),
+    );
+    const beneficialOwner = nextProfile.related_persons?.find((person) =>
+      ["beneficial_owner", "ubo"].includes(person.relationship_type.toLowerCase()),
+    );
+    const profileIdentity = readPersonDocuments(profileDocs);
+    const representativeIdentity = readPersonDocuments(representative?.documents ?? []);
+    const beneficialOwnerIdentity = readPersonDocuments(beneficialOwner?.documents ?? []);
+    const metadata = nextProfile.metadata ?? {};
+    const hydratedDocuments: UploadedDocumentMap = {};
+
+    if (nextProfile.applicant_type === "business") {
+      profileDocs.forEach((document) => {
+        hydratedDocuments[captureKey("business", document.type)] = document;
+      });
+    } else {
+      hydratePersonDocumentMap(hydratedDocuments, "applicant", profileDocs);
+    }
+
+    hydratePersonDocumentMap(hydratedDocuments, "authorized_representative", representative?.documents ?? []);
+    hydratePersonDocumentMap(hydratedDocuments, "beneficial_owner", beneficialOwner?.documents ?? []);
+
+    setApplicantType(nextProfile.applicant_type === "business" ? "business" : "individual");
+    setProfileForm({
+      ...defaultProfileForm(user?.name ?? ""),
+      legalName: nextProfile.legal_name ?? "",
+      dateOfBirth: nextProfile.date_of_birth ?? "",
+      nationality: nextProfile.nationality_country_code ?? "",
+      residence: nextProfile.residence_country_code ?? "",
+      occupation: stringifyMetadata(metadata.occupation),
+      sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
+      expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
+      countryCode: nextProfile.country_code ?? "",
+      addressLine1: nextProfile.address_line1 ?? "",
+      city: nextProfile.city ?? "",
+      state: nextProfile.state ?? "",
+      postalCode: nextProfile.postal_code ?? "",
+      ...profileIdentity,
+    });
+    setBusinessForm({
+      ...defaultBusinessForm(),
+      businessName: nextProfile.business_name ?? "",
+      businessRegistration: nextProfile.business_registration_number ?? "",
+      taxId: nextProfile.tax_id ?? "",
+      businessActivityType: stringifyMetadata(metadata.business_activity_type) || "foreign_trade_export",
+      exportingRegions: stringifyMetadata(metadata.exporting_regions),
+      tradeType: stringifyMetadata(metadata.trade_type) || "goods_trade",
+      mainProduct: stringifyMetadata(metadata.main_product) || "Electrical Products and Accessories",
+      industry: stringifyMetadata(metadata.business_industry),
+      businessActivity: stringifyMetadata(metadata.business_activity),
+      website: stringifyMetadata(metadata.business_website),
+      sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
+      expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
+      registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration"]),
+      certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
+      businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
+      accountOpeningFormUrl: findDocumentUrl(profileDocs, ["account_opening_application_form"]),
+      ownershipStructureUrl: findDocumentUrl(profileDocs, ["ownership_structure"]),
+      tradeAttachmentUrl: findDocumentUrl(profileDocs, ["foreign_trade_attachment"]),
+      agentName: stringifyMetadata(asMetadataRecord(metadata.agent).name),
+      agentAddress: stringifyMetadata(asMetadataRecord(metadata.agent).address),
+      agentIdentityUrl: findDocumentUrl(profileDocs, ["agent_identity_document"]),
+      historicalTradeMaterialsUrl: findDocumentUrl(profileDocs, ["historical_trade_materials"]),
+      historicalTradeComment: stringifyMetadata(metadata.historical_trade_comment),
+    });
+    setRepresentativeForm({
+      ...defaultPersonForm(),
+      legalName: representative?.legal_name ?? "",
+      dateOfBirth: representative?.date_of_birth ?? "",
+      nationality: representative?.nationality_country_code ?? "",
+      residence: representative?.residence_country_code ?? "",
+      addressLine1: representative?.address_line1 ?? "",
+      city: representative?.city ?? "",
+      state: representative?.state ?? "",
+      postalCode: representative?.postal_code ?? "",
+      countryCode: representative?.country_code ?? "",
+      ...representativeIdentity,
+    });
+    setBeneficialOwnerForm({
+      ...defaultPersonForm(),
+      legalName: beneficialOwner?.legal_name ?? "",
+      dateOfBirth: beneficialOwner?.date_of_birth ?? "",
+      nationality: beneficialOwner?.nationality_country_code ?? "",
+      residence: beneficialOwner?.residence_country_code ?? "",
+      ownershipPercentage:
+        beneficialOwner?.ownership_percentage !== undefined && beneficialOwner?.ownership_percentage !== null
+          ? String(beneficialOwner.ownership_percentage)
+          : "",
+      addressLine1: beneficialOwner?.address_line1 ?? "",
+      city: beneficialOwner?.city ?? "",
+      state: beneficialOwner?.state ?? "",
+      postalCode: beneficialOwner?.postal_code ?? "",
+      countryCode: beneficialOwner?.country_code ?? "",
+      ...beneficialOwnerIdentity,
+    });
+    setUploadedDocuments(hydratedDocuments);
+    setVerificationConsent(Boolean(metadata.verification_consent));
+  }, [user?.name]);
+
   useEffect(() => {
-    if (!profile) {
-      setProfileForm((current) => ({ ...current, legalName: current.legalName || user?.name || "" }));
+    draftHydratedRef.current = false;
+    setDraftReady(false);
+
+    if (!draftStorageKey) {
+      setDraftReady(true);
       return;
     }
 
+    try {
+      const rawDraft = localStorage.getItem(draftStorageKey);
+      if (!rawDraft) {
+        setDraftReady(true);
+        return;
+      }
+
+      const draft = JSON.parse(rawDraft) as Partial<KycDraft>;
+      if (draft.version !== kycDraftVersion) {
+        localStorage.removeItem(draftStorageKey);
+        setDraftReady(true);
+        return;
+      }
+
+      applyDraft(draft as KycDraft);
+      draftHydratedRef.current = true;
+    } catch {
+      localStorage.removeItem(draftStorageKey);
+    } finally {
+      setDraftReady(true);
+    }
+  }, [applyDraft, draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+
+    if (!profile) {
+      if (!draftHydratedRef.current) {
+        setProfileForm((current) => ({ ...current, legalName: current.legalName || user?.name || "" }));
+      }
+      return;
+    }
+
+    if (isLockedKycStatus(profile.status)) {
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
+      draftHydratedRef.current = false;
+      hydrateProfile(profile);
+      return;
+    }
+
+    if (draftHydratedRef.current) return;
+
     hydrateProfile(profile);
-  }, [profile?.id, user?.name]);
+  }, [draftReady, draftStorageKey, hydrateProfile, profile, user?.name]);
+
+  useEffect(() => {
+    if (!draftReady || !draftStorageKey || kycQuery.isLoading) return;
+
+    if (isLockedKycStatus(profile?.status ?? user?.kycStatus)) {
+      localStorage.removeItem(draftStorageKey);
+      return;
+    }
+
+    const draft: KycDraft = {
+      version: kycDraftVersion,
+      step,
+      applicantType,
+      profileForm,
+      businessForm,
+      representativeForm,
+      beneficialOwnerForm,
+      captureSessions,
+      captureArtifacts,
+      uploadedDocuments,
+      verificationConsent,
+      savedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+  }, [
+    applicantType,
+    beneficialOwnerForm,
+    businessForm,
+    captureArtifacts,
+    captureSessions,
+    draftReady,
+    draftStorageKey,
+    kycQuery.isLoading,
+    profile?.status,
+    profileForm,
+    representativeForm,
+    step,
+    uploadedDocuments,
+    user?.kycStatus,
+    verificationConsent,
+  ]);
 
   const openRequirements = useMemo(
     () =>
@@ -373,8 +601,116 @@ const AccountKyc = () => {
     }
   };
 
-  const documentEvidence = (subjectType: IdentityVerificationSubject) => (captureType: IdentityCaptureType) =>
-    artifactToDocumentPayload(captureArtifacts[captureKey(subjectType, captureType)]);
+  const uploadKycDocumentFile = async (params: {
+    subjectType: KycDocumentSubjectType;
+    uploadKey: string;
+    type: string;
+    file: File;
+    onUploaded: (document: KycDocumentPayload) => void;
+    side?: string | null;
+    issuingCountryCode?: string | null;
+    documentNumber?: string | null;
+    issuedAt?: string | null;
+    expiresAt?: string | null;
+    metadata?: Record<string, unknown>;
+  }) => {
+    if (!user?.id || !token) {
+      setFormError("Please sign in before uploading KYC/KYB documents.");
+      return;
+    }
+
+    setUploadingDocument(params.uploadKey);
+    setFormError("");
+
+    try {
+      const response = await uploadKycDocument({
+        documentNumber: params.documentNumber?.trim() || null,
+        expiresAt: params.expiresAt?.trim() || null,
+        file: params.file,
+        issuedAt: params.issuedAt?.trim() || null,
+        issuingCountryCode: params.issuingCountryCode?.trim().toUpperCase() || null,
+        metadata: params.metadata,
+        side: params.side,
+        subjectType: params.subjectType,
+        token,
+        type: params.type,
+        userId: user.id,
+      });
+
+      setUploadedDocuments((current) => ({
+        ...current,
+        [params.uploadKey]: response.document,
+      }));
+      params.onUploaded(response.document);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to upload KYC/KYB document.");
+    } finally {
+      setUploadingDocument("");
+    }
+  };
+
+  const uploadPersonDocument = (
+    subjectType: IdentityVerificationSubject,
+    form: ProfileForm | PersonForm,
+    update: (field: DocumentFieldKey, value: string) => void,
+    captureType: IdentityCaptureType,
+    field: DocumentFieldKey,
+    file: File,
+  ) => {
+    const isFront = captureType === "identity_front";
+    const isBack = captureType === "identity_back";
+    const documentType = isFront
+      ? `${form.idDocumentType}_front`
+      : isBack
+        ? `${form.idDocumentType}_back`
+        : "proof_of_address";
+
+    void uploadKycDocumentFile({
+      documentNumber: isFront || isBack ? form.idDocumentNumber : null,
+      expiresAt: isFront || isBack ? form.idExpiresAt : null,
+      file,
+      issuedAt: isFront || isBack ? form.idIssuedAt : null,
+      issuingCountryCode: isFront || isBack
+        ? form.nationality || form.residence || form.countryCode
+        : form.countryCode || form.residence || form.nationality,
+      metadata: {
+        capture_type: captureType,
+        document_type: form.idDocumentType,
+        subject: subjectType,
+      },
+      onUploaded: (document) => update(field, document.file_url),
+      side: isFront ? "front" : isBack ? "back" : null,
+      subjectType,
+      type: documentType,
+      uploadKey: captureKey(subjectType, captureType),
+    });
+  };
+
+  const uploadBusinessDocument = (
+    type: string,
+    field: keyof BusinessForm,
+    file: File,
+    metadata?: Record<string, unknown>,
+  ) => {
+    void uploadKycDocumentFile({
+      file,
+      issuingCountryCode: profileForm.countryCode,
+      metadata: {
+        subject: "business",
+        ...metadata,
+      },
+      onUploaded: (document) => updateBusiness(field, document.file_url),
+      subjectType: "business",
+      type,
+      uploadKey: captureKey("business", type),
+    });
+  };
+
+  const documentEvidence = (subjectType: IdentityVerificationSubject) => (captureType: string) =>
+    documentEvidencePayload(
+      captureArtifacts[captureKey(subjectType, captureType)],
+      uploadedDocuments[captureKey(subjectType, captureType)],
+    );
 
   const requiredFilled = (values: string[]) => values.every((value) => value.trim() !== "");
 
@@ -499,6 +835,8 @@ const AccountKyc = () => {
         payload,
       }),
     onSuccess: async (response) => {
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
+      draftHydratedRef.current = false;
       setMessage(response.message || "KYC/KYB profile submitted and is pending review.");
       setFormError("");
       await Promise.all([
@@ -621,95 +959,6 @@ const AccountKyc = () => {
     };
 
     submitMutation.mutate(payload);
-  };
-
-  const hydrateProfile = (nextProfile: KycProfile) => {
-    const profileDocs = nextProfile.documents ?? [];
-    const representative = nextProfile.related_persons?.find((person) =>
-      ["authorized_representative", "director"].includes(person.relationship_type.toLowerCase()),
-    );
-    const beneficialOwner = nextProfile.related_persons?.find((person) =>
-      ["beneficial_owner", "ubo"].includes(person.relationship_type.toLowerCase()),
-    );
-    const profileIdentity = readPersonDocuments(profileDocs);
-    const representativeIdentity = readPersonDocuments(representative?.documents ?? []);
-    const beneficialOwnerIdentity = readPersonDocuments(beneficialOwner?.documents ?? []);
-    const metadata = nextProfile.metadata ?? {};
-
-    setApplicantType(nextProfile.applicant_type === "business" ? "business" : "individual");
-    setProfileForm({
-      ...defaultProfileForm(user?.name ?? ""),
-      legalName: nextProfile.legal_name ?? "",
-      dateOfBirth: nextProfile.date_of_birth ?? "",
-      nationality: nextProfile.nationality_country_code ?? "",
-      residence: nextProfile.residence_country_code ?? "",
-      occupation: stringifyMetadata(metadata.occupation),
-      sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
-      expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
-      countryCode: nextProfile.country_code ?? "",
-      addressLine1: nextProfile.address_line1 ?? "",
-      city: nextProfile.city ?? "",
-      state: nextProfile.state ?? "",
-      postalCode: nextProfile.postal_code ?? "",
-      ...profileIdentity,
-    });
-    setBusinessForm({
-      ...defaultBusinessForm(),
-      businessName: nextProfile.business_name ?? "",
-      businessRegistration: nextProfile.business_registration_number ?? "",
-      taxId: nextProfile.tax_id ?? "",
-      businessActivityType: stringifyMetadata(metadata.business_activity_type) || "foreign_trade_export",
-      exportingRegions: stringifyMetadata(metadata.exporting_regions),
-      tradeType: stringifyMetadata(metadata.trade_type) || "goods_trade",
-      mainProduct: stringifyMetadata(metadata.main_product) || "Electrical Products and Accessories",
-      industry: stringifyMetadata(metadata.business_industry),
-      businessActivity: stringifyMetadata(metadata.business_activity),
-      website: stringifyMetadata(metadata.business_website),
-      sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
-      expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
-      registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration"]),
-      certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
-      businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
-      accountOpeningFormUrl: findDocumentUrl(profileDocs, ["account_opening_application_form"]),
-      ownershipStructureUrl: findDocumentUrl(profileDocs, ["ownership_structure"]),
-      tradeAttachmentUrl: findDocumentUrl(profileDocs, ["foreign_trade_attachment"]),
-      agentName: stringifyMetadata(asMetadataRecord(metadata.agent).name),
-      agentAddress: stringifyMetadata(asMetadataRecord(metadata.agent).address),
-      agentIdentityUrl: findDocumentUrl(profileDocs, ["agent_identity_document"]),
-      historicalTradeMaterialsUrl: findDocumentUrl(profileDocs, ["historical_trade_materials"]),
-      historicalTradeComment: stringifyMetadata(metadata.historical_trade_comment),
-    });
-    setRepresentativeForm({
-      ...defaultPersonForm(),
-      legalName: representative?.legal_name ?? "",
-      dateOfBirth: representative?.date_of_birth ?? "",
-      nationality: representative?.nationality_country_code ?? "",
-      residence: representative?.residence_country_code ?? "",
-      addressLine1: representative?.address_line1 ?? "",
-      city: representative?.city ?? "",
-      state: representative?.state ?? "",
-      postalCode: representative?.postal_code ?? "",
-      countryCode: representative?.country_code ?? "",
-      ...representativeIdentity,
-    });
-    setBeneficialOwnerForm({
-      ...defaultPersonForm(),
-      legalName: beneficialOwner?.legal_name ?? "",
-      dateOfBirth: beneficialOwner?.date_of_birth ?? "",
-      nationality: beneficialOwner?.nationality_country_code ?? "",
-      residence: beneficialOwner?.residence_country_code ?? "",
-      ownershipPercentage:
-        beneficialOwner?.ownership_percentage !== undefined && beneficialOwner?.ownership_percentage !== null
-          ? String(beneficialOwner.ownership_percentage)
-          : "",
-      addressLine1: beneficialOwner?.address_line1 ?? "",
-      city: beneficialOwner?.city ?? "",
-      state: beneficialOwner?.state ?? "",
-      postalCode: beneficialOwner?.postal_code ?? "",
-      countryCode: beneficialOwner?.country_code ?? "",
-      ...beneficialOwnerIdentity,
-    });
-    setVerificationConsent(Boolean(metadata.verification_consent));
   };
 
   return (
@@ -891,9 +1140,9 @@ const AccountKyc = () => {
                     form={profileForm}
                     onChange={updateProfile}
                     uploadSubject="applicant"
-                    uploadingCapture={uploadingCapture}
+                    uploadingCapture={uploadingDocument}
                     onUploadCapture={(captureType, field, file) =>
-                      uploadCapture("applicant", captureType, file, (artifact) => updateProfile(field, artifact.file_url))
+                      uploadPersonDocument("applicant", profileForm, updateProfile, captureType, field, file)
                     }
                   />
                 ) : (
@@ -906,23 +1155,17 @@ const AccountKyc = () => {
                           value={businessForm.registrationDocumentUrl}
                           onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
                           uploadLabel="Upload business certificate"
-                          uploading={uploadingCapture === "business:business_registration"}
-                          onFile={(file) =>
-                            uploadCapture("business", "business_registration", file, (artifact) =>
-                              updateBusiness("registrationDocumentUrl", artifact.file_url),
-                            )
-                          }
+                          uploading={uploadingDocument === captureKey("business", "business_registration")}
+                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file)}
                         />
                         <FieldWithUpload
                           label="Certificate of Incorporation (CI)"
                           value={businessForm.certificateOfIncorporationUrl}
                           onChange={(value) => updateBusiness("certificateOfIncorporationUrl", value)}
                           uploadLabel="Upload certificate of incorporation"
-                          uploading={uploadingCapture === "business:certificate_of_incorporation"}
+                          uploading={uploadingDocument === captureKey("business", "certificate_of_incorporation")}
                           onFile={(file) =>
-                            uploadCapture("business", "certificate_of_incorporation", file, (artifact) =>
-                              updateBusiness("certificateOfIncorporationUrl", artifact.file_url),
-                            )
+                            uploadBusinessDocument("certificate_of_incorporation", "certificateOfIncorporationUrl", file)
                           }
                         />
                         <FieldWithUpload
@@ -930,23 +1173,19 @@ const AccountKyc = () => {
                           value={businessForm.businessAddressProofUrl}
                           onChange={(value) => updateBusiness("businessAddressProofUrl", value)}
                           uploadLabel="Upload business address proof"
-                          uploading={uploadingCapture === "business:proof_of_business_address"}
-                          onFile={(file) =>
-                            uploadCapture("business", "proof_of_business_address", file, (artifact) =>
-                              updateBusiness("businessAddressProofUrl", artifact.file_url),
-                            )
-                          }
+                          uploading={uploadingDocument === captureKey("business", "proof_of_business_address")}
+                          onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file)}
                         />
                         <FieldWithUpload
                           label="Hand-held account opening application form"
                           value={businessForm.accountOpeningFormUrl}
                           onChange={(value) => updateBusiness("accountOpeningFormUrl", value)}
                           uploadLabel="Upload hand-held account opening form photo"
-                          uploading={uploadingCapture === "business:account_opening_application_form"}
+                          uploading={uploadingDocument === captureKey("business", "account_opening_application_form")}
                           onFile={(file) =>
-                            uploadCapture("business", "account_opening_application_form", file, (artifact) =>
-                              updateBusiness("accountOpeningFormUrl", artifact.file_url),
-                            )
+                            uploadBusinessDocument("account_opening_application_form", "accountOpeningFormUrl", file, {
+                              requirement: "handheld_form_photo",
+                            })
                           }
                         />
                         <FieldWithUpload
@@ -954,27 +1193,36 @@ const AccountKyc = () => {
                           value={businessForm.ownershipStructureUrl}
                           onChange={(value) => updateBusiness("ownershipStructureUrl", value)}
                           uploadLabel="Upload ownership structure"
-                          uploading={uploadingCapture === "business:ownership_structure"}
-                          onFile={(file) =>
-                            uploadCapture("business", "ownership_structure", file, (artifact) =>
-                              updateBusiness("ownershipStructureUrl", artifact.file_url),
-                            )
-                          }
+                          uploading={uploadingDocument === captureKey("business", "ownership_structure")}
+                          onFile={(file) => uploadBusinessDocument("ownership_structure", "ownershipStructureUrl", file)}
                         />
-                        <Field
-                          label="Foreign trade attachment URL (optional)"
+                        <FieldWithUpload
+                          label="Foreign trade attachment (optional)"
                           value={businessForm.tradeAttachmentUrl}
                           onChange={(value) => updateBusiness("tradeAttachmentUrl", value)}
+                          uploadLabel="Upload foreign trade attachment"
+                          uploading={uploadingDocument === captureKey("business", "foreign_trade_attachment")}
+                          onFile={(file) => uploadBusinessDocument("foreign_trade_attachment", "tradeAttachmentUrl", file)}
                         />
-                        <Field
-                          label="Agent ID document URL (optional)"
+                        <FieldWithUpload
+                          label="Agent ID document (optional)"
                           value={businessForm.agentIdentityUrl}
                           onChange={(value) => updateBusiness("agentIdentityUrl", value)}
+                          uploadLabel="Upload agent ID document"
+                          uploading={uploadingDocument === captureKey("business", "agent_identity_document")}
+                          onFile={(file) =>
+                            uploadBusinessDocument("agent_identity_document", "agentIdentityUrl", file, {
+                              subject: "agent",
+                            })
+                          }
                         />
-                        <Field
-                          label="Historical trade materials URL (optional)"
+                        <FieldWithUpload
+                          label="Historical trade materials (optional)"
                           value={businessForm.historicalTradeMaterialsUrl}
                           onChange={(value) => updateBusiness("historicalTradeMaterialsUrl", value)}
+                          uploadLabel="Upload historical trade materials"
+                          uploading={uploadingDocument === captureKey("business", "historical_trade_materials")}
+                          onFile={(file) => uploadBusinessDocument("historical_trade_materials", "historicalTradeMaterialsUrl", file)}
                         />
                         <Field
                           label="Historical trade material comment (optional)"
@@ -988,10 +1236,15 @@ const AccountKyc = () => {
                       form={representativeForm}
                       onChange={updateRepresentative}
                       uploadSubject="authorized_representative"
-                      uploadingCapture={uploadingCapture}
+                      uploadingCapture={uploadingDocument}
                       onUploadCapture={(captureType, field, file) =>
-                        uploadCapture("authorized_representative", captureType, file, (artifact) =>
-                          updateRepresentative(field, artifact.file_url),
+                        uploadPersonDocument(
+                          "authorized_representative",
+                          representativeForm,
+                          updateRepresentative,
+                          captureType,
+                          field,
+                          file,
                         )
                       }
                     />
@@ -1000,10 +1253,15 @@ const AccountKyc = () => {
                       form={beneficialOwnerForm}
                       onChange={updateBeneficialOwner}
                       uploadSubject="beneficial_owner"
-                      uploadingCapture={uploadingCapture}
+                      uploadingCapture={uploadingDocument}
                       onUploadCapture={(captureType, field, file) =>
-                        uploadCapture("beneficial_owner", captureType, file, (artifact) =>
-                          updateBeneficialOwner(field, artifact.file_url),
+                        uploadPersonDocument(
+                          "beneficial_owner",
+                          beneficialOwnerForm,
+                          updateBeneficialOwner,
+                          captureType,
+                          field,
+                          file,
                         )
                       }
                     />
@@ -1159,7 +1417,9 @@ const AccountKyc = () => {
   );
 };
 
-const captureKey = (subjectType: IdentityVerificationSubject, captureType: IdentityCaptureType) =>
+const isLockedKycStatus = (status?: string | null) => lockedKycStatuses.has(String(status ?? "").toLowerCase());
+
+const captureKey = (subjectType: string, captureType: string) =>
   `${subjectType}:${captureType}`;
 
 const artifactToDocumentPayload = (artifact?: IdentityVerificationArtifact): Partial<KycDocumentPayload> => {
@@ -1175,10 +1435,31 @@ const artifactToDocumentPayload = (artifact?: IdentityVerificationArtifact): Par
   };
 };
 
+const uploadedDocumentToPayload = (document?: KycDocumentPayload): Partial<KycDocumentPayload> => {
+  if (!document) return {};
+
+  return {
+    file_hash: document.file_hash ?? null,
+    file_path: document.file_path ?? null,
+    file_size: document.file_size ?? null,
+    mime_type: document.mime_type ?? null,
+    original_name: document.original_name ?? null,
+    storage_disk: document.storage_disk ?? null,
+  };
+};
+
+const documentEvidencePayload = (
+  artifact?: IdentityVerificationArtifact,
+  document?: KycDocumentPayload,
+): Partial<KycDocumentPayload> => ({
+  ...artifactToDocumentPayload(artifact),
+  ...uploadedDocumentToPayload(document),
+});
+
 const buildBusinessDocuments = (
   form: BusinessForm,
   countryCode: string,
-  evidence: (captureType: IdentityCaptureType) => Partial<KycDocumentPayload>,
+  evidence: (captureType: string) => Partial<KycDocumentPayload>,
 ): KycDocumentPayload[] => {
   const issuingCountryCode = countryCode.trim().toUpperCase() || null;
   const documents: KycDocumentPayload[] = [
@@ -1226,6 +1507,7 @@ const buildBusinessDocuments = (
       type: document.type,
       file_url: document.fileUrl,
       issuing_country_code: issuingCountryCode,
+      ...evidence(document.type),
     });
   });
 
@@ -1235,7 +1517,7 @@ const buildBusinessDocuments = (
 const buildPersonDocuments = (
   form: ProfileForm | PersonForm,
   subject: IdentityVerificationSubject,
-  evidence: (captureType: IdentityCaptureType) => Partial<KycDocumentPayload>,
+  evidence: (captureType: string) => Partial<KycDocumentPayload>,
 ): KycDocumentPayload[] => {
   const issuingCountry = ("nationality" in form ? form.nationality : "").trim().toUpperCase();
   const documentType = form.idDocumentType || "identity_document";
@@ -1305,6 +1587,30 @@ const readPersonDocuments = (documents: KycDocumentPayload[]) => {
     selfieLivenessUrl: selfie?.file_url ?? "",
     livenessSessionId: stringifyMetadata(selfie?.metadata?.liveness_session_id),
   };
+};
+
+const hydratePersonDocumentMap = (
+  target: UploadedDocumentMap,
+  subjectType: IdentityVerificationSubject,
+  documents: KycDocumentPayload[],
+) => {
+  documents.forEach((document) => {
+    const captureType = personDocumentCaptureType(document);
+    if (!captureType) return;
+
+    target[captureKey(subjectType, captureType)] = document;
+  });
+};
+
+const personDocumentCaptureType = (document: KycDocumentPayload) => {
+  const type = document.type.toLowerCase();
+
+  if (type.endsWith("_front")) return "identity_front";
+  if (type.endsWith("_back")) return "identity_back";
+  if (type === "proof_of_address") return "proof_of_address";
+  if (type === "selfie_liveness") return "selfie_liveness";
+
+  return null;
 };
 
 const normalizeDocumentType = (type?: string): IdentityDocumentType => {
