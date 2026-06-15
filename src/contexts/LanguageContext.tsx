@@ -13,7 +13,7 @@ export interface LanguageOption {
 
 export const LANGUAGES: LanguageOption[] = [
   { code: "en", nameEn: "English", name: "English", nativeName: "English", flag: "US", googleCode: "en" },
-  { code: "vi", nameEn: "Vietnamese", name: "Tieng Viet", nativeName: "Tieng Viet", flag: "VN", googleCode: "vi" },
+  { code: "vi", nameEn: "Vietnamese", name: "Tieng Viet", nativeName: "Tiếng Việt", flag: "VN", googleCode: "vi" },
   { code: "zh-CN", nameEn: "Chinese", name: "Chinese", nativeName: "Chinese", flag: "CN", googleCode: "zh-CN" },
   { code: "ja", nameEn: "Japanese", name: "Japanese", nativeName: "Japanese", flag: "JP", googleCode: "ja" },
 ];
@@ -29,6 +29,21 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+const setGoogleTranslateCookie = (langCode: string) => {
+  const cookieValue = `/en/${langCode}`;
+  const domain = window.location.hostname;
+
+  document.cookie = `googtrans=${cookieValue}; path=/`;
+  document.cookie = `googtrans=${cookieValue}; path=/; domain=${domain}`;
+};
+
+const clearGoogleTranslateCookie = () => {
+  const domain = window.location.hostname;
+
+  document.cookie = "googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC";
+  document.cookie = `googtrans=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
+};
 
 declare global {
   interface Window {
@@ -72,8 +87,23 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const doTranslate = useCallback(async (langCode: string): Promise<boolean> => {
     return new Promise((resolve) => {
       let attempts = 0;
-      const maxAttempts = 30;
+      const maxAttempts = 50;
       const interval = 150;
+
+      setGoogleTranslateCookie(langCode);
+
+      const applyToSelect = (select: HTMLSelectElement) => {
+        const hasTargetOption = Array.from(select.options).some((option) => option.value === langCode);
+        if (!hasTargetOption) {
+          return false;
+        }
+
+        select.value = langCode;
+        select.dispatchEvent(new Event("input", { bubbles: true }));
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+
+        return select.value === langCode;
+      };
 
       const attempt = () => {
         attempts += 1;
@@ -81,11 +111,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         const combo = document.querySelector(".goog-te-combo") as HTMLSelectElement | null;
         if (combo) {
           try {
-            combo.value = langCode;
-            combo.dispatchEvent(new Event("change", { bubbles: true }));
-            localStorage.setItem("google_translate_language", langCode);
-            resolve(true);
-            return;
+            if (applyToSelect(combo)) {
+              localStorage.setItem("google_translate_language", langCode);
+              resolve(true);
+              return;
+            }
           } catch {
             // Ignore and continue retrying.
           }
@@ -94,21 +124,17 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         const selectById = document.getElementById(":0") as HTMLSelectElement | null;
         if (selectById) {
           try {
-            selectById.value = langCode;
-            selectById.dispatchEvent(new Event("change", { bubbles: true }));
-            localStorage.setItem("google_translate_language", langCode);
-            resolve(true);
-            return;
+            if (applyToSelect(selectById)) {
+              localStorage.setItem("google_translate_language", langCode);
+              resolve(true);
+              return;
+            }
           } catch {
             // Ignore and continue retrying.
           }
         }
 
         if (attempts >= maxAttempts) {
-          const domain = window.location.hostname;
-          document.cookie = `googtrans=/en/${langCode}; path=/`;
-          document.cookie = `googtrans=/en/${langCode}; path=/; domain=${domain}`;
-
           const url = new URL(window.location.href);
           url.searchParams.set("tl", langCode);
           window.location.href = url.toString();
@@ -159,6 +185,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLanguage = useCallback(
     async (lang: Language) => {
       if (lang === currentLanguage) {
+        const langInfo = getLanguageByCode(lang);
+        if (langInfo && lang !== "en") {
+          setIsTranslating(true);
+          await doTranslate(langInfo.googleCode);
+          window.setTimeout(() => setIsTranslating(false), 2000);
+        }
         return;
       }
 
@@ -167,7 +199,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("website_language", lang);
 
       if (lang === "en") {
-        document.cookie = "googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC";
+        clearGoogleTranslateCookie();
         localStorage.removeItem("google_translate_language");
 
         const url = new URL(window.location.href);

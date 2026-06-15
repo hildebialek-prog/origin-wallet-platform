@@ -1413,7 +1413,6 @@ const AccountKyc = () => {
                     title="Applicant face check"
                     selfieLivenessUrl={profileForm.selfieLivenessUrl}
                     livenessSessionId={profileForm.livenessSessionId}
-                    onChange={(field, value) => updateProfile(field, value)}
                     uploading={uploadingCapture === "applicant:selfie_liveness"}
                     onFile={(file) =>
                       uploadCapture("applicant", "selfie_liveness", file, (artifact, session) => {
@@ -1428,7 +1427,6 @@ const AccountKyc = () => {
                       title="Authorized representative face check"
                       selfieLivenessUrl={representativeForm.selfieLivenessUrl}
                       livenessSessionId={representativeForm.livenessSessionId}
-                      onChange={(field, value) => updateRepresentative(field, value)}
                       uploading={uploadingCapture === "authorized_representative:selfie_liveness"}
                       onFile={(file) =>
                         uploadCapture("authorized_representative", "selfie_liveness", file, (artifact, session) => {
@@ -1441,7 +1439,6 @@ const AccountKyc = () => {
                       title="Beneficial owner face check"
                       selfieLivenessUrl={beneficialOwnerForm.selfieLivenessUrl}
                       livenessSessionId={beneficialOwnerForm.livenessSessionId}
-                      onChange={(field, value) => updateBeneficialOwner(field, value)}
                       uploading={uploadingCapture === "beneficial_owner:selfie_liveness"}
                       onFile={(file) =>
                         uploadCapture("beneficial_owner", "selfie_liveness", file, (artifact, session) => {
@@ -2105,51 +2102,166 @@ const PersonDocumentFields = ({
 
 const FaceCheckFields = ({
   livenessSessionId,
-  onChange,
   onFile,
   selfieLivenessUrl,
   title,
   uploading,
 }: {
   livenessSessionId: string;
-  onChange: (field: "selfieLivenessUrl" | "livenessSessionId", value: string) => void;
   onFile: (file: File) => void;
   selfieLivenessUrl: string;
   title: string;
   uploading: boolean;
-}) => (
-  <div className="rounded-2xl border border-gray-200 p-4">
-    <h3 className="font-semibold text-gray-900">{title}</h3>
-    <p className="mt-1 text-sm text-gray-500">
-      Capture a live selfie or short video from the front camera. The session ID is saved with the KYC evidence.
-    </p>
-    <div className="mt-4 grid gap-4 md:grid-cols-2">
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <Label>Selfie/liveness evidence</Label>
-          <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm">
-            <span className={selfieLivenessUrl ? "font-medium text-emerald-700" : "text-gray-500"}>
-              {selfieLivenessUrl ? "Uploaded and stored" : "No selfie/liveness evidence uploaded yet"}
-            </span>
-            {selfieLivenessUrl ? (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                stored
-              </span>
-            ) : null}
+}) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl, stopCamera]);
+
+  const startFaceScan = async () => {
+    setCameraError("");
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera is not available in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: "user",
+          height: { ideal: 720 },
+          width: { ideal: 720 },
+        },
+      });
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+    } catch {
+      setCameraError("Cannot access camera. Allow camera permission and try again.");
+      stopCamera();
+    }
+  };
+
+  const captureFaceScan = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError("Camera is not ready yet.");
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError("Cannot capture face scan from this browser.");
+      return;
+    }
+
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    const sourceX = (video.videoWidth - size) / 2;
+    const sourceY = (video.videoHeight - size) / 2;
+    canvas.width = 720;
+    canvas.height = 720;
+    context.save();
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(video, sourceX, sourceY, size, size, 0, 0, canvas.width, canvas.height);
+    context.restore();
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setCameraError("Cannot save face scan. Try again.");
+          return;
+        }
+
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        const nextPreviewUrl = URL.createObjectURL(blob);
+        setPreviewUrl(nextPreviewUrl);
+        stopCamera();
+        onFile(new File([blob], `face-scan-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      0.92,
+    );
+  };
+
+  return (
+    <div className="rounded-2xl border border-gray-200 p-4">
+      <h3 className="font-semibold text-gray-900">{title}</h3>
+      <p className="mt-1 text-sm text-gray-500">
+        Scan the applicant face using the front camera. The captured liveness evidence is saved with the KYC review.
+      </p>
+      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="space-y-3">
+          <div className="relative aspect-square overflow-hidden rounded-2xl border border-gray-200 bg-slate-950">
+            {cameraActive ? (
+              <video ref={videoRef} playsInline muted className="h-full w-full scale-x-[-1] object-cover" />
+            ) : previewUrl ? (
+              <img src={previewUrl} alt="Captured face scan" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">
+                Start face scan to open the front camera.
+              </div>
+            )}
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+          {cameraError ? <p className="text-sm text-red-600">{cameraError}</p> : null}
+          <div className="flex flex-wrap gap-3">
+            {cameraActive ? (
+              <>
+                <Button className="rounded-full bg-green-600 px-5 text-white hover:bg-green-700" disabled={uploading} onClick={captureFaceScan}>
+                  {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Capture face scan
+                </Button>
+                <Button variant="outline" className="rounded-full" onClick={stopCamera} disabled={uploading}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button className="rounded-full bg-green-600 px-5 text-white hover:bg-green-700" disabled={uploading} onClick={startFaceScan}>
+                {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {selfieLivenessUrl ? "Retake face scan" : "Start face scan"}
+              </Button>
+            )}
           </div>
         </div>
-        <EvidenceUpload
-          accept="image/*,video/*"
-          capture="user"
-          label="Open camera or upload selfie/liveness evidence"
-          onFile={onFile}
-          uploading={uploading}
-        />
+        <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm">
+          <div>
+            <div className="text-gray-500">Face scan status</div>
+            <div className={selfieLivenessUrl ? "font-semibold text-emerald-700" : "font-semibold text-gray-700"}>
+              {uploading ? "Uploading scan..." : selfieLivenessUrl ? "Captured and stored" : "Not captured"}
+            </div>
+          </div>
+          <div>
+            <div className="text-gray-500">Liveness session</div>
+            <div className="break-all font-mono text-xs text-gray-700">{livenessSessionId || "Pending capture"}</div>
+          </div>
+        </div>
       </div>
-      <Field label="Liveness session ID" value={livenessSessionId} onChange={(value) => onChange("livenessSessionId", value)} />
     </div>
-  </div>
-);
+  );
+};
 
 const WizardActions = ({
   nextLabel = "Continue",

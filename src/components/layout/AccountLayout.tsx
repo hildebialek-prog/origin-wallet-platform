@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate, NavLink, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage, getLanguageByCode } from "@/contexts/LanguageContext";
+import { LANGUAGES, useLanguage, getLanguageByCode, type Language } from "@/contexts/LanguageContext";
 import {
   LayoutDashboard,
   Wallet,
@@ -15,6 +15,8 @@ import {
   Globe,
   Settings,
   ChevronDown,
+  Check,
+  Loader2,
   User,
   ArrowUpDown,
   ShieldCheck,
@@ -44,9 +46,9 @@ const navItems = [
 
 const AccountLayout = () => {
   const { user, loading, logout } = useAuth();
-  const { currentLanguage } = useLanguage();
+  const { currentLanguage, setLanguage, isTranslating } = useLanguage();
   const navigate = useNavigate();
-  const languageLabel = getLanguageByCode(currentLanguage)?.nameEn || "English";
+  const currentLanguageOption = getLanguageByCode(currentLanguage) ?? LANGUAGES[0];
   const displayName = user?.name || user?.email?.split("@")[0] || "My account";
   const userInitials = displayName
     .split(" ")
@@ -132,10 +134,39 @@ const AccountLayout = () => {
             </Link>
           </Button>
 
-          <button className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
-            <Globe className="w-4 h-4" />
-            {languageLabel}
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 disabled:cursor-wait disabled:opacity-70 dark:text-gray-300 dark:hover:text-white"
+                disabled={isTranslating}
+              >
+                {isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                {currentLanguageOption.nameEn}
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-64 rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#1c2128]"
+            >
+              {LANGUAGES.map((language) => (
+                <DropdownMenuItem
+                  key={language.code}
+                  onClick={() => setLanguage(language.code as Language)}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm text-gray-700 dark:text-gray-200"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                    {language.flag}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{language.nameEn}</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400">{language.nativeName}</span>
+                  </span>
+                  {language.code === currentLanguage ? <Check className="h-4 w-4 text-green-600" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <div className="h-8 w-px bg-gray-200 dark:bg-white/10" />
 
