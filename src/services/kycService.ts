@@ -199,12 +199,13 @@ export const uploadKycDocument = async (params: {
   metadata?: Record<string, unknown>;
 }): Promise<KycDocumentUploadResponse> => {
   const formData = new FormData();
+  const issuingCountryCode = String(params.issuingCountryCode ?? "").trim().toUpperCase();
   formData.append("type", params.type);
   formData.append("file", params.file);
 
   if (params.subjectType) formData.append("subject_type", params.subjectType);
   if (params.side) formData.append("side", params.side);
-  if (params.issuingCountryCode) formData.append("issuing_country_code", params.issuingCountryCode.toUpperCase());
+  if (/^[A-Z]{2}$/.test(issuingCountryCode)) formData.append("issuing_country_code", issuingCountryCode);
   if (params.documentNumber) formData.append("document_number", params.documentNumber);
   if (params.issuedAt) formData.append("issued_at", params.issuedAt);
   if (params.expiresAt) formData.append("expires_at", params.expiresAt);

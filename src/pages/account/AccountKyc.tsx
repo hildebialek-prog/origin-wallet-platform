@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type HTMLInputTypeAttribute } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -131,6 +131,71 @@ const stepLabels = ["Profile type", "Applicant details", "Address & risk", "Docu
 const kycDraftVersion = 1;
 const kycDraftKey = (userId: string | number) => `origin-wallet-kyc-draft:${userId}`;
 const lockedKycStatuses = new Set(["approved", "verified", "submitted", "under_review"]);
+const todayInputValue = new Date().toISOString().slice(0, 10);
+const tomorrowInputValue = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+
+const countryOptions = [
+  { label: "Vietnam (VN)", value: "VN" },
+  { label: "Hong Kong (HK)", value: "HK" },
+  { label: "Singapore (SG)", value: "SG" },
+  { label: "China (CN)", value: "CN" },
+  { label: "United States (US)", value: "US" },
+  { label: "United Kingdom (GB)", value: "GB" },
+  { label: "Australia (AU)", value: "AU" },
+  { label: "Canada (CA)", value: "CA" },
+  { label: "Japan (JP)", value: "JP" },
+  { label: "South Korea (KR)", value: "KR" },
+  { label: "Thailand (TH)", value: "TH" },
+  { label: "Malaysia (MY)", value: "MY" },
+  { label: "Indonesia (ID)", value: "ID" },
+  { label: "Philippines (PH)", value: "PH" },
+  { label: "India (IN)", value: "IN" },
+  { label: "United Arab Emirates (AE)", value: "AE" },
+  { label: "Germany (DE)", value: "DE" },
+  { label: "France (FR)", value: "FR" },
+  { label: "Netherlands (NL)", value: "NL" },
+];
+
+const occupationOptions = [
+  { label: "Business owner", value: "business_owner" },
+  { label: "Director / Executive", value: "director_executive" },
+  { label: "Employee", value: "employee" },
+  { label: "Freelancer / Consultant", value: "freelancer_consultant" },
+  { label: "Investor", value: "investor" },
+  { label: "Student", value: "student" },
+  { label: "Retired", value: "retired" },
+  { label: "Other", value: "other" },
+];
+
+const sourceOfFundsOptions = [
+  { label: "Salary", value: "salary" },
+  { label: "Business income", value: "business_income" },
+  { label: "Export / import revenue", value: "trade_revenue" },
+  { label: "Investment income", value: "investment_income" },
+  { label: "Savings", value: "savings" },
+  { label: "Loan / financing", value: "loan_financing" },
+  { label: "Other", value: "other" },
+];
+
+const monthlyVolumeOptions = [
+  { label: "Under 10,000 USD", value: "under_10000_usd" },
+  { label: "10,000 - 50,000 USD", value: "10000_50000_usd" },
+  { label: "50,000 - 100,000 USD", value: "50000_100000_usd" },
+  { label: "100,000 - 500,000 USD", value: "100000_500000_usd" },
+  { label: "500,000 - 1,000,000 USD", value: "500000_1000000_usd" },
+  { label: "Over 1,000,000 USD", value: "over_1000000_usd" },
+];
+
+const industryOptions = [
+  { label: "Wholesale / Distribution", value: "wholesale_distribution" },
+  { label: "Manufacturing", value: "manufacturing" },
+  { label: "E-commerce", value: "ecommerce" },
+  { label: "Logistics", value: "logistics" },
+  { label: "Technology", value: "technology" },
+  { label: "Professional services", value: "professional_services" },
+  { label: "Import / Export", value: "import_export" },
+  { label: "Other", value: "other" },
+];
 
 const businessActivityOptions = [
   { label: "Foreign trade export business", value: "foreign_trade_export" },
@@ -239,6 +304,55 @@ const defaultPersonForm = (): PersonForm => ({
   livenessSessionId: "",
 });
 
+const optionValue = <TValue extends string>(options: { value: TValue }[], value?: string | null) =>
+  options.some((option) => option.value === value) ? (value as TValue) : "";
+
+const normalizeProfileDraftForm = (form?: Partial<ProfileForm>, fallbackName = ""): ProfileForm => {
+  const next = { ...defaultProfileForm(fallbackName), ...(form ?? {}) };
+
+  return {
+    ...next,
+    countryCode: normalizeCountryCode(next.countryCode),
+    dateOfBirth: toDateInputValue(next.dateOfBirth),
+    expectedMonthlyVolume: optionValue(monthlyVolumeOptions, next.expectedMonthlyVolume),
+    idExpiresAt: toDateInputValue(next.idExpiresAt),
+    idIssuedAt: toDateInputValue(next.idIssuedAt),
+    nationality: normalizeCountryCode(next.nationality),
+    occupation: optionValue(occupationOptions, next.occupation),
+    residence: normalizeCountryCode(next.residence),
+    sourceOfFunds: optionValue(sourceOfFundsOptions, next.sourceOfFunds),
+  };
+};
+
+const normalizeBusinessDraftForm = (form?: Partial<BusinessForm>): BusinessForm => {
+  const next = { ...defaultBusinessForm(), ...(form ?? {}) };
+
+  return {
+    ...next,
+    businessActivityType: optionValue(businessActivityOptions, next.businessActivityType) || "foreign_trade_export",
+    expectedMonthlyVolume: optionValue(monthlyVolumeOptions, next.expectedMonthlyVolume),
+    exportingRegions: selectedValues(next.exportingRegions).filter(isCountryCode).join(","),
+    industry: optionValue(industryOptions, next.industry),
+    mainProduct: optionValue(mainProductOptions, next.mainProduct) || "Electrical Products and Accessories",
+    sourceOfFunds: optionValue(sourceOfFundsOptions, next.sourceOfFunds),
+    tradeType: optionValue(tradeTypeOptions, next.tradeType) || "goods_trade",
+  };
+};
+
+const normalizePersonDraftForm = (form?: Partial<PersonForm>): PersonForm => {
+  const next = { ...defaultPersonForm(), ...(form ?? {}) };
+
+  return {
+    ...next,
+    countryCode: normalizeCountryCode(next.countryCode),
+    dateOfBirth: toDateInputValue(next.dateOfBirth),
+    idExpiresAt: toDateInputValue(next.idExpiresAt),
+    idIssuedAt: toDateInputValue(next.idIssuedAt),
+    nationality: normalizeCountryCode(next.nationality),
+    residence: normalizeCountryCode(next.residence),
+  };
+};
+
 const statusTone = (status?: string | null) => {
   const normalized = String(status ?? "").toLowerCase();
 
@@ -265,6 +379,35 @@ const formatDate = (value?: string | null) => {
     timeStyle: "short",
   }).format(new Date(value));
 };
+
+const normalizeCountryCode = (value?: string | null) => {
+  const normalized = String(value ?? "").trim().toUpperCase();
+
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : "";
+};
+
+const isCountryCode = (value?: string | null) => normalizeCountryCode(value) !== "";
+
+const normalizeDateValue = (value?: string | null) => {
+  const normalized = String(value ?? "").trim();
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
+};
+
+const toDateInputValue = (value?: string | null) => {
+  const normalized = String(value ?? "").trim();
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
+
+  return match?.[1] ?? "";
+};
+
+const isDateValue = (value?: string | null) => normalizeDateValue(value) !== "";
+
+const selectedValues = (value: string) =>
+  value
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
 
 const AccountKyc = () => {
   const { user, token, refreshSession } = useAuth();
@@ -298,10 +441,10 @@ const AccountKyc = () => {
   const applyDraft = useCallback((draft: KycDraft) => {
     setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 0), stepLabels.length - 1) : 0);
     setApplicantType(draft.applicantType === "business" ? "business" : "individual");
-    setProfileForm({ ...defaultProfileForm(user?.name ?? ""), ...(draft.profileForm ?? {}) });
-    setBusinessForm({ ...defaultBusinessForm(), ...(draft.businessForm ?? {}) });
-    setRepresentativeForm({ ...defaultPersonForm(), ...(draft.representativeForm ?? {}) });
-    setBeneficialOwnerForm({ ...defaultPersonForm(), ...(draft.beneficialOwnerForm ?? {}) });
+    setProfileForm(normalizeProfileDraftForm(draft.profileForm, user?.name ?? ""));
+    setBusinessForm(normalizeBusinessDraftForm(draft.businessForm));
+    setRepresentativeForm(normalizePersonDraftForm(draft.representativeForm));
+    setBeneficialOwnerForm(normalizePersonDraftForm(draft.beneficialOwnerForm));
     setCaptureSessions(draft.captureSessions ?? {});
     setCaptureArtifacts(draft.captureArtifacts ?? {});
     setUploadedDocuments(draft.uploadedDocuments ?? {});
@@ -337,13 +480,13 @@ const AccountKyc = () => {
     setProfileForm({
       ...defaultProfileForm(user?.name ?? ""),
       legalName: nextProfile.legal_name ?? "",
-      dateOfBirth: nextProfile.date_of_birth ?? "",
-      nationality: nextProfile.nationality_country_code ?? "",
-      residence: nextProfile.residence_country_code ?? "",
-      occupation: stringifyMetadata(metadata.occupation),
-      sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
-      expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
-      countryCode: nextProfile.country_code ?? "",
+      dateOfBirth: toDateInputValue(nextProfile.date_of_birth),
+      nationality: normalizeCountryCode(nextProfile.nationality_country_code),
+      residence: normalizeCountryCode(nextProfile.residence_country_code),
+      occupation: optionValue(occupationOptions, stringifyMetadata(metadata.occupation)),
+      sourceOfFunds: optionValue(sourceOfFundsOptions, stringifyMetadata(metadata.source_of_funds)),
+      expectedMonthlyVolume: optionValue(monthlyVolumeOptions, stringifyMetadata(metadata.expected_monthly_volume)),
+      countryCode: normalizeCountryCode(nextProfile.country_code),
       addressLine1: nextProfile.address_line1 ?? "",
       city: nextProfile.city ?? "",
       state: nextProfile.state ?? "",
@@ -355,15 +498,15 @@ const AccountKyc = () => {
       businessName: nextProfile.business_name ?? "",
       businessRegistration: nextProfile.business_registration_number ?? "",
       taxId: nextProfile.tax_id ?? "",
-      businessActivityType: stringifyMetadata(metadata.business_activity_type) || "foreign_trade_export",
+      businessActivityType: optionValue(businessActivityOptions, stringifyMetadata(metadata.business_activity_type)) || "foreign_trade_export",
       exportingRegions: stringifyMetadata(metadata.exporting_regions),
-      tradeType: stringifyMetadata(metadata.trade_type) || "goods_trade",
-      mainProduct: stringifyMetadata(metadata.main_product) || "Electrical Products and Accessories",
-      industry: stringifyMetadata(metadata.business_industry),
+      tradeType: optionValue(tradeTypeOptions, stringifyMetadata(metadata.trade_type)) || "goods_trade",
+      mainProduct: optionValue(mainProductOptions, stringifyMetadata(metadata.main_product)) || "Electrical Products and Accessories",
+      industry: optionValue(industryOptions, stringifyMetadata(metadata.business_industry)),
       businessActivity: stringifyMetadata(metadata.business_activity),
       website: stringifyMetadata(metadata.business_website),
-      sourceOfFunds: stringifyMetadata(metadata.source_of_funds),
-      expectedMonthlyVolume: stringifyMetadata(metadata.expected_monthly_volume),
+      sourceOfFunds: optionValue(sourceOfFundsOptions, stringifyMetadata(metadata.source_of_funds)),
+      expectedMonthlyVolume: optionValue(monthlyVolumeOptions, stringifyMetadata(metadata.expected_monthly_volume)),
       registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration"]),
       certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
       businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
@@ -379,22 +522,22 @@ const AccountKyc = () => {
     setRepresentativeForm({
       ...defaultPersonForm(),
       legalName: representative?.legal_name ?? "",
-      dateOfBirth: representative?.date_of_birth ?? "",
-      nationality: representative?.nationality_country_code ?? "",
-      residence: representative?.residence_country_code ?? "",
+      dateOfBirth: toDateInputValue(representative?.date_of_birth),
+      nationality: normalizeCountryCode(representative?.nationality_country_code),
+      residence: normalizeCountryCode(representative?.residence_country_code),
       addressLine1: representative?.address_line1 ?? "",
       city: representative?.city ?? "",
       state: representative?.state ?? "",
       postalCode: representative?.postal_code ?? "",
-      countryCode: representative?.country_code ?? "",
+      countryCode: normalizeCountryCode(representative?.country_code),
       ...representativeIdentity,
     });
     setBeneficialOwnerForm({
       ...defaultPersonForm(),
       legalName: beneficialOwner?.legal_name ?? "",
-      dateOfBirth: beneficialOwner?.date_of_birth ?? "",
-      nationality: beneficialOwner?.nationality_country_code ?? "",
-      residence: beneficialOwner?.residence_country_code ?? "",
+      dateOfBirth: toDateInputValue(beneficialOwner?.date_of_birth),
+      nationality: normalizeCountryCode(beneficialOwner?.nationality_country_code),
+      residence: normalizeCountryCode(beneficialOwner?.residence_country_code),
       ownershipPercentage:
         beneficialOwner?.ownership_percentage !== undefined && beneficialOwner?.ownership_percentage !== null
           ? String(beneficialOwner.ownership_percentage)
@@ -403,7 +546,7 @@ const AccountKyc = () => {
       city: beneficialOwner?.city ?? "",
       state: beneficialOwner?.state ?? "",
       postalCode: beneficialOwner?.postal_code ?? "",
-      countryCode: beneficialOwner?.country_code ?? "",
+      countryCode: normalizeCountryCode(beneficialOwner?.country_code),
       ...beneficialOwnerIdentity,
     });
     setUploadedDocuments(hydratedDocuments);
@@ -625,10 +768,10 @@ const AccountKyc = () => {
     try {
       const response = await uploadKycDocument({
         documentNumber: params.documentNumber?.trim() || null,
-        expiresAt: params.expiresAt?.trim() || null,
+        expiresAt: normalizeDateValue(params.expiresAt) || null,
         file: params.file,
-        issuedAt: params.issuedAt?.trim() || null,
-        issuingCountryCode: params.issuingCountryCode?.trim().toUpperCase() || null,
+        issuedAt: normalizeDateValue(params.issuedAt) || null,
+        issuingCountryCode: normalizeCountryCode(params.issuingCountryCode) || null,
         metadata: params.metadata,
         side: params.side,
         subjectType: params.subjectType,
@@ -664,15 +807,25 @@ const AccountKyc = () => {
       : isBack
         ? `${form.idDocumentType}_back`
         : "proof_of_address";
+    const issuingCountryCode = isFront || isBack
+      ? normalizeCountryCode(form.nationality) || normalizeCountryCode(form.residence) || normalizeCountryCode(form.countryCode)
+      : normalizeCountryCode(form.countryCode) || normalizeCountryCode(form.residence) || normalizeCountryCode(form.nationality);
+
+    if (!issuingCountryCode) {
+      setFormError(
+        isFront || isBack
+          ? "Select a valid nationality or residence country before uploading the identity document."
+          : "Select a valid address country before uploading proof of address.",
+      );
+      return;
+    }
 
     void uploadKycDocumentFile({
       documentNumber: isFront || isBack ? form.idDocumentNumber : null,
       expiresAt: isFront || isBack ? form.idExpiresAt : null,
       file,
       issuedAt: isFront || isBack ? form.idIssuedAt : null,
-      issuingCountryCode: isFront || isBack
-        ? form.nationality || form.residence || form.countryCode
-        : form.countryCode || form.residence || form.nationality,
+      issuingCountryCode,
       metadata: {
         capture_type: captureType,
         document_type: form.idDocumentType,
@@ -694,7 +847,7 @@ const AccountKyc = () => {
   ) => {
     void uploadKycDocumentFile({
       file,
-      issuingCountryCode: profileForm.countryCode,
+      issuingCountryCode: normalizeCountryCode(profileForm.countryCode) || null,
       metadata: {
         subject: "business",
         ...metadata,
@@ -713,91 +866,75 @@ const AccountKyc = () => {
     );
 
   const requiredFilled = (values: string[]) => values.every((value) => value.trim() !== "");
+  const requiredSelects = (values: string[]) => values.every((value) => value.trim() !== "");
+  const validPersonDetails = (form: Pick<PersonForm, "legalName" | "dateOfBirth" | "nationality" | "residence">) =>
+    requiredFilled([form.legalName]) && isDateValue(form.dateOfBirth) && isCountryCode(form.nationality) && isCountryCode(form.residence);
+  const validAddress = (form: Pick<PersonForm, "countryCode" | "addressLine1" | "city">) =>
+    isCountryCode(form.countryCode) && requiredFilled([form.addressLine1, form.city]);
+  const validIdentityDocuments = (form: Pick<PersonForm, DocumentFieldKey>) =>
+    requiredFilled([form.idDocumentNumber, form.idFrontUrl, form.idBackUrl, form.proofOfAddressUrl]) &&
+    isDateValue(form.idExpiresAt);
 
   const validateCurrentStep = () => {
     if (step === 1) {
       if (applicantType === "individual") {
-        return requiredFilled([
-          profileForm.legalName,
-          profileForm.dateOfBirth,
-          profileForm.nationality,
-          profileForm.residence,
-          profileForm.occupation,
-          profileForm.sourceOfFunds,
-          profileForm.expectedMonthlyVolume,
-        ]);
+        return (
+          validPersonDetails(profileForm) &&
+          requiredSelects([profileForm.occupation, profileForm.sourceOfFunds, profileForm.expectedMonthlyVolume])
+        );
       }
 
-      return requiredFilled([
-        profileForm.legalName,
-        businessForm.businessName,
-        businessForm.businessRegistration,
-        businessForm.taxId,
-        businessForm.businessActivityType,
-        businessForm.exportingRegions,
-        businessForm.tradeType,
-        businessForm.mainProduct,
-        businessForm.industry,
-        businessForm.businessActivity,
-        businessForm.sourceOfFunds,
-        businessForm.expectedMonthlyVolume,
-        representativeForm.legalName,
-        representativeForm.dateOfBirth,
-        representativeForm.nationality,
-        representativeForm.residence,
-        beneficialOwnerForm.legalName,
-        beneficialOwnerForm.dateOfBirth,
-        beneficialOwnerForm.nationality,
-        beneficialOwnerForm.residence,
-        beneficialOwnerForm.ownershipPercentage,
-      ]);
+      return (
+        requiredFilled([
+          profileForm.legalName,
+          businessForm.businessName,
+          businessForm.businessRegistration,
+          businessForm.taxId,
+          businessForm.businessActivity,
+          beneficialOwnerForm.ownershipPercentage,
+        ]) &&
+        requiredSelects([
+          businessForm.businessActivityType,
+          businessForm.tradeType,
+          businessForm.mainProduct,
+          businessForm.industry,
+          businessForm.sourceOfFunds,
+          businessForm.expectedMonthlyVolume,
+        ]) &&
+        selectedValues(businessForm.exportingRegions).every(isCountryCode) &&
+        selectedValues(businessForm.exportingRegions).length > 0 &&
+        validPersonDetails(representativeForm) &&
+        validPersonDetails(beneficialOwnerForm)
+      );
     }
 
     if (step === 2) {
-      const accountAddress = requiredFilled([profileForm.countryCode, profileForm.addressLine1, profileForm.city]);
+      const accountAddress = validAddress(profileForm);
       if (applicantType === "individual") return accountAddress;
 
       return (
         accountAddress &&
-        requiredFilled([
-          representativeForm.countryCode,
-          representativeForm.addressLine1,
-          representativeForm.city,
-          beneficialOwnerForm.countryCode,
-          beneficialOwnerForm.addressLine1,
-          beneficialOwnerForm.city,
-        ])
+        validAddress(representativeForm) &&
+        validAddress(beneficialOwnerForm)
       );
     }
 
     if (step === 3) {
       if (applicantType === "individual") {
-        return requiredFilled([
-          profileForm.idDocumentNumber,
-          profileForm.idExpiresAt,
-          profileForm.idFrontUrl,
-          profileForm.idBackUrl,
-          profileForm.proofOfAddressUrl,
-        ]);
+        return validIdentityDocuments(profileForm);
       }
 
-      return requiredFilled([
-        businessForm.registrationDocumentUrl,
-        businessForm.certificateOfIncorporationUrl,
-        businessForm.businessAddressProofUrl,
-        businessForm.accountOpeningFormUrl,
-        businessForm.ownershipStructureUrl,
-        representativeForm.idDocumentNumber,
-        representativeForm.idExpiresAt,
-        representativeForm.idFrontUrl,
-        representativeForm.idBackUrl,
-        representativeForm.proofOfAddressUrl,
-        beneficialOwnerForm.idDocumentNumber,
-        beneficialOwnerForm.idExpiresAt,
-        beneficialOwnerForm.idFrontUrl,
-        beneficialOwnerForm.idBackUrl,
-        beneficialOwnerForm.proofOfAddressUrl,
-      ]);
+      return (
+        requiredFilled([
+          businessForm.registrationDocumentUrl,
+          businessForm.certificateOfIncorporationUrl,
+          businessForm.businessAddressProofUrl,
+          businessForm.accountOpeningFormUrl,
+          businessForm.ownershipStructureUrl,
+        ]) &&
+        validIdentityDocuments(representativeForm) &&
+        validIdentityDocuments(beneficialOwnerForm)
+      );
     }
 
     if (step === 4) {
@@ -863,19 +1000,19 @@ const AccountKyc = () => {
     const payload: KycSubmissionPayload = {
       applicant_type: applicantType,
       legal_name: profileForm.legalName.trim(),
-      date_of_birth: applicantType === "individual" ? profileForm.dateOfBirth.trim() : null,
-      nationality_country_code: profileForm.nationality.trim().toUpperCase() || null,
-      residence_country_code: profileForm.residence.trim().toUpperCase() || null,
+      date_of_birth: applicantType === "individual" ? normalizeDateValue(profileForm.dateOfBirth) : null,
+      nationality_country_code: normalizeCountryCode(profileForm.nationality) || null,
+      residence_country_code: normalizeCountryCode(profileForm.residence) || null,
       business_name: applicantType === "business" ? businessForm.businessName.trim() : null,
       business_registration_number:
         applicantType === "business" ? businessForm.businessRegistration.trim() || null : null,
       tax_id: applicantType === "business" ? businessForm.taxId.trim() || null : null,
-      registered_country_code: applicantType === "business" ? profileForm.countryCode.trim().toUpperCase() : null,
+      registered_country_code: applicantType === "business" ? normalizeCountryCode(profileForm.countryCode) || null : null,
       address_line1: profileForm.addressLine1.trim(),
       city: profileForm.city.trim(),
       state: profileForm.state.trim() || null,
       postal_code: profileForm.postalCode.trim() || null,
-      country_code: profileForm.countryCode.trim().toUpperCase(),
+      country_code: normalizeCountryCode(profileForm.countryCode),
       documents,
       related_persons:
         applicantType === "business"
@@ -883,14 +1020,14 @@ const AccountKyc = () => {
               {
                 relationship_type: "authorized_representative",
                 legal_name: representativeForm.legalName.trim(),
-                date_of_birth: representativeForm.dateOfBirth.trim(),
-                nationality_country_code: representativeForm.nationality.trim().toUpperCase(),
-                residence_country_code: representativeForm.residence.trim().toUpperCase(),
+                date_of_birth: normalizeDateValue(representativeForm.dateOfBirth),
+                nationality_country_code: normalizeCountryCode(representativeForm.nationality),
+                residence_country_code: normalizeCountryCode(representativeForm.residence),
                 address_line1: representativeForm.addressLine1.trim(),
                 city: representativeForm.city.trim(),
                 state: representativeForm.state.trim() || null,
                 postal_code: representativeForm.postalCode.trim() || null,
-                country_code: representativeForm.countryCode.trim().toUpperCase(),
+                country_code: normalizeCountryCode(representativeForm.countryCode),
                 metadata: { role: "authorized_representative" },
                 documents: buildPersonDocuments(
                   representativeForm,
@@ -901,15 +1038,15 @@ const AccountKyc = () => {
               {
                 relationship_type: "beneficial_owner",
                 legal_name: beneficialOwnerForm.legalName.trim(),
-                date_of_birth: beneficialOwnerForm.dateOfBirth.trim(),
-                nationality_country_code: beneficialOwnerForm.nationality.trim().toUpperCase(),
-                residence_country_code: beneficialOwnerForm.residence.trim().toUpperCase(),
+                date_of_birth: normalizeDateValue(beneficialOwnerForm.dateOfBirth),
+                nationality_country_code: normalizeCountryCode(beneficialOwnerForm.nationality),
+                residence_country_code: normalizeCountryCode(beneficialOwnerForm.residence),
                 ownership_percentage: Number.isFinite(ownership) ? ownership : null,
                 address_line1: beneficialOwnerForm.addressLine1.trim(),
                 city: beneficialOwnerForm.city.trim(),
                 state: beneficialOwnerForm.state.trim() || null,
                 postal_code: beneficialOwnerForm.postalCode.trim() || null,
-                country_code: beneficialOwnerForm.countryCode.trim().toUpperCase(),
+                country_code: normalizeCountryCode(beneficialOwnerForm.countryCode),
                 metadata: { role: "beneficial_owner" },
                 documents: buildPersonDocuments(
                   beneficialOwnerForm,
@@ -936,10 +1073,7 @@ const AccountKyc = () => {
         business_activity_type: applicantType === "business" ? businessForm.businessActivityType.trim() : null,
         exporting_regions:
           applicantType === "business"
-            ? businessForm.exportingRegions
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean)
+            ? selectedValues(businessForm.exportingRegions)
             : [],
         trade_type: applicantType === "business" ? businessForm.tradeType.trim() : null,
         main_product: applicantType === "business" ? businessForm.mainProduct.trim() : null,
@@ -1027,14 +1161,14 @@ const AccountKyc = () => {
                 {applicantType === "individual" ? (
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
-                      <Field label="Date of birth" value={profileForm.dateOfBirth} onChange={(value) => updateProfile("dateOfBirth", value)} placeholder="YYYY-MM-DD" />
-                      <Field label="Nationality" value={profileForm.nationality} onChange={(value) => updateProfile("nationality", value)} placeholder="VN" />
-                      <Field label="Residence" value={profileForm.residence} onChange={(value) => updateProfile("residence", value)} placeholder="VN" />
+                      <Field label="Date of birth" value={profileForm.dateOfBirth} onChange={(value) => updateProfile("dateOfBirth", value)} type="date" max={todayInputValue} />
+                      <SelectField label="Nationality" value={profileForm.nationality} onChange={(value) => updateProfile("nationality", value)} options={countryOptions} placeholder="Select nationality" />
+                      <SelectField label="Residence" value={profileForm.residence} onChange={(value) => updateProfile("residence", value)} options={countryOptions} placeholder="Select residence" />
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
-                      <Field label="Occupation" value={profileForm.occupation} onChange={(value) => updateProfile("occupation", value)} />
-                      <Field label="Source of funds" value={profileForm.sourceOfFunds} onChange={(value) => updateProfile("sourceOfFunds", value)} />
-                      <Field label="Expected monthly volume" value={profileForm.expectedMonthlyVolume} onChange={(value) => updateProfile("expectedMonthlyVolume", value)} />
+                      <SelectField label="Occupation" value={profileForm.occupation} onChange={(value) => updateProfile("occupation", value)} options={occupationOptions} placeholder="Select occupation" />
+                      <SelectField label="Source of funds" value={profileForm.sourceOfFunds} onChange={(value) => updateProfile("sourceOfFunds", value)} options={sourceOfFundsOptions} placeholder="Select source" />
+                      <SelectField label="Expected monthly volume" value={profileForm.expectedMonthlyVolume} onChange={(value) => updateProfile("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
                     </div>
                   </>
                 ) : (
@@ -1059,11 +1193,11 @@ const AccountKyc = () => {
                       />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field
+                      <MultiSelectField
                         label="Exporting countries/regions"
                         value={businessForm.exportingRegions}
                         onChange={(value) => updateBusiness("exportingRegions", value)}
-                        placeholder="Hong Kong, Vietnam, Singapore"
+                        options={countryOptions}
                       />
                       <SelectField
                         label="Main product"
@@ -1073,13 +1207,13 @@ const AccountKyc = () => {
                       />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Industry" value={businessForm.industry} onChange={(value) => updateBusiness("industry", value)} />
+                      <SelectField label="Industry" value={businessForm.industry} onChange={(value) => updateBusiness("industry", value)} options={industryOptions} placeholder="Select industry" />
                       <Field label="Business website" value={businessForm.website} onChange={(value) => updateBusiness("website", value)} />
                     </div>
                     <Field label="Business activity" value={businessForm.businessActivity} onChange={(value) => updateBusiness("businessActivity", value)} />
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Business source of funds" value={businessForm.sourceOfFunds} onChange={(value) => updateBusiness("sourceOfFunds", value)} />
-                      <Field label="Expected monthly volume" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} />
+                      <SelectField label="Business source of funds" value={businessForm.sourceOfFunds} onChange={(value) => updateBusiness("sourceOfFunds", value)} options={sourceOfFundsOptions} placeholder="Select source" />
+                      <SelectField label="Expected monthly volume" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Agent name (optional)" value={businessForm.agentName} onChange={(value) => updateBusiness("agentName", value)} />
@@ -1461,7 +1595,7 @@ const buildBusinessDocuments = (
   countryCode: string,
   evidence: (captureType: string) => Partial<KycDocumentPayload>,
 ): KycDocumentPayload[] => {
-  const issuingCountryCode = countryCode.trim().toUpperCase() || null;
+  const issuingCountryCode = normalizeCountryCode(countryCode) || null;
   const documents: KycDocumentPayload[] = [
     {
       type: "business_registration",
@@ -1519,7 +1653,7 @@ const buildPersonDocuments = (
   subject: IdentityVerificationSubject,
   evidence: (captureType: string) => Partial<KycDocumentPayload>,
 ): KycDocumentPayload[] => {
-  const issuingCountry = ("nationality" in form ? form.nationality : "").trim().toUpperCase();
+  const issuingCountry = normalizeCountryCode("nationality" in form ? form.nationality : "");
   const documentType = form.idDocumentType || "identity_document";
   const baseMetadata = {
     subject,
@@ -1533,8 +1667,8 @@ const buildPersonDocuments = (
       side: "front",
       document_number: form.idDocumentNumber.trim(),
       issuing_country_code: issuingCountry || null,
-      issued_at: form.idIssuedAt.trim() || null,
-      expires_at: form.idExpiresAt.trim() || null,
+      issued_at: normalizeDateValue(form.idIssuedAt) || null,
+      expires_at: normalizeDateValue(form.idExpiresAt) || null,
       metadata: baseMetadata,
       ...evidence("identity_front"),
     },
@@ -1544,15 +1678,15 @@ const buildPersonDocuments = (
       side: "back",
       document_number: form.idDocumentNumber.trim(),
       issuing_country_code: issuingCountry || null,
-      issued_at: form.idIssuedAt.trim() || null,
-      expires_at: form.idExpiresAt.trim() || null,
+      issued_at: normalizeDateValue(form.idIssuedAt) || null,
+      expires_at: normalizeDateValue(form.idExpiresAt) || null,
       metadata: baseMetadata,
       ...evidence("identity_back"),
     },
     {
       type: "proof_of_address",
       file_url: form.proofOfAddressUrl.trim(),
-      issuing_country_code: "countryCode" in form ? form.countryCode.trim().toUpperCase() || null : null,
+      issuing_country_code: "countryCode" in form ? normalizeCountryCode(form.countryCode) || null : null,
       metadata: { subject },
       ...evidence("proof_of_address"),
     },
@@ -1579,8 +1713,8 @@ const readPersonDocuments = (documents: KycDocumentPayload[]) => {
   return {
     idDocumentType: documentType,
     idDocumentNumber: front?.document_number ?? back?.document_number ?? "",
-    idIssuedAt: front?.issued_at ?? back?.issued_at ?? "",
-    idExpiresAt: front?.expires_at ?? back?.expires_at ?? "",
+    idIssuedAt: toDateInputValue(front?.issued_at ?? back?.issued_at),
+    idExpiresAt: toDateInputValue(front?.expires_at ?? back?.expires_at),
     idFrontUrl: front?.file_url ?? "",
     idBackUrl: back?.file_url ?? "",
     proofOfAddressUrl: proofOfAddress?.file_url ?? "",
@@ -1682,21 +1816,30 @@ const SectionTitle = ({ title }: { title: string }) => (
 
 const Field = ({
   label,
+  max,
+  min,
   onChange,
   placeholder,
+  type = "text",
   value,
 }: {
   label: string;
+  max?: string;
+  min?: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  type?: HTMLInputTypeAttribute;
   value: string;
 }) => (
   <div className="space-y-2">
     <Label>{label}</Label>
     <Input
       value={value}
+      max={max}
+      min={min}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
+      type={type}
       className="h-12 rounded-xl border-gray-200"
     />
   </div>
@@ -1773,11 +1916,13 @@ const SelectField = <TValue extends string>({
   label,
   onChange,
   options,
+  placeholder = "Select an option",
   value,
 }: {
   label: string;
   onChange: (value: TValue) => void;
   options: { label: string; value: TValue }[];
+  placeholder?: string;
   value: TValue;
 }) => (
   <div className="space-y-2">
@@ -1787,6 +1932,9 @@ const SelectField = <TValue extends string>({
       value={value}
       onChange={(event) => onChange(event.target.value as TValue)}
     >
+      <option value="" disabled>
+        {placeholder}
+      </option>
       {options.map((option) => (
         <option key={option.value} value={option.value}>
           {option.label}
@@ -1795,6 +1943,41 @@ const SelectField = <TValue extends string>({
     </select>
   </div>
 );
+
+const MultiSelectField = ({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: { label: string; value: string }[];
+  value: string;
+}) => {
+  const selected = selectedValues(value);
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <select
+        multiple
+        className="min-h-[116px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+        value={selected}
+        onChange={(event) => {
+          const values = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
+          onChange(values.join(","));
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 
 const PersonDetails = ({
   form,
@@ -1811,15 +1994,15 @@ const PersonDetails = ({
     <h3 className="font-semibold text-gray-900">{title}</h3>
     <div className="mt-4 grid gap-4 md:grid-cols-3">
       <Field label="Legal name" value={form.legalName} onChange={(value) => onChange("legalName", value)} />
-      <Field label="Date of birth" value={form.dateOfBirth} onChange={(value) => onChange("dateOfBirth", value)} placeholder="YYYY-MM-DD" />
+      <Field label="Date of birth" value={form.dateOfBirth} onChange={(value) => onChange("dateOfBirth", value)} type="date" max={todayInputValue} />
       {includeOwnership ? (
-        <Field label="Ownership %" value={form.ownershipPercentage} onChange={(value) => onChange("ownershipPercentage", value)} />
+        <Field label="Ownership %" value={form.ownershipPercentage} onChange={(value) => onChange("ownershipPercentage", value)} type="number" min="0" max="100" />
       ) : (
-        <Field label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} placeholder="VN" />
+        <SelectField label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} options={countryOptions} placeholder="Select residence" />
       )}
-      <Field label="Nationality" value={form.nationality} onChange={(value) => onChange("nationality", value)} placeholder="VN" />
+      <SelectField label="Nationality" value={form.nationality} onChange={(value) => onChange("nationality", value)} options={countryOptions} placeholder="Select nationality" />
       {includeOwnership ? (
-        <Field label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} placeholder="VN" />
+        <SelectField label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} options={countryOptions} placeholder="Select residence" />
       ) : null}
     </div>
   </div>
@@ -1845,7 +2028,7 @@ const AddressFields = ({
   <div className="rounded-2xl border border-gray-200 p-4">
     <h3 className="font-semibold text-gray-900">{title}</h3>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
-      <Field label="Country code" value={countryCode} onChange={(value) => onChange("countryCode", value)} placeholder="VN" />
+      <SelectField label="Country" value={countryCode} onChange={(value) => onChange("countryCode", value)} options={countryOptions} placeholder="Select country" />
       <Field label="Postal code" value={postalCode} onChange={(value) => onChange("postalCode", value)} />
     </div>
     <div className="mt-4">
@@ -1888,8 +2071,8 @@ const PersonDocumentFields = ({
         ]}
       />
       <Field label="Document number" value={form.idDocumentNumber} onChange={(value) => onChange("idDocumentNumber", value)} />
-      <Field label="Issued date" value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} placeholder="YYYY-MM-DD" />
-      <Field label="Expiry date" value={form.idExpiresAt} onChange={(value) => onChange("idExpiresAt", value)} placeholder="YYYY-MM-DD" />
+      <Field label="Issued date" value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} type="date" max={todayInputValue} />
+      <Field label="Expiry date" value={form.idExpiresAt} onChange={(value) => onChange("idExpiresAt", value)} type="date" min={tomorrowInputValue} />
       <FieldWithUpload
         label="ID front image"
         value={form.idFrontUrl}
