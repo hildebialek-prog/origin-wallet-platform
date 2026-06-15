@@ -127,6 +127,11 @@ const Header = () => {
               Compare fees
             </Button>
           </Link>
+          <Link to="/talk-to-sales">
+            <Button variant="outline" size="sm" className="px-3">
+              Talk to sales
+            </Button>
+          </Link>
           {user ? (
             <div className="flex items-center gap-2">
               <Link to="/account/settings/profile">
@@ -205,6 +210,9 @@ const Header = () => {
               ))}
 
               <div className="space-y-2 pt-4">
+                <Link to="/talk-to-sales" className="block">
+                  <Button variant="hero" className="w-full">Talk to sales</Button>
+                </Link>
                 {user ? (
                   <>
                     <Link to="/account/settings/profile" className="block">

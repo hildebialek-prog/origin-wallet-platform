@@ -30,6 +30,35 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const installGoogleTranslateDomGuard = () => {
+  if (window.originWalletGoogleTranslateDomGuardInstalled || typeof Node === "undefined") {
+    return;
+  }
+
+  window.originWalletGoogleTranslateDomGuardInstalled = true;
+
+  const originalRemoveChild = Node.prototype.removeChild;
+  const originalInsertBefore = Node.prototype.insertBefore;
+
+  Node.prototype.removeChild = function removeChild<T extends Node>(child: T): T {
+    if (child.parentNode !== this) {
+      return child;
+    }
+
+    return originalRemoveChild.call(this, child) as T;
+  };
+
+  Node.prototype.insertBefore = function insertBefore<T extends Node>(newNode: T, referenceNode: Node | null): T {
+    if (referenceNode && referenceNode.parentNode !== this) {
+      return this.appendChild(newNode) as T;
+    }
+
+    return originalInsertBefore.call(this, newNode, referenceNode) as T;
+  };
+};
+
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
 const setGoogleTranslateCookie = (langCode: string) => {
   const cookieValue = `/en/${langCode}`;
   const domain = window.location.hostname;
@@ -48,6 +77,7 @@ const clearGoogleTranslateCookie = () => {
 declare global {
   interface Window {
     googleTranslateElementInit: () => void;
+    originWalletGoogleTranslateDomGuardInstalled?: boolean;
   }
 }
 
@@ -56,6 +86,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [isTranslating, setIsTranslating] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    installGoogleTranslateDomGuard();
+  }, []);
 
   useEffect(() => {
     const checkGoogle = () => {
@@ -90,19 +124,24 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       const maxAttempts = 50;
       const interval = 150;
 
-      setGoogleTranslateCookie(langCode);
+      if (langCode === "en") {
+        clearGoogleTranslateCookie();
+      } else {
+        setGoogleTranslateCookie(langCode);
+      }
 
       const applyToSelect = (select: HTMLSelectElement) => {
-        const hasTargetOption = Array.from(select.options).some((option) => option.value === langCode);
-        if (!hasTargetOption) {
+        const optionValues = Array.from(select.options).map((option) => option.value);
+        const targetValue = optionValues.includes(langCode) ? langCode : langCode === "en" && optionValues.includes("") ? "" : null;
+        if (targetValue === null) {
           return false;
         }
 
-        select.value = langCode;
+        select.value = targetValue;
         select.dispatchEvent(new Event("input", { bubbles: true }));
         select.dispatchEvent(new Event("change", { bubbles: true }));
 
-        return select.value === langCode;
+        return select.value === targetValue;
       };
 
       const attempt = () => {
@@ -135,9 +174,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         }
 
         if (attempts >= maxAttempts) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("tl", langCode);
-          window.location.href = url.toString();
           resolve(false);
           return;
         }
@@ -188,8 +224,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         const langInfo = getLanguageByCode(lang);
         if (langInfo && lang !== "en") {
           setIsTranslating(true);
+          await wait(120);
+          setIsTranslating(false);
+          await wait(50);
           await doTranslate(langInfo.googleCode);
-          window.setTimeout(() => setIsTranslating(false), 2000);
         }
         return;
       }
@@ -201,18 +239,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       if (lang === "en") {
         clearGoogleTranslateCookie();
         localStorage.removeItem("google_translate_language");
-
-        const url = new URL(window.location.href);
-        url.searchParams.delete("tl");
-        window.location.href = url.toString();
+        await wait(120);
+        setIsTranslating(false);
+        await wait(50);
+        await doTranslate("en");
       } else {
         const langInfo = getLanguageByCode(lang);
         if (langInfo) {
+          await wait(120);
+          setIsTranslating(false);
+          await wait(50);
           await doTranslate(langInfo.googleCode);
         }
       }
-
-      window.setTimeout(() => setIsTranslating(false), 2000);
     },
     [currentLanguage, doTranslate],
   );

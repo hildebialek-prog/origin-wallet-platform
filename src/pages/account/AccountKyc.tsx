@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type HTMLInputTypeAt
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ApiRequestError } from "@/services/apiClient";
 import {
   completeIdentityVerificationSession,
   getKycProfile,
@@ -26,6 +27,115 @@ import { Label } from "@/components/ui/label";
 
 type ApplicantType = "individual" | "business";
 type IdentityDocumentType = "national_id" | "passport" | "driver_license" | "identity_document";
+
+type BrowserFaceDetection = {
+  boundingBox: DOMRectReadOnly | { height: number; width: number; x: number; y: number };
+};
+
+type BrowserFaceDetector = {
+  detect: (image: CanvasImageSource) => Promise<BrowserFaceDetection[]>;
+};
+
+type BrowserFaceDetectorConstructor = new (options?: {
+  fastMode?: boolean;
+  maxDetectedFaces?: number;
+}) => BrowserFaceDetector;
+
+declare global {
+  interface Window {
+    FaceDetector?: BrowserFaceDetectorConstructor;
+  }
+}
+
+type LivenessStep = {
+  key: string;
+  label: string;
+  prompt: string;
+  durationMs: number;
+  requirement: "center" | "first_side" | "opposite_side" | "return_center";
+};
+
+type FramePositionSignal = {
+  centerX: number;
+  descriptor: Uint8Array;
+  quality: number;
+};
+
+type LivenessCheckResult = {
+  ok: boolean;
+  message: string;
+};
+
+const livenessSteps: LivenessStep[] = [
+  {
+    key: "center_face",
+    label: "Center face",
+    prompt: "Center your face inside the oval and hold still",
+    durationMs: 1500,
+    requirement: "center",
+  },
+  {
+    key: "turn_left",
+    label: "Turn left",
+    prompt: "Turn your face left and move slightly to one side",
+    durationMs: 1500,
+    requirement: "first_side",
+  },
+  {
+    key: "turn_right",
+    label: "Turn right",
+    prompt: "Turn your face right and move to the opposite side",
+    durationMs: 1500,
+    requirement: "opposite_side",
+  },
+  {
+    key: "look_straight",
+    label: "Look straight",
+    prompt: "Return to center and look straight",
+    durationMs: 1400,
+    requirement: "return_center",
+  },
+];
+
+const livenessVideoMimeTypes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+const livenessMovementThreshold = 0.075;
+const livenessCenterTolerance = 0.06;
+const livenessAppearanceChangeThreshold = 0.032;
+const livenessReturnAppearanceThreshold = 0.05;
+const maxLivenessVideoUploadBytes = 18 * 1024 * 1024;
+
+const frameDescriptorDistance = (current: Uint8Array, reference: Uint8Array | null) => {
+  if (!reference || current.length !== reference.length) return 0;
+
+  let total = 0;
+  for (let index = 0; index < current.length; index += 1) {
+    total += Math.abs(current[index] - reference[index]);
+  }
+
+  return total / current.length / 255;
+};
+
+const normalizeEvidenceMimeType = (mimeType: string) => {
+  if (mimeType.includes("webm")) return "video/webm";
+  if (mimeType.includes("mp4")) return "video/mp4";
+  if (mimeType.includes("quicktime") || mimeType.includes("mov")) return "video/quicktime";
+  if (mimeType.includes("png")) return "image/png";
+  if (mimeType.includes("webp")) return "image/webp";
+  return "image/jpeg";
+};
+
+const isIdentitySessionUsable = (session?: IdentityVerificationSession) => {
+  if (!session) return false;
+  if (!session.expires_at) return true;
+
+  const expiresAt = new Date(session.expires_at).getTime();
+  if (Number.isNaN(expiresAt)) return true;
+
+  return expiresAt - Date.now() > 10_000;
+};
+
+const isExpiredIdentitySessionError = (error: unknown) =>
+  error instanceof ApiRequestError && /identity verification session has expired/i.test(error.message);
 
 type ProfileForm = {
   legalName: string;
@@ -673,9 +783,17 @@ const AccountKyc = () => {
     setBeneficialOwnerForm((current) => ({ ...current, [field]: value }));
   };
 
-  const getVerificationSession = async (subjectType: IdentityVerificationSubject) => {
+  const getVerificationSession = async (subjectType: IdentityVerificationSubject, forceNew = false) => {
     const existingSession = captureSessions[subjectType];
-    if (existingSession) return existingSession;
+    if (!forceNew && isIdentitySessionUsable(existingSession)) return existingSession;
+
+    if (existingSession && !isIdentitySessionUsable(existingSession)) {
+      setCaptureSessions((current) => {
+        const next = { ...current };
+        delete next[subjectType];
+        return next;
+      });
+    }
 
     const response = await startIdentityVerificationSession({
       subjectType,
@@ -693,6 +811,8 @@ const AccountKyc = () => {
     captureType: IdentityCaptureType,
     file: File,
     onUploaded: (artifact: IdentityVerificationArtifact, session: IdentityVerificationSession) => void,
+    metadata?: Record<string, unknown>,
+    fallbackFile?: File,
   ) => {
     if (!user?.id || !token) {
       setFormError("Please sign in before uploading verification evidence.");
@@ -704,14 +824,74 @@ const AccountKyc = () => {
     setFormError("");
 
     try {
-      const session = await getVerificationSession(subjectType);
-      const response = await uploadIdentityVerificationFile({
-        captureType,
-        file,
-        sessionId: session.id,
-        token,
-        userId: user.id,
-      });
+      let session = await getVerificationSession(subjectType);
+
+      const uploadEvidence = (
+        sessionToUse: IdentityVerificationSession,
+        evidenceFile: File,
+        evidenceMetadata?: Record<string, unknown>,
+      ) =>
+        uploadIdentityVerificationFile({
+          captureType,
+          file: evidenceFile,
+          metadata: evidenceMetadata,
+          sessionId: sessionToUse.id,
+          token,
+          userId: user.id,
+        });
+
+      const uploadWithFallback = async (sessionToUse: IdentityVerificationSession) => {
+        try {
+          return {
+            completedMetadata: metadata,
+            response: await uploadEvidence(sessionToUse, file, metadata),
+          };
+        } catch (error) {
+          if (isExpiredIdentitySessionError(error)) {
+            throw error;
+          }
+
+          const canRetryWithStill = captureType === "selfie_liveness" && fallbackFile && file.type.startsWith("video/");
+
+          if (!canRetryWithStill) {
+            throw error;
+          }
+
+          const fallbackMetadata = {
+            ...metadata,
+            evidence_type: "guided_liveness_image_fallback",
+            fallback_reason: "video_upload_failed",
+            original_evidence_mime_type: file.type,
+            original_evidence_size: file.size,
+            video_evidence_recorded: true,
+          };
+
+          return {
+            completedMetadata: fallbackMetadata,
+            response: await uploadEvidence(sessionToUse, fallbackFile, fallbackMetadata),
+          };
+        }
+      };
+
+      let uploadResult: Awaited<ReturnType<typeof uploadWithFallback>>;
+
+      try {
+        uploadResult = await uploadWithFallback(session);
+      } catch (error) {
+        if (!isExpiredIdentitySessionError(error)) {
+          throw error;
+        }
+
+        setCaptureSessions((current) => {
+          const next = { ...current };
+          delete next[subjectType];
+          return next;
+        });
+        session = await getVerificationSession(subjectType, true);
+        uploadResult = await uploadWithFallback(session);
+      }
+
+      const { completedMetadata, response } = uploadResult;
 
       setCaptureSessions((current) => ({ ...current, [subjectType]: response.session }));
       setCaptureArtifacts((current) => ({
@@ -729,8 +909,10 @@ const AccountKyc = () => {
             checks: {
               liveness: "captured",
               face_match: "pending_manual_or_provider_review",
+              liveness_method: completedMetadata?.evidence_type ?? "guided_liveness_capture",
+              liveness_steps: completedMetadata?.challenge_steps ?? null,
             },
-            liveness_score: 90,
+            liveness_score: Number(completedMetadata?.liveness_score ?? 90),
             face_match_score: 90,
           },
         });
@@ -1414,11 +1596,11 @@ const AccountKyc = () => {
                     selfieLivenessUrl={profileForm.selfieLivenessUrl}
                     livenessSessionId={profileForm.livenessSessionId}
                     uploading={uploadingCapture === "applicant:selfie_liveness"}
-                    onFile={(file) =>
+                    onFile={(file, metadata, fallbackFile) =>
                       uploadCapture("applicant", "selfie_liveness", file, (artifact, session) => {
                         updateProfile("selfieLivenessUrl", artifact.file_url);
                         updateProfile("livenessSessionId", session.external_session_id);
-                      })
+                      }, metadata, fallbackFile)
                     }
                   />
                 ) : (
@@ -1428,11 +1610,11 @@ const AccountKyc = () => {
                       selfieLivenessUrl={representativeForm.selfieLivenessUrl}
                       livenessSessionId={representativeForm.livenessSessionId}
                       uploading={uploadingCapture === "authorized_representative:selfie_liveness"}
-                      onFile={(file) =>
+                      onFile={(file, metadata, fallbackFile) =>
                         uploadCapture("authorized_representative", "selfie_liveness", file, (artifact, session) => {
                           updateRepresentative("selfieLivenessUrl", artifact.file_url);
                           updateRepresentative("livenessSessionId", session.external_session_id);
-                        })
+                        }, metadata, fallbackFile)
                       }
                     />
                     <FaceCheckFields
@@ -1440,11 +1622,11 @@ const AccountKyc = () => {
                       selfieLivenessUrl={beneficialOwnerForm.selfieLivenessUrl}
                       livenessSessionId={beneficialOwnerForm.livenessSessionId}
                       uploading={uploadingCapture === "beneficial_owner:selfie_liveness"}
-                      onFile={(file) =>
+                      onFile={(file, metadata, fallbackFile) =>
                         uploadCapture("beneficial_owner", "selfie_liveness", file, (artifact, session) => {
                           updateBeneficialOwner("selfieLivenessUrl", artifact.file_url);
                           updateBeneficialOwner("livenessSessionId", session.external_session_id);
-                        })
+                        }, metadata, fallbackFile)
                       }
                     />
                   </>
@@ -2108,36 +2290,537 @@ const FaceCheckFields = ({
   uploading,
 }: {
   livenessSessionId: string;
-  onFile: (file: File) => void;
+  onFile: (file: File, metadata?: Record<string, unknown>, fallbackFile?: File) => void;
   selfieLivenessUrl: string;
   title: string;
   uploading: boolean;
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const previewUrlRef = useRef("");
+  const scanStartedAtRef = useRef(0);
+  const stepStartedAtRef = useRef(0);
+  const neutralCenterXRef = useRef<number | null>(null);
+  const neutralFrameRef = useRef<Uint8Array | null>(null);
+  const firstSideDirectionRef = useRef<-1 | 1 | null>(null);
+  const firstSideFrameRef = useRef<Uint8Array | null>(null);
+  const verifiedStepKeysRef = useRef<Set<string>>(new Set());
+  const faceDetectorRef = useRef<BrowserFaceDetector | null>(null);
+  const faceDetectionAvailableRef = useRef<boolean | null>(null);
+  const finishInProgressRef = useRef(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [scanStatus, setScanStatus] = useState<"idle" | "requesting" | "scanning" | "processing" | "captured">(
+    selfieLivenessUrl ? "captured" : "idle",
+  );
+  const [currentStep, setCurrentStep] = useState(0);
+  const [stepProgress, setStepProgress] = useState(0);
+  const [faceStatus, setFaceStatus] = useState("Waiting for camera");
+  const [usingFaceDetector, setUsingFaceDetector] = useState(false);
+  const [verifiedStepKeys, setVerifiedStepKeys] = useState<string[]>([]);
+
+  const revokePreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = "";
+    }
+  }, []);
+
+  const markStepVerified = useCallback((stepKey: string) => {
+    if (verifiedStepKeysRef.current.has(stepKey)) return;
+
+    const next = new Set(verifiedStepKeysRef.current);
+    next.add(stepKey);
+    verifiedStepKeysRef.current = next;
+    setVerifiedStepKeys(Array.from(next));
+  }, []);
+
+  const resetLivenessChecks = useCallback(() => {
+    neutralCenterXRef.current = null;
+    neutralFrameRef.current = null;
+    firstSideDirectionRef.current = null;
+    firstSideFrameRef.current = null;
+    verifiedStepKeysRef.current = new Set();
+    setVerifiedStepKeys([]);
+  }, []);
+
+  const selectedVideoMimeType = useMemo(() => {
+    if (typeof MediaRecorder === "undefined") return "";
+    return livenessVideoMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? "";
+  }, []);
+
+  const stopRecorder = useCallback(async () => {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      return null;
+    }
+
+    if (recorder.state === "inactive") {
+      const mimeType = recorder.mimeType || selectedVideoMimeType || "video/webm";
+      mediaRecorderRef.current = null;
+      return recordedChunksRef.current.length > 0 ? new Blob(recordedChunksRef.current, { type: mimeType }) : null;
+    }
+
+    return new Promise<Blob | null>((resolve) => {
+      const mimeType = recorder.mimeType || selectedVideoMimeType || "video/webm";
+      recorder.onstop = () => {
+        mediaRecorderRef.current = null;
+        resolve(recordedChunksRef.current.length > 0 ? new Blob(recordedChunksRef.current, { type: mimeType }) : null);
+      };
+      recorder.stop();
+    });
+  }, [selectedVideoMimeType]);
+
+  const startRecorder = useCallback(
+    (stream: MediaStream) => {
+      recordedChunksRef.current = [];
+
+      if (typeof MediaRecorder === "undefined") {
+        return;
+      }
+
+      try {
+        const recorder = new MediaRecorder(stream, {
+          ...(selectedVideoMimeType ? { mimeType: selectedVideoMimeType } : {}),
+          videoBitsPerSecond: 800_000,
+        });
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunksRef.current.push(event.data);
+          }
+        };
+        recorder.start(500);
+        mediaRecorderRef.current = recorder;
+      } catch {
+        mediaRecorderRef.current = null;
+        recordedChunksRef.current = [];
+      }
+    },
+    [selectedVideoMimeType],
+  );
+
+  const attachStreamToVideo = useCallback(async () => {
+    const stream = streamRef.current;
+    const video = videoRef.current;
+
+    if (!stream || !video) return;
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+
+    try {
+      await video.play();
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setCameraReady(true);
+        setCameraError("");
+        setFaceStatus("Position your face in the oval");
+      }
+    } catch {
+      setCameraError("Camera is waiting for browser permission. Allow camera access and try again.");
+    }
+  }, []);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraReady(false);
     setCameraActive(false);
   }, []);
 
+  const cancelFaceScan = useCallback(() => {
+    void stopRecorder().finally(() => {
+      recordedChunksRef.current = [];
+    });
+    stopCamera();
+    finishInProgressRef.current = false;
+    resetLivenessChecks();
+    setCameraError("");
+    setCurrentStep(0);
+    setStepProgress(0);
+    setFaceStatus("Scan cancelled");
+    setScanStatus(previewUrlRef.current || selfieLivenessUrl ? "captured" : "idle");
+  }, [resetLivenessChecks, selfieLivenessUrl, stopCamera, stopRecorder]);
+
   useEffect(() => {
     return () => {
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
       stopCamera();
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      revokePreview();
     };
-  }, [previewUrl, stopCamera]);
+  }, [revokePreview, stopCamera]);
+
+  useEffect(() => {
+    if (cameraActive) {
+      void attachStreamToVideo();
+    }
+  }, [attachStreamToVideo, cameraActive]);
+
+  useEffect(() => {
+    setScanStatus((current) => (current === "idle" && selfieLivenessUrl ? "captured" : current));
+  }, [selfieLivenessUrl]);
+
+  const captureStillBlob = useCallback(async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      return null;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    const sourceX = (video.videoWidth - size) / 2;
+    const sourceY = (video.videoHeight - size) / 2;
+    canvas.width = 720;
+    canvas.height = 720;
+    context.save();
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(video, sourceX, sourceY, size, size, 0, 0, canvas.width, canvas.height);
+    context.restore();
+
+    return new Promise<Blob | null>((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92));
+  }, []);
+
+  const measureFramePosition = useCallback((): FramePositionSignal | null => {
+    const video = videoRef.current;
+    const canvas = analysisCanvasRef.current;
+
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      return null;
+    }
+
+    const width = 96;
+    const height = 72;
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return null;
+
+    context.drawImage(video, 0, 0, width, height);
+    const data = context.getImageData(0, 0, width, height).data;
+    let luminanceTotal = 0;
+    let sampleCount = 0;
+
+    for (let y = 6; y < height - 4; y += 1) {
+      for (let x = 3; x < width - 3; x += 1) {
+        const offset = (y * width + x) * 4;
+        luminanceTotal += 0.299 * data[offset] + 0.587 * data[offset + 1] + 0.114 * data[offset + 2];
+        sampleCount += 1;
+      }
+    }
+
+    if (sampleCount === 0) return null;
+
+    const averageLuminance = luminanceTotal / sampleCount;
+    const descriptor = new Uint8Array(sampleCount);
+    let weightedX = 0;
+    let weightTotal = 0;
+    let descriptorIndex = 0;
+
+    for (let y = 6; y < height - 4; y += 1) {
+      for (let x = 3; x < width - 3; x += 1) {
+        const offset = (y * width + x) * 4;
+        const red = data[offset];
+        const green = data[offset + 1];
+        const blue = data[offset + 2];
+        const luminance = 0.299 * red + 0.587 * green + 0.114 * blue;
+        const contrast = Math.abs(luminance - averageLuminance);
+        const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
+        const weight = Math.max(0, contrast - 6) + saturation * 0.25;
+        descriptor[descriptorIndex] = Math.max(0, Math.min(255, Math.round(luminance)));
+        descriptorIndex += 1;
+
+        if (weight <= 0) continue;
+
+        weightedX += x * weight;
+        weightTotal += weight;
+      }
+    }
+
+    const quality = weightTotal / (sampleCount * 255);
+    if (quality < 0.018) return null;
+
+    return {
+      centerX: weightedX / weightTotal / (width - 1),
+      descriptor,
+      quality,
+    };
+  }, []);
+
+  const evaluateLivenessPosition = useCallback(
+    (signal: FramePositionSignal): LivenessCheckResult => {
+      const step = livenessSteps[currentStep];
+      const baseline = neutralCenterXRef.current;
+      const centerX = signal.centerX;
+      const neutralDistance = frameDescriptorDistance(signal.descriptor, neutralFrameRef.current);
+      const firstSideDistance = frameDescriptorDistance(signal.descriptor, firstSideFrameRef.current);
+
+      if (step.requirement === "center") {
+        if (Math.abs(centerX - 0.5) > 0.24) {
+          return { ok: false, message: "Keep your face centered in the oval" };
+        }
+
+        neutralCenterXRef.current = baseline === null ? centerX : baseline * 0.75 + centerX * 0.25;
+        neutralFrameRef.current = new Uint8Array(signal.descriptor);
+        markStepVerified(step.key);
+        return { ok: true, message: "Center position verified" };
+      }
+
+      if (baseline === null || !neutralFrameRef.current) {
+        return { ok: false, message: "Center your face first" };
+      }
+
+      const delta = centerX - baseline;
+
+      if (step.requirement === "first_side") {
+        if (Math.abs(delta) < livenessMovementThreshold && neutralDistance < livenessAppearanceChangeThreshold) {
+          return { ok: false, message: "Turn your face farther to one side" };
+        }
+
+        firstSideDirectionRef.current = delta === 0 ? 1 : delta < 0 ? -1 : 1;
+        firstSideFrameRef.current = new Uint8Array(signal.descriptor);
+        markStepVerified(step.key);
+        return { ok: true, message: "First side gesture verified" };
+      }
+
+      if (step.requirement === "opposite_side") {
+        const firstDirection = firstSideDirectionRef.current;
+
+        if (!firstDirection || !firstSideFrameRef.current) {
+          return { ok: false, message: "Complete the first side movement first" };
+        }
+
+        if (delta * firstDirection > -livenessMovementThreshold && firstSideDistance < livenessAppearanceChangeThreshold) {
+          return { ok: false, message: "Turn your face to the opposite side" };
+        }
+
+        markStepVerified(step.key);
+        return { ok: true, message: "Opposite side gesture verified" };
+      }
+
+      if (Math.abs(delta) > livenessCenterTolerance && neutralDistance > livenessReturnAppearanceThreshold) {
+        return { ok: false, message: "Return to center and look straight" };
+      }
+
+      markStepVerified(step.key);
+      return { ok: true, message: "Straight look verified" };
+    },
+    [currentStep, markStepVerified],
+  );
+
+  const inspectMotionFallback = useCallback((): LivenessCheckResult => {
+    const signal = measureFramePosition();
+
+    if (!signal) {
+      setFaceStatus("Camera image is unclear");
+      return { ok: false, message: "Improve lighting and keep your face in frame" };
+    }
+
+    const result = evaluateLivenessPosition(signal);
+    setFaceStatus(result.message);
+    return result;
+  }, [evaluateLivenessPosition, measureFramePosition]);
+
+  const inspectFace = useCallback(async () => {
+    const video = videoRef.current;
+
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      return { ok: false, message: "Camera is starting" };
+    }
+
+    if (faceDetectionAvailableRef.current === null) {
+      faceDetectionAvailableRef.current = typeof window.FaceDetector !== "undefined";
+      setUsingFaceDetector(faceDetectionAvailableRef.current);
+    }
+
+    if (!faceDetectionAvailableRef.current || !window.FaceDetector) {
+      setUsingFaceDetector(false);
+      return inspectMotionFallback();
+    }
+
+    try {
+      if (!faceDetectorRef.current) {
+        faceDetectorRef.current = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 2 });
+      }
+
+      const faces = await faceDetectorRef.current.detect(video);
+
+      if (faces.length === 0) {
+        setFaceStatus("No face detected");
+        return { ok: false, message: "Move your face into the oval" };
+      }
+
+      if (faces.length > 1) {
+        setFaceStatus("Multiple faces detected");
+        return { ok: false, message: "Only one face can be in frame" };
+      }
+
+      const face = faces[0].boundingBox;
+      const centerX = (face.x + face.width / 2) / video.videoWidth;
+      const centerY = (face.y + face.height / 2) / video.videoHeight;
+      const faceAreaRatio = (face.width * face.height) / (video.videoWidth * video.videoHeight);
+      const faceCentered = centerX > 0.28 && centerX < 0.72 && centerY > 0.22 && centerY < 0.78;
+
+      if (faceAreaRatio < 0.055) {
+        setFaceStatus("Face too far");
+        return { ok: false, message: "Move closer to the camera" };
+      }
+
+      if (faceAreaRatio > 0.55) {
+        setFaceStatus("Face too close");
+        return { ok: false, message: "Move back slightly" };
+      }
+
+      if (!faceCentered) {
+        setFaceStatus("Face outside frame");
+        return { ok: false, message: "Keep your face inside the oval" };
+      }
+
+      const frameSignal = measureFramePosition();
+      const result = evaluateLivenessPosition(frameSignal ? { ...frameSignal, centerX } : { centerX, descriptor: new Uint8Array(0), quality: 1 });
+      setFaceStatus(result.message);
+      return result;
+    } catch {
+      faceDetectionAvailableRef.current = false;
+      setUsingFaceDetector(false);
+      return inspectMotionFallback();
+    }
+  }, [evaluateLivenessPosition, inspectMotionFallback, measureFramePosition]);
+
+  const finishLivenessScan = useCallback(async () => {
+    if (finishInProgressRef.current) return;
+    finishInProgressRef.current = true;
+    setScanStatus("processing");
+    setCameraError("");
+    setStepProgress(100);
+    setFaceStatus("Processing liveness evidence");
+
+    const stillBlob = await captureStillBlob();
+    const videoBlob = await stopRecorder();
+    stopCamera();
+
+    if (stillBlob) {
+      revokePreview();
+      const nextPreviewUrl = URL.createObjectURL(stillBlob);
+      previewUrlRef.current = nextPreviewUrl;
+      setPreviewUrl(nextPreviewUrl);
+    }
+
+    const shouldUseVideo = Boolean(videoBlob && videoBlob.size > 2048 && videoBlob.size <= maxLivenessVideoUploadBytes);
+    const evidenceBlob = shouldUseVideo ? videoBlob : stillBlob;
+
+    if (!evidenceBlob) {
+      finishInProgressRef.current = false;
+      setScanStatus("idle");
+      setCameraError("Cannot save liveness evidence. Try again.");
+      return;
+    }
+
+    const mimeType = normalizeEvidenceMimeType(evidenceBlob.type || (shouldUseVideo ? "video/webm" : "image/jpeg"));
+    const extension = mimeType.includes("mp4") ? "mp4" : mimeType.includes("webm") ? "webm" : "jpg";
+    const uploadBlob = evidenceBlob.type === mimeType ? evidenceBlob : new Blob([evidenceBlob], { type: mimeType });
+    const fallbackFile = stillBlob
+      ? new File([stillBlob], `liveness-still-${Date.now()}.jpg`, { type: "image/jpeg" })
+      : undefined;
+    const durationMs = Math.max(0, Date.now() - scanStartedAtRef.current);
+    const metadata = {
+      evidence_type: mimeType.startsWith("video/") ? "guided_liveness_video" : "guided_liveness_image_fallback",
+      evidence_mime_type: mimeType,
+      evidence_size: uploadBlob.size,
+      video_evidence_recorded: Boolean(videoBlob && videoBlob.size > 2048),
+      video_evidence_size: videoBlob?.size ?? null,
+      video_upload_skipped_reason: videoBlob && videoBlob.size > maxLivenessVideoUploadBytes ? "video_too_large" : null,
+      challenge_steps: livenessSteps.map((step) => step.key),
+      challenge_step_count: livenessSteps.length,
+      verified_challenge_steps: Array.from(verifiedStepKeysRef.current),
+      verified_challenge_step_count: verifiedStepKeysRef.current.size,
+      duration_ms: durationMs,
+      face_detection: usingFaceDetector ? "browser_face_detector" : "motion_position_fallback",
+      liveness_score: usingFaceDetector ? 88 : 78,
+      captured_at: new Date().toISOString(),
+    };
+    const file = new File([uploadBlob], `liveness-session-${Date.now()}.${extension}`, { type: mimeType });
+
+    setScanStatus("captured");
+    setFaceStatus("Liveness evidence captured");
+    onFile(file, metadata, fallbackFile);
+    finishInProgressRef.current = false;
+  }, [captureStillBlob, onFile, revokePreview, stopCamera, stopRecorder, usingFaceDetector]);
+
+  useEffect(() => {
+    if (scanStatus !== "scanning" || !cameraReady) return undefined;
+
+    stepStartedAtRef.current = performance.now();
+    setStepProgress(0);
+
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        if (cancelled) return;
+
+        const faceCheck = await inspectFace();
+        if (cancelled) return;
+
+        const elapsed = performance.now() - stepStartedAtRef.current;
+        setStepProgress(Math.min(100, Math.round((elapsed / livenessSteps[currentStep].durationMs) * 100)));
+
+        if (!faceCheck.ok) {
+          setCameraError(faceCheck.message);
+          stepStartedAtRef.current = performance.now();
+          return;
+        }
+
+        setCameraError("");
+
+        if (elapsed < livenessSteps[currentStep].durationMs) return;
+
+        if (currentStep >= livenessSteps.length - 1) {
+          await finishLivenessScan();
+          return;
+        }
+
+        setCurrentStep((step) => Math.min(step + 1, livenessSteps.length - 1));
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [cameraReady, currentStep, finishLivenessScan, inspectFace, scanStatus]);
 
   const startFaceScan = async () => {
     setCameraError("");
+    setCameraReady(false);
+    setCurrentStep(0);
+    setStepProgress(0);
+    setFaceStatus("Requesting camera access");
+    setScanStatus("requesting");
+    finishInProgressRef.current = false;
+    resetLivenessChecks();
+    revokePreview();
+    setPreviewUrl("");
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("Camera is not available in this browser.");
+      setScanStatus("idle");
       return;
     }
 
@@ -2152,96 +2835,105 @@ const FaceCheckFields = ({
       });
 
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      scanStartedAtRef.current = Date.now();
+      startRecorder(stream);
       setCameraActive(true);
+      setScanStatus("scanning");
     } catch {
       setCameraError("Cannot access camera. Allow camera permission and try again.");
+      setScanStatus("idle");
+      resetLivenessChecks();
       stopCamera();
     }
   };
 
-  const captureFaceScan = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
-      setCameraError("Camera is not ready yet.");
-      return;
-    }
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      setCameraError("Cannot capture face scan from this browser.");
-      return;
-    }
-
-    const size = Math.min(video.videoWidth, video.videoHeight);
-    const sourceX = (video.videoWidth - size) / 2;
-    const sourceY = (video.videoHeight - size) / 2;
-    canvas.width = 720;
-    canvas.height = 720;
-    context.save();
-    context.translate(canvas.width, 0);
-    context.scale(-1, 1);
-    context.drawImage(video, sourceX, sourceY, size, size, 0, 0, canvas.width, canvas.height);
-    context.restore();
-
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          setCameraError("Cannot save face scan. Try again.");
-          return;
-        }
-
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        const nextPreviewUrl = URL.createObjectURL(blob);
-        setPreviewUrl(nextPreviewUrl);
-        stopCamera();
-        onFile(new File([blob], `face-scan-${Date.now()}.jpg`, { type: "image/jpeg" }));
-      },
-      "image/jpeg",
-      0.92,
-    );
-  };
+  const activeStep = livenessSteps[currentStep];
+  const canStart = !uploading && scanStatus !== "requesting" && scanStatus !== "scanning" && scanStatus !== "processing";
 
   return (
     <div className="rounded-2xl border border-gray-200 p-4">
       <h3 className="font-semibold text-gray-900">{title}</h3>
       <p className="mt-1 text-sm text-gray-500">
-        Scan the applicant face using the front camera. The captured liveness evidence is saved with the KYC review.
+        Complete the guided liveness challenge with the front camera. A short evidence video is saved with the KYC review.
       </p>
       <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-3">
           <div className="relative aspect-square overflow-hidden rounded-2xl border border-gray-200 bg-slate-950">
             {cameraActive ? (
-              <video ref={videoRef} playsInline muted className="h-full w-full scale-x-[-1] object-cover" />
+              <>
+                <video
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  autoPlay
+                  onCanPlay={() => {
+                    setCameraReady(true);
+                    setCameraError("");
+                  }}
+                  onLoadedMetadata={() => {
+                    void attachStreamToVideo();
+                  }}
+                  className="h-full w-full scale-x-[-1] object-cover"
+                />
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="h-[72%] w-[58%] rounded-[48%] border-2 border-white/80 shadow-[0_0_0_999px_rgba(2,6,23,0.28)]" />
+                </div>
+                <div className="absolute inset-x-4 top-4 rounded-2xl bg-slate-950/70 px-4 py-3 text-center text-white backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-emerald-200">{activeStep.label}</div>
+                  <div className="mt-1 text-lg font-semibold">{activeStep.prompt}</div>
+                </div>
+              </>
             ) : previewUrl ? (
               <img src={previewUrl} alt="Captured face scan" className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">
-                Start face scan to open the front camera.
+                Start guided scan to open the front camera.
               </div>
             )}
             <canvas ref={canvasRef} className="hidden" />
+            <canvas ref={analysisCanvasRef} className="hidden" />
           </div>
+          {scanStatus === "scanning" || scanStatus === "processing" ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-gray-900">{faceStatus}</span>
+                <span className="text-gray-500">
+                  {currentStep + 1}/{livenessSteps.length}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                <div className="h-full rounded-full bg-green-600 transition-all" style={{ width: `${stepProgress}%` }} />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {livenessSteps.map((step, index) => (
+                  <div
+                    key={step.key}
+                    className={`h-1.5 rounded-full ${
+                      verifiedStepKeys.includes(step.key) ? "bg-green-600" : index === currentStep ? "bg-amber-400" : "bg-gray-200"
+                    }`}
+                    title={step.label}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
           {cameraError ? <p className="text-sm text-red-600">{cameraError}</p> : null}
+          {cameraActive && !cameraReady && !cameraError ? <p className="text-sm text-gray-500">Starting camera...</p> : null}
           <div className="flex flex-wrap gap-3">
-            {cameraActive ? (
+            {scanStatus === "scanning" || scanStatus === "requesting" || scanStatus === "processing" ? (
               <>
-                <Button className="rounded-full bg-green-600 px-5 text-white hover:bg-green-700" disabled={uploading} onClick={captureFaceScan}>
-                  {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Capture face scan
+                <Button className="rounded-full bg-green-600 px-5 text-white hover:bg-green-700" disabled>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {scanStatus === "processing" ? "Processing evidence" : "Scanning"}
                 </Button>
-                <Button variant="outline" className="rounded-full" onClick={stopCamera} disabled={uploading}>
+                <Button variant="outline" className="rounded-full" onClick={cancelFaceScan} disabled={uploading || scanStatus === "processing"}>
                   Cancel
                 </Button>
               </>
             ) : (
-              <Button className="rounded-full bg-green-600 px-5 text-white hover:bg-green-700" disabled={uploading} onClick={startFaceScan}>
+              <Button className="rounded-full bg-green-600 px-5 text-white hover:bg-green-700" disabled={!canStart} onClick={startFaceScan}>
                 {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {selfieLivenessUrl ? "Retake face scan" : "Start face scan"}
+                {selfieLivenessUrl || previewUrl ? "Retake guided scan" : "Start guided scan"}
               </Button>
             )}
           </div>
@@ -2250,8 +2942,24 @@ const FaceCheckFields = ({
           <div>
             <div className="text-gray-500">Face scan status</div>
             <div className={selfieLivenessUrl ? "font-semibold text-emerald-700" : "font-semibold text-gray-700"}>
-              {uploading ? "Uploading scan..." : selfieLivenessUrl ? "Captured and stored" : "Not captured"}
+              {uploading
+                ? "Uploading evidence..."
+                : scanStatus === "processing"
+                  ? "Processing evidence"
+                  : selfieLivenessUrl
+                    ? "Captured and stored"
+                    : scanStatus === "scanning"
+                      ? "Scanning"
+                      : "Not captured"}
             </div>
+          </div>
+          <div>
+            <div className="text-gray-500">Challenge</div>
+            <div className="font-semibold text-gray-700">{verifiedStepKeys.length}/{livenessSteps.length} verified</div>
+          </div>
+          <div>
+            <div className="text-gray-500">Face detection</div>
+            <div className="font-semibold text-gray-700">{usingFaceDetector ? "FaceDetector" : "Motion check"}</div>
           </div>
           <div>
             <div className="text-gray-500">Liveness session</div>

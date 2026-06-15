@@ -324,7 +324,7 @@ export const BusinessFeaturePage = ({ feature }: { feature: BusinessFeature }) =
                 {feature.heroDescription}
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Link to="/contact">
+                <Link to="/talk-to-sales">
                   <Button variant="hero" size="lg" className="w-full sm:w-auto">
                     Talk to sales
                     <ArrowRight className="ml-1 h-4 w-4" />
@@ -413,7 +413,7 @@ export const BusinessFeaturePage = ({ feature }: { feature: BusinessFeature }) =
               </ul>
 
               <div className="flex gap-3">
-                <Link to="/contact">
+                <Link to="/talk-to-sales">
                   <Button size="sm">Contact sales</Button>
                 </Link>
                 <Link to="/pricing">
@@ -503,7 +503,7 @@ export const BusinessFeaturePage = ({ feature }: { feature: BusinessFeature }) =
           <p className="mx-auto mb-8 max-w-md text-primary-foreground/72">
             Talk to our team about how this flow can fit your operating model and cross-border finance needs.
           </p>
-          <Link to="/contact">
+          <Link to="/talk-to-sales">
             <Button variant="hero" size="lg">
               Talk to sales
               <ArrowRight className="ml-1 h-4 w-4" />
@@ -516,7 +516,7 @@ export const BusinessFeaturePage = ({ feature }: { feature: BusinessFeature }) =
             <Link to="/pricing" className="hover:text-white hover:underline">
               Pricing visibility
             </Link>
-            <Link to="/contact" className="hover:text-white hover:underline">
+            <Link to="/talk-to-sales" className="hover:text-white hover:underline">
               Contact sales
             </Link>
           </div>

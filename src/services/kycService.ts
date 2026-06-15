@@ -263,10 +263,16 @@ export const uploadIdentityVerificationFile = async (params: {
   sessionId: string | number;
   captureType: IdentityCaptureType;
   file: File;
+  metadata?: Record<string, unknown>;
 }): Promise<IdentityVerificationUploadResponse> => {
   const formData = new FormData();
   formData.append("capture_type", params.captureType);
   formData.append("file", params.file);
+
+  Object.entries(params.metadata ?? {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    formData.append(`metadata[${key}]`, typeof value === "object" ? JSON.stringify(value) : String(value));
+  });
 
   return requestApi<IdentityVerificationUploadResponse>(
     `/user/users/${params.userId}/identity-verification-sessions/${params.sessionId}/uploads`,

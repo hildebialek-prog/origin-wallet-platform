@@ -158,6 +158,34 @@
   <body>
     <div id="google_translate_element" style="display: none !important"></div>
     <div id="root"></div>
+    <script type="text/javascript">
+      (function installGoogleTranslateDomGuard() {
+        if (window.originWalletGoogleTranslateDomGuardInstalled || typeof Node === "undefined") {
+          return;
+        }
+
+        window.originWalletGoogleTranslateDomGuardInstalled = true;
+
+        var originalRemoveChild = Node.prototype.removeChild;
+        var originalInsertBefore = Node.prototype.insertBefore;
+
+        Node.prototype.removeChild = function (child) {
+          if (child && child.parentNode !== this) {
+            return child;
+          }
+
+          return originalRemoveChild.call(this, child);
+        };
+
+        Node.prototype.insertBefore = function (newNode, referenceNode) {
+          if (referenceNode && referenceNode.parentNode !== this) {
+            return this.appendChild(newNode);
+          }
+
+          return originalInsertBefore.call(this, newNode, referenceNode);
+        };
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
 
     <script type="text/javascript">

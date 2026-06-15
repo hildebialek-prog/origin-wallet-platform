@@ -29,7 +29,7 @@ const Business = () => {
               orchestration and operational visibility.
             </p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
-              <Link to="/contact">
+              <Link to="/talk-to-sales">
                 <Button variant="hero" size="lg" className="w-full sm:w-auto">
                   Talk to sales
                   <ArrowRight className="ml-1 h-4 w-4" />
