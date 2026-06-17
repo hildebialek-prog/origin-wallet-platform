@@ -20,6 +20,7 @@ import {
   User,
   ArrowUpDown,
   ShieldCheck,
+  SendHorizonal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HelpChatbot from "@/components/help/HelpChatbot";
@@ -35,6 +36,7 @@ import {
 const navItems = [
   { to: "/account", label: "Home", icon: LayoutDashboard },
   { to: "/account/balances", label: "Balances", icon: Wallet },
+  { to: "/account/transfers", label: "Move funds", icon: SendHorizonal },
   { to: "/account/transactions", label: "Transactions", icon: ArrowLeftRight },
   { to: "/account/virtual-accounts", label: "Virtual accounts", icon: CreditCard },
   { to: "/account/beneficiaries", label: "Beneficiaries", icon: Users },
@@ -71,7 +73,7 @@ const AccountLayout = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-[#0f1115]">
-        <div className="w-10 h-10 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-2 border-[#16a34a] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -81,9 +83,9 @@ const AccountLayout = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50 dark:bg-[#111318]">
+    <div className="min-h-screen bg-[#f8f8f6] dark:bg-[#111318] lg:pl-64">
       {/* Sidebar - Currenxie style */}
-      <aside className="w-64 min-h-screen bg-[#1a1d21] text-white flex flex-col shrink-0">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 bg-[#1a1d21] text-white shadow-sm lg:flex lg:flex-col">
         <div className="p-6 flex items-center gap-2 border-b border-white/10">
           <img
             src="/logo/knt-logo.svg"
@@ -92,7 +94,7 @@ const AccountLayout = () => {
           />
           <span className="font-semibold text-lg">Origin Wallet</span>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-3">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -102,7 +104,7 @@ const AccountLayout = () => {
                 cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-2 border-transparent",
                   isActive
-                    ? "bg-gray-700/80 text-green-400 border-l-green-400"
+                    ? "bg-[#22314a] text-[#22c55e] border-l-[#22c55e]"
                     : "text-gray-300 hover:bg-gray-700/50 hover:text-white"
                 )
               }
@@ -124,11 +126,11 @@ const AccountLayout = () => {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 bg-[#f8f8f6] dark:bg-[#161a20]">
-        <div className="h-1 bg-gradient-to-r from-green-400 via-emerald-300 to-green-400" />
-        <header className="sticky top-0 z-20 flex items-center justify-end gap-3 border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-[#1b2027]/95">
-          <Button asChild className="gap-2 rounded-full bg-green-500 px-5 text-white hover:bg-green-600">
-            <Link to="/account/fx-orders">
+      <main className="min-h-screen min-w-0 bg-[#f8f8f6] dark:bg-[#161a20]">
+        <div className="h-1 bg-gradient-to-r from-[#3ce4bf] via-[#7ae3cb] to-[#22c55e]" />
+        <header className="sticky top-0 z-20 flex min-h-[72px] items-center justify-end gap-3 border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-[#1b2027]/95">
+          <Button asChild className="gap-2 rounded-full bg-[#16a34a] px-5 text-white hover:bg-[#15803d]">
+            <Link to="/account/transfers">
               <ArrowUpDown className="w-4 h-4" />
               Move funds
             </Link>
@@ -162,7 +164,7 @@ const AccountLayout = () => {
                     <span className="block font-semibold">{language.nameEn}</span>
                     <span className="block text-xs text-gray-500 dark:text-gray-400">{language.nativeName}</span>
                   </span>
-                  {language.code === currentLanguage ? <Check className="h-4 w-4 text-green-600" /> : null}
+                  {language.code === currentLanguage ? <Check className="h-4 w-4 text-[#16a34a]" /> : null}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -172,7 +174,7 @@ const AccountLayout = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="inline-flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-gray-800 transition-colors hover:border-green-400 dark:text-white">
+              <button className="inline-flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-gray-800 transition-colors hover:border-[#22c55e] dark:text-white">
                 <User className="w-4 h-4" />
                 My account
                 <ChevronDown className="w-4 h-4" />
@@ -187,7 +189,7 @@ const AccountLayout = () => {
                   Origin Wallet
                 </div>
                 <div className="mt-3 flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ecfdf3] text-sm font-bold text-[#16a34a]">
                     {userInitials || "OW"}
                   </div>
                   <div className="min-w-0">

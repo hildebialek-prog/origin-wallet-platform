@@ -26,14 +26,14 @@ const AccountSettings = () => {
   return (
     <div className="bg-[#f8f8f6] px-7 py-10 dark:bg-[#161a20]">
       <div className="mx-auto max-w-6xl">
-        <h1 className="mb-10 text-[3.2rem] font-bold tracking-[-0.04em] text-[#111111] dark:text-white">Settings</h1>
+        <h1 className="mb-10 text-[3.2rem] font-bold tracking-[-0.04em] text-[#0f2442] dark:text-white">Settings</h1>
 
         <div className="mb-8 flex items-center gap-8 text-[1.05rem] font-semibold">
           <Link
             to="/account/settings/general"
             className={
               !isSecurity
-                ? "border-b-2 border-[#3ce4bf] pb-3 text-[#202020] dark:text-white"
+                ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] dark:text-white"
                 : "pb-3 text-[#5e5e5e] dark:text-gray-400"
             }
           >
@@ -43,7 +43,7 @@ const AccountSettings = () => {
             to="/account/settings/security"
             className={
               isSecurity
-                ? "border-b-2 border-[#3ce4bf] pb-3 text-[#202020] dark:text-white"
+                ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] dark:text-white"
                 : "pb-3 text-[#5e5e5e] dark:text-gray-400"
             }
           >
@@ -55,12 +55,12 @@ const AccountSettings = () => {
           <div className="space-y-4">
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center justify-between p-5">
-                <div className="text-[1.15rem] font-medium text-[#232323] dark:text-white">Language</div>
+                <div className="text-[1.15rem] font-medium text-[#0f2442] dark:text-white">Language</div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="rounded-md px-3 text-[1.05rem] font-semibold text-[#232323] hover:bg-[#f5f5f2] dark:text-white dark:hover:bg-white/10"
+                      className="rounded-md px-3 text-[1.05rem] font-semibold text-[#0f2442] hover:bg-[#ecfdf3] dark:text-white dark:hover:bg-white/10"
                     >
                       <Globe className="mr-2 h-5 w-5" />
                       {isTranslating ? "Updating..." : currentLanguageOption.nameEn}
@@ -88,12 +88,12 @@ const AccountSettings = () => {
 
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center justify-between p-5">
-                <div className="text-[1.15rem] font-medium text-[#232323] dark:text-white">Dark mode</div>
+                <div className="text-[1.15rem] font-medium text-[#0f2442] dark:text-white">Dark mode</div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="rounded-md border-[#7ae3cb] bg-white px-5 text-[1rem] font-semibold text-[#232323] hover:bg-[#f3fdf9] dark:border-white/15 dark:bg-[#252b34] dark:text-white dark:hover:bg-[#2d3440]"
+                      className="rounded-md border-[#16a34a] bg-white px-5 text-[1rem] font-semibold text-[#16a34a] hover:bg-[#ecfdf3] dark:border-[#86efac] dark:bg-[#252b34] dark:text-[#86efac] dark:hover:bg-[#16a34a]/10"
                     >
                       {darkModeLabel}
                       <ChevronDown className="ml-2 h-4 w-4" />
@@ -115,11 +115,11 @@ const AccountSettings = () => {
           <div className="space-y-4">
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center justify-between p-5">
-                <div className="text-[1.15rem] font-medium text-[#232323] dark:text-white">Update password</div>
+                <div className="text-[1.15rem] font-medium text-[#0f2442] dark:text-white">Update password</div>
                 <Link to="/account/settings/password">
                   <Button
                     variant="outline"
-                    className="rounded-full border-[#7ae3cb] bg-white px-7 text-[1rem] font-semibold text-[#232323] hover:bg-[#f3fdf9] dark:border-white/15 dark:bg-[#252b34] dark:text-white dark:hover:bg-[#2d3440]"
+                    className="rounded-full border-[#16a34a] bg-white px-7 text-[1rem] font-semibold text-[#16a34a] hover:bg-[#ecfdf3] dark:border-[#86efac] dark:bg-[#252b34] dark:text-[#86efac] dark:hover:bg-[#16a34a]/10"
                   >
                     Update
                   </Button>
@@ -129,16 +129,16 @@ const AccountSettings = () => {
 
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center justify-between p-5">
-                <div className="text-[1.15rem] font-medium text-[#232323] dark:text-white">Profile</div>
+                <div className="text-[1.15rem] font-medium text-[#0f2442] dark:text-white">Profile</div>
                 <div className="flex items-center gap-5">
                   <div className="inline-flex items-center gap-2 text-[1rem] font-medium text-[#8e8e8e] dark:text-gray-400">
-                    <UserRound className="h-5 w-5 text-[#5de1c3]" />
+                    <UserRound className="h-5 w-5 text-[#16a34a]" />
                     Basic personal information
                   </div>
                   <Link to="/account/settings/profile">
                     <Button
                       variant="outline"
-                      className="rounded-full border-[#7ae3cb] bg-white px-7 text-[1rem] font-semibold text-[#232323] hover:bg-[#f3fdf9] dark:border-white/15 dark:bg-[#252b34] dark:text-white dark:hover:bg-[#2d3440]"
+                      className="rounded-full border-[#16a34a] bg-white px-7 text-[1rem] font-semibold text-[#16a34a] hover:bg-[#ecfdf3] dark:border-[#86efac] dark:bg-[#252b34] dark:text-[#86efac] dark:hover:bg-[#16a34a]/10"
                     >
                       Manage
                     </Button>

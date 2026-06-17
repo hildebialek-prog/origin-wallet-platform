@@ -1277,6 +1277,8 @@ const AccountKyc = () => {
     submitMutation.mutate(payload);
   };
 
+  const lockedProfile = profile && isLockedKycStatus(profile.status) ? profile : null;
+
   return (
     <div className="min-h-screen bg-[#f5f5f5] p-6 dark:bg-[#161a20]">
       <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -1313,7 +1315,11 @@ const AccountKyc = () => {
               </div>
             ) : null}
 
-            {step === 0 ? (
+            {lockedProfile ? (
+              <LockedKycSummary profile={lockedProfile} />
+            ) : null}
+
+            {!lockedProfile && step === 0 ? (
               <section className="space-y-4">
                 <SectionTitle title="Choose profile type" />
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1336,7 +1342,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {step === 1 ? (
+            {!lockedProfile && step === 1 ? (
               <section className="space-y-5">
                 <SectionTitle title={applicantType === "business" ? "Business and people details" : "Personal details"} />
                 <Field label="Legal name" value={profileForm.legalName} onChange={(value) => updateProfile("legalName", value)} />
@@ -1409,7 +1415,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {step === 2 ? (
+            {!lockedProfile && step === 2 ? (
               <section className="space-y-5">
                 <SectionTitle title="Address and risk data" />
                 <AddressFields
@@ -1447,7 +1453,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {step === 3 ? (
+            {!lockedProfile && step === 3 ? (
               <section className="space-y-5">
                 <SectionTitle title="Documents" />
                 {applicantType === "individual" ? (
@@ -1587,7 +1593,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {step === 4 ? (
+            {!lockedProfile && step === 4 ? (
               <section className="space-y-5">
                 <SectionTitle title="Face check and consent" />
                 {applicantType === "individual" ? (
@@ -1642,7 +1648,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {step === 5 ? (
+            {!lockedProfile && step === 5 ? (
               <section className="space-y-4">
                 <SectionTitle title="Review and submit" />
                 <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-white/10 dark:bg-white/5">
@@ -1714,6 +1720,11 @@ const AccountKyc = () => {
                     <li key={requirement.key} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
                       <div className="font-medium">{requirement.label}</div>
                       <div className="text-xs">{requirement.status.replace(/_/g, " ")}</div>
+                      {requirement.rejection_reason || requirement.review_note ? (
+                        <div className="mt-2 text-xs leading-5">
+                          {requirement.rejection_reason || requirement.review_note}
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -1731,6 +1742,68 @@ const AccountKyc = () => {
 };
 
 const isLockedKycStatus = (status?: string | null) => lockedKycStatuses.has(String(status ?? "").toLowerCase());
+
+const LockedKycSummary = ({ profile }: { profile: KycProfile }) => {
+  const profileName =
+    profile.applicant_type === "business"
+      ? profile.business_name || profile.legal_name || "Business profile"
+      : profile.legal_name || "Individual profile";
+  const countryCode =
+    profile.applicant_type === "business"
+      ? profile.registered_country_code || profile.country_code
+      : profile.residence_country_code || profile.nationality_country_code || profile.country_code;
+  const openRequirements =
+    profile.requirements?.filter((requirement) =>
+      ["open", "pending", "needs_more_info", "requested"].includes(String(requirement.status ?? "").toLowerCase()),
+    ) ?? [];
+
+  return (
+    <section className="space-y-5">
+      <div className={`rounded-2xl border p-5 ${statusTone(profile.status)}`}>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em]">Review status</div>
+            <h3 className="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">
+              KYC/KYB profile submitted
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+              Operations has received this profile. The form is locked while the profile is under review, and new
+              requirements will appear here if more information is needed.
+            </p>
+          </div>
+          <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold capitalize shadow-sm dark:bg-white/10">
+            {String(profile.status).replace(/_/g, " ")}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm dark:border-white/10 dark:bg-white/5">
+        <SummaryRow label="Profile type" value={profile.applicant_type === "business" ? "Business KYB" : "Individual KYC"} />
+        <SummaryRow label="Profile name" value={profileName} />
+        <SummaryRow label="Country" value={countryCode || "-"} />
+        <SummaryRow label="Submitted" value={formatDate(profile.submitted_at)} />
+        <SummaryRow label="Reviewed" value={formatDate(profile.reviewed_at)} />
+      </div>
+
+      {openRequirements.length ? (
+        <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+          <div className="font-semibold">Open requirements</div>
+          {openRequirements.map((requirement) => (
+            <div key={requirement.key} className="rounded-xl border border-amber-200 bg-white/70 p-3">
+              <div className="font-medium">{requirement.label}</div>
+              <div className="text-xs capitalize">{String(requirement.status).replace(/_/g, " ")}</div>
+              {requirement.rejection_reason || requirement.review_note ? (
+                <div className="mt-2 text-xs leading-5">
+                  {requirement.rejection_reason || requirement.review_note}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+};
 
 const captureKey = (subjectType: string, captureType: string) =>
   `${subjectType}:${captureType}`;
@@ -2109,13 +2182,14 @@ const SelectField = <TValue extends string>({
     <select
       className="h-12 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm"
       value={value}
+      translate="no"
       onChange={(event) => onChange(event.target.value as TValue)}
     >
-      <option value="" disabled>
+      <option value="" disabled translate="no">
         {placeholder}
       </option>
       {options.map((option) => (
-        <option key={option.value} value={option.value}>
+        <option key={option.value} value={option.value} translate="no">
           {option.label}
         </option>
       ))}
@@ -2143,13 +2217,14 @@ const MultiSelectField = ({
         multiple
         className="min-h-[116px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
         value={selected}
+        translate="no"
         onChange={(event) => {
           const values = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
           onChange(values.join(","));
         }}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} translate="no">
             {option.label}
           </option>
         ))}

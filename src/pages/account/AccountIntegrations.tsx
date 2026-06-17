@@ -392,7 +392,7 @@ const AccountIntegrations = () => {
         {(runtimeMessage || onboarding?.message) && (
           <div className="mb-6 rounded-2xl border border-[#d7d7d2] bg-white px-5 py-4 text-[#232323] dark:border-white/10 dark:bg-[#1b2027] dark:text-white">
             <div className="flex items-start gap-3">
-              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-[#4f46e5] dark:text-[#8b83ff]" />
+              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-[#16a34a] dark:text-[#86efac]" />
               <div className="space-y-1">
                 <p className="font-semibold">Current onboarding status</p>
                 <p className="text-sm text-[#5f5f5a] dark:text-gray-400">{runtimeMessage || onboarding?.message}</p>
@@ -449,7 +449,7 @@ const AccountIntegrations = () => {
                           {badge.label}
                         </span>
                         {capability?.is_available_for_onboarding && (
-                          <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#4338ca] dark:bg-[#4f46e5]/15 dark:text-[#b6b1ff]">
+                          <span className="rounded-full bg-[#ecfdf3] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#15803d] dark:bg-[#16a34a]/15 dark:text-[#86efac]">
                             Onboarding enabled
                           </span>
                         )}
@@ -493,7 +493,7 @@ const AccountIntegrations = () => {
                   <div className="flex flex-col items-stretch gap-3 sm:min-w-[240px]">
                     {canOpenConnect && (
                       <Button
-                        className="h-11 rounded-full bg-[#4f46e5] px-7 text-[1rem] font-semibold text-white hover:bg-[#4338ca] dark:shadow-[0_12px_24px_rgba(79,70,229,0.22)]"
+                        className="h-11 rounded-full bg-[#16a34a] px-7 text-[1rem] font-semibold text-white hover:bg-[#15803d] dark:shadow-[0_12px_24px_rgba(79,70,229,0.22)]"
                         onClick={() => connectMutation.mutate(item)}
                         disabled={connectMutation.isPending}
                       >
@@ -510,7 +510,7 @@ const AccountIntegrations = () => {
                       <Button
                         variant="outline"
                         disabled={!canRequestConnect || requestConnectMutation.isPending}
-                        className="h-11 rounded-full border-[#4f46e5] px-7 text-[1rem] font-semibold text-[#4f46e5] hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#8b83ff] dark:text-[#b6b1ff] dark:hover:bg-[#4f46e5]/10"
+                        className="h-11 rounded-full border-[#16a34a] px-7 text-[1rem] font-semibold text-[#16a34a] hover:bg-[#ecfdf3] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#86efac] dark:text-[#86efac] dark:hover:bg-[#16a34a]/10"
                         onClick={() => {
                           if (!canRequestConnect) {
                             return;
@@ -617,7 +617,7 @@ const AccountIntegrations = () => {
               Cancel
             </Button>
             <Button
-              className="rounded-full bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+              className="rounded-full bg-[#16a34a] text-white hover:bg-[#15803d]"
               disabled={!requestProvider || requestConnectMutation.isPending || !isProfileComplete}
               onClick={() => {
                 if (!requestProvider || !isProfileComplete) {

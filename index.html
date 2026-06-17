@@ -139,17 +139,30 @@
         clip: rect(0, 0, 0, 0) !important;
       }
 
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0 !important;
+      }
+
       body {
         position: relative;
+        top: 0 !important;
       }
 
       html.goog-translate body,
-      html.goog-translate {
+      html.goog-translate,
+      body.translated-ltr,
+      body.translated-rtl {
         margin-top: 0 !important;
+        top: 0 !important;
       }
 
       iframe[src*="translate.google"],
-      iframe.goog-te-balloon-frame {
+      iframe.goog-te-balloon-frame,
+      iframe.skiptranslate,
+      body > .skiptranslate {
         display: none !important;
       }
     </style>

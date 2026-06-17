@@ -212,10 +212,10 @@ const AccountFxOrders = () => {
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-[2.35rem] font-bold tracking-[-0.04em] text-[#111111] sm:text-[3.2rem] dark:text-white">
+            <h1 className="text-[2.35rem] font-bold tracking-[-0.04em] text-[#0f2442] sm:text-[3.2rem] dark:text-white">
               FX Orders
             </h1>
-            <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#6c6c68] dark:text-gray-400">
+            <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
               Submit a provider FX instruction for operations review. Orders stay pending until Origin Wallet confirms them.
             </p>
           </div>
@@ -223,7 +223,7 @@ const AccountFxOrders = () => {
             variant="outline"
             onClick={() => void refreshOrders()}
             disabled={ordersQuery.isFetching || ratesQuery.isFetching}
-            className="h-11 rounded-full border-[#d7d7d2] bg-white px-6 text-[1rem] font-semibold text-[#232323] hover:bg-[#f5f5f2] dark:border-white/10 dark:bg-[#1b2027] dark:text-white dark:hover:bg-white/10"
+            className="h-11 rounded-full border-[#d7d7d2] bg-white px-6 text-[1rem] font-semibold text-[#0f2442] hover:border-[#16a34a] hover:bg-[#ecfdf3] dark:border-white/10 dark:bg-[#1b2027] dark:text-white dark:hover:bg-white/10"
           >
             {ordersQuery.isFetching || ratesQuery.isFetching ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -254,8 +254,8 @@ const AccountFxOrders = () => {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-[#111111] dark:text-white">
-                <SendHorizonal className="h-5 w-5 text-green-600" />
+              <CardTitle className="flex items-center gap-2 text-xl text-[#0f2442] dark:text-white">
+                <SendHorizonal className="h-5 w-5 text-[#16a34a]" />
                 New FX order
               </CardTitle>
             </CardHeader>
@@ -264,7 +264,9 @@ const AccountFxOrders = () => {
                 <Label>Provider platform</Label>
                 <Select value={providerId} onValueChange={setProviderId}>
                   <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#11161d]">
-                    <SelectValue placeholder="Select provider" />
+                    <SelectValue placeholder="Select provider">
+                      {providerId ? selectedProvider?.name : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {providers.map((provider) => (
@@ -274,7 +276,7 @@ const AccountFxOrders = () => {
                             provider={provider}
                             className="h-6 w-6 rounded-md"
                             imageClassName="p-0.5"
-                            fallbackClassName="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                            fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                           />
                           <span>{provider.name}</span>
                         </div>
@@ -289,12 +291,14 @@ const AccountFxOrders = () => {
                   <Label>Source currency</Label>
                   <Select value={sourceCurrency} onValueChange={setSourceCurrency}>
                     <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#11161d]">
-                      <SelectValue />
+                      <SelectValue>
+                        <span translate="no">{sourceCurrency}</span>
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {currencyOptions.map((currency) => (
                         <SelectItem key={currency} value={currency}>
-                          {currency}
+                          <span translate="no">{currency}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -305,12 +309,14 @@ const AccountFxOrders = () => {
                   <Label>Target currency</Label>
                   <Select value={targetCurrency} onValueChange={setTargetCurrency}>
                     <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#11161d]">
-                      <SelectValue />
+                      <SelectValue>
+                        <span translate="no">{targetCurrency}</span>
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {currencyOptions.map((currency) => (
                         <SelectItem key={currency} value={currency}>
-                          {currency}
+                          <span translate="no">{currency}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -335,32 +341,32 @@ const AccountFxOrders = () => {
                 </div>
                 <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                   <div>
-                    <p className="text-[#6c6c68] dark:text-gray-400">Provider</p>
+                    <p className="text-[#62708a] dark:text-gray-400">Provider</p>
                     <div className="mt-1 flex items-center gap-2">
                       {selectedProvider ? (
                         <ProviderLogo
                           provider={selectedProvider}
                           className="h-7 w-7 rounded-lg"
                           imageClassName="p-0.5"
-                          fallbackClassName="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                          fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                       ) : null}
-                      <p className="font-semibold text-[#111111] dark:text-white">{selectedProvider?.name || "-"}</p>
+                      <p className="font-semibold text-[#0f2442] dark:text-white">{selectedProvider?.name || "-"}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-[#6c6c68] dark:text-gray-400">Quote status</p>
-                    <p className="font-semibold text-[#111111] dark:text-white">{selectedRate?.quote_status || "-"}</p>
+                    <p className="text-[#62708a] dark:text-gray-400">Quote status</p>
+                    <p className="font-semibold text-[#0f2442] dark:text-white">{selectedRate?.quote_status || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-[#6c6c68] dark:text-gray-400">Estimated receive</p>
-                    <p className="font-semibold text-[#111111] dark:text-white">
+                    <p className="text-[#62708a] dark:text-gray-400">Estimated receive</p>
+                    <p className="font-semibold text-[#0f2442] dark:text-white">
                       {formatAmount(quote?.target_amount, targetCurrency)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[#6c6c68] dark:text-gray-400">Rate / fee</p>
-                    <p className="font-semibold text-[#111111] dark:text-white">
+                    <p className="text-[#62708a] dark:text-gray-400">Rate / fee</p>
+                    <p className="font-semibold text-[#0f2442] dark:text-white">
                       {formatNumber(getRateValue(selectedRate))} / {formatAmount(quote?.fee_amount ?? 0, targetCurrency)}
                     </p>
                   </div>
@@ -384,7 +390,7 @@ const AccountFxOrders = () => {
               )}
 
               <Button
-                className="h-12 w-full rounded-full bg-green-600 text-[1rem] font-semibold text-white hover:bg-green-700"
+                className="h-12 w-full rounded-full bg-[#16a34a] text-[1rem] font-semibold text-white hover:bg-[#15803d]"
                 disabled={!canCreateOrder || createOrderMutation.isPending}
                 onClick={() => createOrderMutation.mutate()}
               >
@@ -410,7 +416,7 @@ const AccountFxOrders = () => {
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a7a74] dark:text-gray-500">
                       {item.label}
                     </div>
-                    <div className="mt-2 text-3xl font-semibold text-[#111111] dark:text-white">{item.value}</div>
+                    <div className="mt-2 text-3xl font-semibold text-[#0f2442] dark:text-white">{item.value}</div>
                   </CardContent>
                 </Card>
               ))}
@@ -418,8 +424,8 @@ const AccountFxOrders = () => {
 
             <Card className="overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl text-[#111111] dark:text-white">
-                  <ClipboardList className="h-5 w-5 text-green-600" />
+                <CardTitle className="flex items-center gap-2 text-xl text-[#0f2442] dark:text-white">
+                  <ClipboardList className="h-5 w-5 text-[#16a34a]" />
                   My FX orders
                 </CardTitle>
               </CardHeader>
@@ -474,7 +480,7 @@ const OrderRow = ({
         provider={order.provider}
         className="h-8 w-8 rounded-lg"
         imageClassName="p-0.5"
-        fallbackClassName="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+        fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
       />
       <div className="min-w-0">
         <p className="truncate font-semibold text-[#202020] dark:text-white">

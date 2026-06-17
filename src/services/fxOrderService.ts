@@ -7,8 +7,12 @@ export interface ProviderSummary {
   logo_url?: string | null;
   status: string;
   is_available_for_onboarding?: boolean;
+  supports_beneficiaries?: boolean;
+  supports_data_sync?: boolean;
   supports_quotes?: boolean;
   supports_transfers?: boolean;
+  supports_webhooks?: boolean;
+  is_configured?: boolean;
 }
 
 export interface FxOrder {

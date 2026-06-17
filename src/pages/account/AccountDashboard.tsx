@@ -2,6 +2,13 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { getKycProfile, type KycProfile } from "@/services/kycService";
+import {
+  getBalances,
+  getBankAccounts,
+  getBeneficiaries,
+  getTransactions,
+} from "@/services/moneyMovementService";
+import { formatAmount, formatDateTime, toNumber } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,15 +31,15 @@ const QUICK_ACTIONS = [
     icon: ArrowUpRight,
     label: "Send money",
     desc: "Send to a beneficiary",
-    href: "/account/transactions",
-    color: "bg-green-600",
+    href: "/account/transfers",
+    color: "bg-[#16a34a]",
   },
   {
     icon: ArrowDownLeft,
     label: "Receive money",
     desc: "Get your account details",
     href: "/account/virtual-accounts",
-    color: "bg-blue-600",
+    color: "bg-[#16a34a]",
   },
   {
     icon: Wallet,
@@ -122,6 +129,34 @@ const AccountDashboard = () => {
   const kycProfile = kycQuery.data?.kyc_profile ?? null;
   const kycStatus = kycProfile?.status ?? user?.kycStatus ?? "pending";
   const setupSteps = getKycSetupSteps(kycProfile, user?.status);
+  const balancesQuery = useQuery({
+    queryKey: ["money-balances", user?.id, token],
+    enabled: !!user?.id && !!token,
+    queryFn: async () => getBalances({ userId: user?.id as string, token: token as string }),
+  });
+  const accountsQuery = useQuery({
+    queryKey: ["money-bank-accounts", user?.id, token],
+    enabled: !!user?.id && !!token,
+    queryFn: async () => getBankAccounts({ userId: user?.id as string, token: token as string }),
+  });
+  const beneficiariesQuery = useQuery({
+    queryKey: ["money-beneficiaries", user?.id, token],
+    enabled: !!user?.id && !!token,
+    queryFn: async () => getBeneficiaries({ userId: user?.id as string, token: token as string }),
+  });
+  const transactionsQuery = useQuery({
+    queryKey: ["money-transactions", user?.id, token],
+    enabled: !!user?.id && !!token,
+    queryFn: async () => getTransactions({ userId: user?.id as string, token: token as string }),
+  });
+  const balances = balancesQuery.data ?? [];
+  const bankAccounts = accountsQuery.data ?? [];
+  const beneficiaries = beneficiariesQuery.data ?? [];
+  const transactions = transactionsQuery.data ?? [];
+  const totalVisibleBalance = balances.reduce((sum, balance) => sum + toNumber(balance.available_balance), 0);
+  const topBalances = balances.slice(0, 4);
+  const topVirtualAccounts = bankAccounts.slice(0, 3);
+  const recentActivity = transactions.slice(0, 5);
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
@@ -130,9 +165,13 @@ const AccountDashboard = () => {
           <div className="space-y-6 lg:col-span-2">
             <div>
               <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">{displayName}</h1>
-              <p className="text-4xl font-bold text-gray-900 dark:text-white">Waiting for live data</p>
+              <p className="text-4xl font-bold text-gray-900 dark:text-white">
+                {balances.length ? formatAmount(totalVisibleBalance, "mixed") : "Waiting for live data"}
+              </p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Your total balance will appear here once synced.
+                {balances.length
+                  ? `${balances.length} synced balance records across your provider accounts.`
+                  : "Your total balance will appear here once synced."}
               </p>
             </div>
 
@@ -146,13 +185,13 @@ const AccountDashboard = () => {
                     <Link
                       key={action.label}
                       to={action.href}
-                      className="group flex flex-col items-center gap-2 rounded-lg border border-gray-100 p-4 transition-all hover:border-green-200 hover:bg-green-50/30 dark:border-white/5 dark:hover:bg-white/5"
+                      className="group flex flex-col items-center gap-2 rounded-lg border border-gray-100 p-4 transition-all hover:border-[#bbf7d0] hover:bg-[#ecfdf3]/40 dark:border-white/5 dark:hover:bg-white/5"
                     >
                       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${action.color}`}>
                         <action.icon className="h-5 w-5 text-white" />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-green-700 dark:text-white dark:group-hover:text-green-400">
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-[#16a34a] dark:text-white dark:group-hover:text-[#86efac]">
                           {action.label}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{action.desc}</p>
@@ -166,22 +205,22 @@ const AccountDashboard = () => {
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-semibold dark:text-white">Top balances</CardTitle>
-                <Link to="/account/balances" className="text-sm font-medium text-green-600 hover:underline dark:text-green-400">
+                <Link to="/account/balances" className="text-sm font-medium text-[#16a34a] hover:underline dark:text-[#86efac]">
                   View all
                 </Link>
               </CardHeader>
               <CardContent>
-                {TOP_BALANCES.length > 0 ? (
+                {topBalances.length > 0 ? (
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    {TOP_BALANCES.map((balance) => (
+                    {topBalances.map((balance) => (
                       <div
-                        key={balance.code}
+                        key={balance.id}
                         className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-white/10 dark:bg-white/5"
                       >
-                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{balance.flag}</span>
+                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{balance.currency}</span>
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">
-                            {balance.code} {balance.amount}
+                            {formatAmount(balance.available_balance, balance.currency)}
                           </p>
                         </div>
                       </div>
@@ -198,24 +237,26 @@ const AccountDashboard = () => {
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-semibold dark:text-white">Your virtual accounts</CardTitle>
-                <Link to="/account/virtual-accounts" className="text-sm font-medium text-green-600 hover:underline dark:text-green-400">
+                <Link to="/account/virtual-accounts" className="text-sm font-medium text-[#16a34a] hover:underline dark:text-[#86efac]">
                   View all
                 </Link>
               </CardHeader>
               <CardContent className="pt-0">
-                {VIRTUAL_ACCOUNTS.length > 0 ? (
+                {topVirtualAccounts.length > 0 ? (
                   <div className="space-y-3">
-                    {VIRTUAL_ACCOUNTS.map((account) => (
+                    {topVirtualAccounts.map((account) => (
                       <div
-                        key={account.name}
+                        key={account.id}
                         className="flex items-center justify-between rounded-lg border border-gray-100 p-4 transition-colors hover:border-gray-200 dark:border-white/5 dark:hover:border-white/10"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{account.flag}</span>
+                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{account.currency}</span>
                           <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {account.account_name || account.external_account_id || "Provider account"}
+                            </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {account.country} - {account.currencies}
+                              {account.country_code || "Provider"} - {account.currency}
                             </p>
                           </div>
                         </div>
@@ -236,13 +277,17 @@ const AccountDashboard = () => {
                 <CardTitle className="text-base font-semibold dark:text-white">Recent activity</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                {RECENT_ACTIVITY.length > 0 ? (
+                {recentActivity.length > 0 ? (
                   <ul className="divide-y divide-gray-100 dark:divide-white/5">
-                    {RECENT_ACTIVITY.map((item, index) => (
-                      <li key={index} className="group flex cursor-pointer items-start justify-between gap-4 py-4">
+                    {recentActivity.map((item) => (
+                      <li key={item.id} className="group flex cursor-pointer items-start justify-between gap-4 py-4">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{item.date}</p>
-                          <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">{item.text}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {formatDateTime(item.booked_at || item.created_at)}
+                          </p>
+                          <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">
+                            {item.description || item.transaction_type} - {formatAmount(item.amount, item.currency)}
+                          </p>
                         </div>
                         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300" />
                       </li>
@@ -261,7 +306,7 @@ const AccountDashboard = () => {
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold dark:text-white">
-                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                  <ShieldCheck className="h-5 w-5 text-[#16a34a]" />
                   Account status
                 </CardTitle>
               </CardHeader>
@@ -291,14 +336,14 @@ const AccountDashboard = () => {
                   {setupSteps.map((step, index) => (
                     <li key={index} className="flex items-center gap-3">
                       {step.done ? (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-[#16a34a]" />
                       ) : (
                         <Circle className="h-5 w-5 shrink-0 text-gray-300 dark:text-gray-600" />
                       )}
                       {step.href && !step.disabled ? (
                         <Link
                           to={step.href}
-                          className="group flex flex-1 items-center gap-1 text-sm font-medium text-gray-900 hover:text-green-600 dark:text-white dark:hover:text-green-400"
+                          className="group flex flex-1 items-center gap-1 text-sm font-medium text-gray-900 hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]"
                         >
                           {step.label}
                           <ChevronRight className="h-4 w-4" />
@@ -319,7 +364,7 @@ const AccountDashboard = () => {
                 </ul>
                 <Button
                   asChild
-                  className="mt-5 w-full rounded-full bg-green-600 text-white hover:bg-green-700"
+                  className="mt-5 w-full rounded-full bg-[#16a34a] text-white hover:bg-[#15803d]"
                 >
                   <Link to="/account/kyc">
                     {kycProfile ? "Review KYC/KYB profile" : "Start KYC/KYB"}
@@ -330,16 +375,20 @@ const AccountDashboard = () => {
 
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
-                <CardTitle className="text-base font-semibold dark:text-white">No beneficiaries yet</CardTitle>
+                <CardTitle className="text-base font-semibold dark:text-white">
+                  {beneficiaries.length ? `${beneficiaries.length} beneficiaries` : "No beneficiaries yet"}
+                </CardTitle>
                 <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
-                  Add beneficiaries to send payments in more than 20 currencies to accounts worldwide.
+                  {beneficiaries.length
+                    ? "Manage recipient details before initiating provider transfers."
+                    : "Add beneficiaries to send payments in more than 20 currencies to accounts worldwide."}
                 </p>
               </CardHeader>
               <CardContent className="pt-0">
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full gap-2 border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700 dark:border-green-500/50 dark:text-green-400 dark:hover:bg-green-500/10 dark:hover:text-green-300"
+                  className="w-full gap-2 border-[#16a34a] text-[#16a34a] hover:bg-[#ecfdf3] hover:text-[#15803d] dark:border-[#16a34a]/60 dark:text-[#86efac] dark:hover:bg-[#16a34a]/10 dark:hover:text-[#bbf7d0]"
                 >
                   <Link to="/account/beneficiaries">
                     <Plus className="h-4 w-4" />

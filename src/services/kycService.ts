@@ -60,7 +60,9 @@ export interface KycRequirement {
   category: string;
   status: string;
   requirement_type: string;
+  review_note?: string | null;
   rejection_reason?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface KycProfile extends KycSubmissionPayload {

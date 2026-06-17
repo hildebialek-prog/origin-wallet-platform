@@ -23,7 +23,7 @@ export const ProviderLogo = ({
   provider,
   className = "h-12 w-12 rounded-2xl",
   imageClassName = "p-1.5",
-  fallbackClassName = "bg-[#4f46e5]/10 text-[#4f46e5] dark:bg-[#4f46e5]/15 dark:text-[#8b83ff]",
+  fallbackClassName = "bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/15 dark:text-[#86efac]",
 }: ProviderLogoProps) => {
   const [imageFailed, setImageFailed] = useState(false);
   const logoUrl = provider?.logo_url?.trim() || "";

@@ -151,7 +151,7 @@ const AccountProfile = () => {
                 <p className={`text-sm ${errorMessage ? "text-[#dc2626]" : "text-[#6c6c68]"}`}>
                   {errorMessage || savedMessage || ""}
                 </p>
-                <Button className="rounded-full bg-[#4f46e5] px-6 text-white hover:bg-[#4338ca]" disabled={isSaving}>
+                <Button className="rounded-full bg-[#16a34a] px-6 text-white hover:bg-[#15803d]" disabled={isSaving}>
                   <Save className="mr-2 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save profile"}
                 </Button>

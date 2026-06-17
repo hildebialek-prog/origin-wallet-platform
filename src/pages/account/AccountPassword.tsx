@@ -121,7 +121,7 @@ const AccountPassword = () => {
 
               <div className="flex items-center justify-between gap-4 border-t border-[#ecece8] pt-6">
                 <p className={`text-sm ${error ? "text-[#dc2626]" : "text-[#6c6c68]"}`}>{error || message || ""}</p>
-                <Button className="rounded-full bg-[#4f46e5] px-6 text-white hover:bg-[#4338ca]" disabled={isSaving}>
+                <Button className="rounded-full bg-[#16a34a] px-6 text-white hover:bg-[#15803d]" disabled={isSaving}>
                   <Save className="mr-2 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save password"}
                 </Button>
