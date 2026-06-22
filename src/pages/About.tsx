@@ -72,7 +72,7 @@ const About = () => {
             </p>
             <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">Built as a clearer financial operations layer</h1>
             <p className="text-primary-foreground/70 text-lg max-w-3xl mx-auto leading-relaxed">
-              Origin Wallet is being built as a multi-provider financial platform for managing
+              Origin Wallet is being built as a Nium-backed financial platform for managing
               cross-border payments, balances, onboarding workflows, and operational visibility
               through cleaner product flows and secure integrations.
             </p>
@@ -151,19 +151,19 @@ const About = () => {
               How It Works
             </p>
             <h2 className="text-3xl font-extrabold text-foreground sm:text-4xl">
-              One platform layer across multiple provider workflows
+              One platform layer across Nium-backed workflows
             </h2>
           </motion.div>
 
           <div className="grid gap-6 md:grid-cols-3">
             {[
               {
-                title: "Connect providers",
-                desc: "Bring provider onboarding and connection journeys into one clearer platform entry point.",
+                title: "Activate Nium",
+                desc: "Bring Nium onboarding and account setup journeys into one clearer platform entry point.",
               },
               {
                 title: "View balances and workflows",
-                desc: "See balances, status changes, and operational steps with better visibility across products and providers.",
+                desc: "See balances, status changes, and operational steps with better visibility across Nium-backed products.",
               },
               {
                 title: "Move money with more structure",
@@ -215,7 +215,7 @@ const About = () => {
               },
               {
                 title: "SaaS",
-                desc: "Integration-led products that need finance workflows, APIs, and clearer orchestration across providers.",
+                desc: "Integration-led products that need finance workflows, APIs, and clearer orchestration through Nium.",
               },
             ].map((segment) => (
               <div
@@ -352,7 +352,7 @@ const About = () => {
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-purple-600" />
-                    <span>Interface patterns for customer onboarding and provider connection flows</span>
+                    <span>Interface patterns for customer onboarding and Nium account setup flows</span>
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-purple-600" />
@@ -475,7 +475,7 @@ const About = () => {
             <div className="mx-auto max-w-4xl text-center">
               <div className="mb-6 flex justify-center">
                 <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-sm">
-                  <img src="/logo/knt-logo.svg" alt="KNT" className="h-12 w-auto" />
+                  <img src="/logo/logo.jpg" alt="Origin Wallet" className="h-12 w-12 rounded-2xl object-cover" />
                 </div>
               </div>
 
@@ -489,10 +489,9 @@ const About = () => {
                 Origin Wallet is a cross-border finance experience built by <span className="font-semibold text-white">KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</span>, focused on transparent product flows, operational clarity, and modern digital financial experiences.
               </p>
               <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-slate-400 md:text-base">
-                We are currently onboarding early users and expanding provider integrations to
-                support a stronger multi-provider financial operations platform over time,
-                including workflows designed around providers such as Airwallex, Wise, and
-                Currenxie where available.
+                We are currently onboarding early users and aligning platform operations to
+                Nium-backed financial workflows, including account setup, balances, beneficiaries,
+                FX quotes, transfers, and webhook-driven reconciliation.
               </p>
             </div>
 

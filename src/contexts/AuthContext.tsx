@@ -67,6 +67,7 @@ export interface ProviderCapability {
 
 export interface OnboardingState {
   profile_completed: boolean;
+  internal_kyc_verified?: boolean;
   selected_provider_code: string | null;
   selected_provider_account_status: string | null;
   provider_account_statuses: Record<string, unknown>;
@@ -234,6 +235,7 @@ const extractOnboarding = (source: unknown): OnboardingState | null => {
 
   return {
     profile_completed: Boolean(onboardingRecord.profile_completed),
+    internal_kyc_verified: Boolean(onboardingRecord.internal_kyc_verified),
     selected_provider_code: (onboardingRecord.selected_provider_code as string | null | undefined) ?? null,
     selected_provider_account_status:
       (onboardingRecord.selected_provider_account_status as string | null | undefined) ?? null,

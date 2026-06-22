@@ -60,6 +60,8 @@ export interface KycRequirement {
   category: string;
   status: string;
   requirement_type: string;
+  subject_type?: string | null;
+  subject_id?: number | null;
   review_note?: string | null;
   rejection_reason?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -183,6 +185,24 @@ export const submitKycProfile = (params: {
 }) =>
   requestApi<KycSubmissionResponse>(`/user/users/${params.userId}/kyc-profile`, {
     method: "PUT",
+    token: params.token,
+    body: params.payload as unknown as Record<string, unknown>,
+  });
+
+export const resubmitKycRequirement = (params: {
+  token: string;
+  userId: string | number;
+  requirementId: number;
+  payload: {
+    note?: string | null;
+    profile?: Partial<KycSubmissionPayload>;
+    related_person?: Partial<KycRelatedPersonPayload>;
+    document?: KycDocumentPayload;
+    metadata?: Record<string, unknown>;
+  };
+}) =>
+  requestApi<KycSubmissionResponse>(`/user/users/${params.userId}/kyc-profile/requirements/${params.requirementId}/resubmit`, {
+    method: "POST",
     token: params.token,
     body: params.payload as unknown as Record<string, unknown>,
   });

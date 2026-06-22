@@ -287,7 +287,7 @@ const Contact = () => {
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground">
                   Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, a
-                  technology company based in Ha Noi, Viet Nam, building provider-connected
+                  technology company based in Ha Noi, Viet Nam, building Nium-backed
                   financial workflows and cross-border product experiences.
                 </p>
               </div>

@@ -1,5 +1,6 @@
 import { requestApi } from "@/services/apiClient";
 import type { OnboardingState, ProviderCapability } from "@/contexts/AuthContext";
+import { filterPrimaryProviders, isPrimaryProvider } from "@/lib/primaryProvider";
 
 export interface IntegrationProvider {
   id: number;
@@ -36,6 +37,8 @@ export interface ProviderIntegrationItem {
   provider_account: ProviderAccount | null;
   integration_link: IntegrationLink | null;
   integration_request: IntegrationRequest | null;
+  internal_kyc_verified?: boolean;
+  provider_submission_approved?: boolean;
   link_available: boolean;
   can_connect: boolean;
   can_request_connect: boolean;
@@ -63,7 +66,7 @@ export const getProviderReference = async (params: { token: string }) => {
     token: params.token,
   });
 
-  return Array.isArray(payload?.data) ? payload.data : [];
+  return filterPrimaryProviders(Array.isArray(payload?.data) ? payload.data : []);
 };
 
 export const getProviderIntegrations = async (params: AuthenticatedParams) => {
@@ -71,7 +74,7 @@ export const getProviderIntegrations = async (params: AuthenticatedParams) => {
     token: params.token,
   });
 
-  return Array.isArray(payload?.data) ? payload.data : [];
+  return (Array.isArray(payload?.data) ? payload.data : []).filter((item) => isPrimaryProvider(item.provider));
 };
 
 export const linkProviderAccount = (params: AuthenticatedParams & { providerCode: string; force?: boolean }) =>

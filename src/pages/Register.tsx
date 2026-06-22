@@ -92,7 +92,7 @@ const Register = () => {
         <Card className="border border-slate-200 bg-white/95 shadow-2xl backdrop-blur">
           <CardHeader className="space-y-4 pb-3 text-center">
             <div className="flex justify-center">
-              <img src="/logo/knt-logo.svg" alt="Origin Wallet" className="h-16 w-auto" />
+              <img src="/logo/logo.jpg" alt="Origin Wallet" className="h-16 w-16 rounded-2xl object-cover" />
             </div>
             <div className="space-y-2">
               <CardTitle className="text-2xl font-bold text-slate-900">

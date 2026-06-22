@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getProviders, type ProviderSummary } from "@/services/fxOrderService";
 import { getBankAccounts } from "@/services/moneyMovementService";
 import { statusBadgeClassName } from "@/lib/money";
+import { normalizeStatus } from "@/lib/status";
+import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 const AccountVirtualAccounts = () => {
   const { user, token } = useAuth();
@@ -31,7 +33,7 @@ const AccountVirtualAccounts = () => {
     },
   });
 
-  const providers = providersQuery.data ?? [];
+  const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
   const accounts = accountsQuery.data ?? [];
   const providerById = useMemo(() => {
     const map = new Map<number, ProviderSummary>();
@@ -40,7 +42,7 @@ const AccountVirtualAccounts = () => {
   }, [providers]);
 
   const visibleAccounts = accounts.filter((account) => {
-    const normalized = String(account.status ?? "").toLowerCase();
+    const normalized = normalizeStatus(account.status);
     if (activeTab === "pending") {
       return !["active", "approved"].includes(normalized);
     }
@@ -57,7 +59,7 @@ const AccountVirtualAccounts = () => {
               Virtual accounts
             </h1>
             <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-              View provider-synced receiving account details and wallet account references.
+              View Nium receiving account details and wallet account references.
             </p>
           </div>
 
@@ -115,7 +117,7 @@ const AccountVirtualAccounts = () => {
             <div className="min-w-[920px]">
               <div className="grid grid-cols-[1.25fr_1fr_0.7fr_1.2fr_0.7fr_52px] border-b border-[#d7d7d2] px-5 py-4 text-sm font-semibold text-[#0f2442] dark:border-white/10 dark:text-gray-200">
                 <div>Alias</div>
-                <div>Provider</div>
+                <div>Infrastructure</div>
                 <div>Currency</div>
                 <div>Account details</div>
                 <div>Status</div>
@@ -132,7 +134,7 @@ const AccountVirtualAccounts = () => {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-[1.05rem] font-semibold text-[#0f2442] dark:text-white">
-                          {account.account_name || account.external_account_id || "Provider account"}
+                          {account.account_name || account.external_account_id || "Nium account"}
                         </p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
                           {account.account_type || "wallet"}
@@ -146,7 +148,7 @@ const AccountVirtualAccounts = () => {
                           fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
-                          {provider?.name || `Provider #${account.provider_id}`}
+                          {provider?.name || PRIMARY_PROVIDER_NAME}
                         </span>
                       </div>
                       <div>
@@ -159,7 +161,7 @@ const AccountVirtualAccounts = () => {
                           {account.iban || account.account_number || account.external_account_id || "-"}
                         </p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
-                          {account.bank_name || account.swift_bic || account.routing_number || account.country_code || "Provider account details"}
+                          {account.bank_name || account.swift_bic || account.routing_number || account.country_code || "Nium account details"}
                         </p>
                       </div>
                       <div>
@@ -177,7 +179,7 @@ const AccountVirtualAccounts = () => {
                       {accountsQuery.isLoading ? "Loading virtual accounts..." : "No virtual account data available"}
                     </p>
                     <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-                      Provider account details will appear here after onboarding or data sync is completed.
+                      Nium account details will appear here after onboarding or data sync is completed.
                     </p>
                     <Button asChild className="mt-5 rounded-full bg-[#16a34a] px-5 font-semibold text-white hover:bg-[#15803d]">
                       <Link to="/account/integrations">Manage integrations</Link>

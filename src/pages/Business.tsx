@@ -145,8 +145,8 @@ const Business = () => {
             {[
               {
                 step: "01",
-                title: "Connect providers",
-                desc: "Set up provider relationships and onboarding entry points from one business experience.",
+                title: "Activate Nium",
+                desc: "Set up Nium access and onboarding entry points from one business experience.",
               },
               {
                 step: "02",
@@ -202,7 +202,7 @@ const Business = () => {
               },
               {
                 title: "SaaS",
-                desc: "Platform experiences that need API integrations and provider-connected finance workflows.",
+                desc: "Platform experiences that need API integrations and Nium-backed finance workflows.",
               },
             ].map((segment) => (
               <div

@@ -9,6 +9,7 @@ import {
   getTransactions,
 } from "@/services/moneyMovementService";
 import { formatAmount, formatDateTime, toNumber } from "@/lib/money";
+import { formatStatusLabel, getSemanticStatus, isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -62,29 +63,23 @@ const RECENT_ACTIVITY: Array<{ date: string; text: string }> = [];
 const VIRTUAL_ACCOUNTS: Array<{ name: string; country: string; flag: string; currencies: string }> = [];
 
 const getStatusClassName = (status?: string | null) => {
-  const normalized = String(status ?? "").toLowerCase();
-
-  if (["verified", "approved", "active"].includes(normalized)) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
+  switch (getSemanticStatus(status)) {
+    case "success":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
+    case "danger":
+      return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300";
+    case "warning":
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
+    default:
+      return "border-gray-200 bg-gray-50 text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300";
   }
-
-  if (["rejected", "failed", "suspended"].includes(normalized)) {
-    return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300";
-  }
-
-  if (["pending", "submitted", "under_review", "needs_more_info"].includes(normalized)) {
-    return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
-  }
-
-  return "border-gray-200 bg-gray-50 text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300";
 };
 
-const formatStatus = (status?: string | null) => (status ? status.replace(/_/g, " ") : "not started");
-
 const getKycSetupSteps = (profile: KycProfile | null, accountStatus?: string | null) => {
-  const profileStatus = profile?.status?.toLowerCase() ?? "";
+  const profileStatus = normalizeStatus(profile?.status);
+  const profileVerified = isVerifiedKycStatus(profileStatus);
   const documentsSubmitted = (profile?.documents?.length ?? 0) > 0;
-  const reviewDone = ["verified", "rejected"].includes(profileStatus);
+  const reviewDone = profileVerified || profileStatus === "rejected";
 
   return [
     { done: Boolean(accountStatus), label: "Account created" },
@@ -102,7 +97,7 @@ const getKycSetupSteps = (profile: KycProfile | null, accountStatus?: string | n
     {
       done: reviewDone,
       label:
-        profileStatus === "verified"
+        profileVerified
           ? "Internal review approved"
           : profileStatus === "rejected"
             ? "Review needs attention"
@@ -110,10 +105,10 @@ const getKycSetupSteps = (profile: KycProfile | null, accountStatus?: string | n
       href: "/account/kyc",
     },
     {
-      done: profileStatus === "verified",
-      label: "Provider onboarding",
+      done: profileVerified,
+      label: "Nium onboarding",
       href: "/account/integrations",
-      disabled: profileStatus !== "verified",
+      disabled: !profileVerified,
     },
   ];
 };
@@ -170,7 +165,7 @@ const AccountDashboard = () => {
               </p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {balances.length
-                  ? `${balances.length} synced balance records across your provider accounts.`
+                  ? `${balances.length} synced balance records across your Nium accounts.`
                   : "Your total balance will appear here once synced."}
               </p>
             </div>
@@ -253,10 +248,10 @@ const AccountDashboard = () => {
                           <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{account.currency}</span>
                           <div>
                             <p className="font-semibold text-gray-900 dark:text-white">
-                              {account.account_name || account.external_account_id || "Provider account"}
+                              {account.account_name || account.external_account_id || "Nium account"}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {account.country_code || "Provider"} - {account.currency}
+                              {account.country_code || "Nium"} - {account.currency}
                             </p>
                           </div>
                         </div>
@@ -311,11 +306,11 @@ const AccountDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
-                <StatusRow label="Account" value={formatStatus(user?.status || "pending")} status={user?.status || "pending"} />
-                <StatusRow label="KYC/KYB" value={formatStatus(kycStatus)} status={kycStatus} />
+                <StatusRow label="Account" value={formatStatusLabel(user?.status || "pending")} status={user?.status || "pending"} />
+                <StatusRow label="KYC/KYB" value={formatStatusLabel(kycStatus)} status={kycStatus} />
                 <StatusRow
-                  label="Provider"
-                  value={formatStatus(onboarding?.selected_provider_account_status || "not_started")}
+                  label="Nium"
+                  value={formatStatusLabel(onboarding?.selected_provider_account_status || "not_started")}
                   status={onboarding?.selected_provider_account_status || "not_started"}
                 />
                 {kycQuery.isLoading ? (
@@ -380,7 +375,7 @@ const AccountDashboard = () => {
                 </CardTitle>
                 <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
                   {beneficiaries.length
-                    ? "Manage recipient details before initiating provider transfers."
+                    ? "Manage recipient details before initiating Nium transfers."
                     : "Add beneficiaries to send payments in more than 20 currencies to accounts worldwide."}
                 </p>
               </CardHeader>

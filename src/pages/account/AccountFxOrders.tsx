@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
+import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 
 const currencyOptions = ["USD", "EUR", "GBP", "AUD", "CAD", "CHF", "JPY", "KRW", "NZD", "SGD", "THB", "VND"];
 
@@ -65,7 +67,7 @@ const formatDate = (value?: string | null) => {
 };
 
 const statusClassName = (status?: string | null) => {
-  const normalized = String(status ?? "").toLowerCase();
+  const normalized = normalizeStatus(status);
 
   if (normalized === "confirmed") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
@@ -83,7 +85,7 @@ const statusClassName = (status?: string | null) => {
 };
 
 const getOrderIcon = (status: string) => {
-  const normalized = status.toLowerCase();
+  const normalized = normalizeStatus(status);
 
   if (normalized === "confirmed") return CheckCircle2;
   if (normalized === "rejected") return AlertCircle;
@@ -131,7 +133,7 @@ const AccountFxOrders = () => {
       }),
   });
 
-  const providers = providersQuery.data ?? [];
+  const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
   const orders = ordersQuery.data ?? [];
   const selectedProvider = providers.find((provider) => String(provider.id) === providerId) ?? null;
   const selectedRate = useMemo(
@@ -139,10 +141,18 @@ const AccountFxOrders = () => {
     [providerId, ratesQuery.data?.data],
   );
   const quote = selectedRate?.quote ?? null;
-  const verifiedForOrders = ["verified", "approved"].includes(String(user?.kycStatus ?? "").toLowerCase());
+  const verifiedForOrders = isVerifiedKycStatus(user?.kycStatus);
   const canCreateOrder = Boolean(
     user?.id && token && providerId && numericAmount > 0 && sourceCurrency !== targetCurrency && verifiedForOrders,
   );
+
+  useEffect(() => {
+    if (!providers.length) return;
+
+    if (!providerId || !providers.some((provider) => String(provider.id) === providerId)) {
+      setProviderId(String(providers[0].id));
+    }
+  }, [providerId, providers]);
 
   const refreshOrders = async () => {
     await Promise.all([
@@ -160,7 +170,7 @@ const AccountFxOrders = () => {
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       if (!canCreateOrder || !selectedProvider) {
-        throw new Error("Select a provider, currency pair, and valid source amount first.");
+        throw new Error("Nium FX rail, currency pair, and valid source amount are required first.");
       }
 
       return createFxOrder({
@@ -216,7 +226,7 @@ const AccountFxOrders = () => {
               FX Orders
             </h1>
             <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-              Submit a provider FX instruction for operations review. Orders stay pending until Origin Wallet confirms them.
+              Submit a Nium FX instruction for operations review. Orders stay pending until Origin Wallet confirms them.
             </p>
           </div>
           <Button
@@ -261,29 +271,20 @@ const AccountFxOrders = () => {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <Label>Provider platform</Label>
-                <Select value={providerId} onValueChange={setProviderId}>
-                  <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#11161d]">
-                    <SelectValue placeholder="Select provider">
-                      {providerId ? selectedProvider?.name : undefined}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providers.map((provider) => (
-                      <SelectItem key={provider.id} value={String(provider.id)}>
-                        <div className="flex items-center gap-2">
-                          <ProviderLogo
-                            provider={provider}
-                            className="h-6 w-6 rounded-md"
-                            imageClassName="p-0.5"
-                            fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
-                          />
-                          <span>{provider.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Infrastructure rail</Label>
+                <div className="flex h-12 items-center gap-2 rounded-xl border border-[#d7d7d2] bg-white px-4 dark:border-white/10 dark:bg-[#11161d]">
+                  {selectedProvider ? (
+                    <ProviderLogo
+                      provider={selectedProvider}
+                      className="h-7 w-7 rounded-lg"
+                      imageClassName="p-0.5"
+                      fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
+                    />
+                  ) : null}
+                  <span className="font-semibold text-[#0f2442] dark:text-white">
+                    {selectedProvider?.name ?? PRIMARY_PROVIDER_NAME}
+                  </span>
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -341,7 +342,7 @@ const AccountFxOrders = () => {
                 </div>
                 <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                   <div>
-                    <p className="text-[#62708a] dark:text-gray-400">Provider</p>
+                    <p className="text-[#62708a] dark:text-gray-400">Infrastructure</p>
                     <div className="mt-1 flex items-center gap-2">
                       {selectedProvider ? (
                         <ProviderLogo
@@ -446,7 +447,7 @@ const AccountFxOrders = () => {
                       {ordersQuery.isLoading ? "Loading FX orders..." : "No FX orders yet"}
                     </p>
                     <p className="mt-2 text-sm text-[#6b6b6b] dark:text-gray-400">
-                      Submitted provider instructions will appear here while they wait for admin confirmation.
+                      Submitted Nium instructions will appear here while they wait for admin confirmation.
                     </p>
                   </div>
                 )}
@@ -484,10 +485,10 @@ const OrderRow = ({
       />
       <div className="min-w-0">
         <p className="truncate font-semibold text-[#202020] dark:text-white">
-          {order.provider?.name || `Provider #${order.provider_id}`}
+          {order.provider?.name || PRIMARY_PROVIDER_NAME}
         </p>
         <p className="mt-1 truncate text-xs text-[#6b6b6b] dark:text-gray-400">
-          {order.provider?.code || "Provider platform"}
+          {order.provider?.code || "Nium platform"}
         </p>
       </div>
     </div>

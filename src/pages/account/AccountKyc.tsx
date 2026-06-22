@@ -6,6 +6,7 @@ import { ApiRequestError } from "@/services/apiClient";
 import {
   completeIdentityVerificationSession,
   getKycProfile,
+  resubmitKycRequirement,
   startIdentityVerificationSession,
   submitKycProfile,
   uploadKycDocument,
@@ -17,6 +18,7 @@ import {
   type KycDocumentPayload,
   type KycDocumentSubjectType,
   type KycProfile,
+  type KycRequirement,
   type KycSubmissionPayload,
 } from "@/services/kycService";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  formatStatusLabel,
+  getSemanticStatus,
+  isLockedKycStatus,
+  isOpenKycRequirementStatus,
+  isVerifiedKycStatus,
+} from "@/lib/status";
 
 type ApplicantType = "individual" | "business";
 type IdentityDocumentType = "national_id" | "passport" | "driver_license" | "identity_document";
@@ -240,7 +249,6 @@ type KycDraft = {
 const stepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
 const kycDraftVersion = 1;
 const kycDraftKey = (userId: string | number) => `origin-wallet-kyc-draft:${userId}`;
-const lockedKycStatuses = new Set(["approved", "verified", "submitted", "under_review"]);
 const todayInputValue = new Date().toISOString().slice(0, 10);
 const tomorrowInputValue = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 
@@ -464,21 +472,16 @@ const normalizePersonDraftForm = (form?: Partial<PersonForm>): PersonForm => {
 };
 
 const statusTone = (status?: string | null) => {
-  const normalized = String(status ?? "").toLowerCase();
-
-  if (["verified", "approved", "active"].includes(normalized)) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  switch (getSemanticStatus(status)) {
+    case "success":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "danger":
+      return "border-red-200 bg-red-50 text-red-700";
+    case "warning":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
   }
-
-  if (["rejected", "failed"].includes(normalized)) {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  if (["pending", "submitted", "under_review", "needs_more_info"].includes(normalized)) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600";
 };
 
 const formatDate = (value?: string | null) => {
@@ -488,6 +491,27 @@ const formatDate = (value?: string | null) => {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+};
+
+const metadataString = (metadata: Record<string, unknown> | null | undefined, key: string) => {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : "";
+};
+
+const isDocumentRequirement = (requirement: KycRequirement) =>
+  requirement.requirement_type === "document" ||
+  requirement.subject_type === "document" ||
+  requirement.category.includes("document");
+
+const requirementDocumentType = (requirement: KycRequirement) => {
+  const explicitType = metadataString(requirement.metadata, "document_type");
+  if (explicitType) return explicitType;
+
+  return requirement.key
+    .replace(/^document_\d+_?/, "")
+    .replace(/^related_person_document_\d+_?/, "")
+    .replace(/[^a-zA-Z0-9_:-]/g, "")
+    || "document";
 };
 
 const normalizeCountryCode = (value?: string | null) => {
@@ -537,6 +561,10 @@ const AccountKyc = () => {
   const [draftReady, setDraftReady] = useState(false);
   const [message, setMessage] = useState("");
   const [formError, setFormError] = useState("");
+  const [requirementFiles, setRequirementFiles] = useState<Record<number, File | null>>({});
+  const [requirementNotes, setRequirementNotes] = useState<Record<number, string>>({});
+  const [resubmittingRequirementId, setResubmittingRequirementId] = useState<number | null>(null);
+  const [editingRequestedInfo, setEditingRequestedInfo] = useState(false);
   const draftHydratedRef = useRef(false);
   const draftStorageKey = useMemo(() => (user?.id ? kycDraftKey(user.id) : ""), [user?.id]);
 
@@ -720,7 +748,7 @@ const AccountKyc = () => {
   useEffect(() => {
     if (!draftReady || !draftStorageKey || kycQuery.isLoading) return;
 
-    if (isLockedKycStatus(profile?.status ?? user?.kycStatus)) {
+    if (isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo) {
       localStorage.removeItem(draftStorageKey);
       return;
     }
@@ -749,6 +777,7 @@ const AccountKyc = () => {
     captureSessions,
     draftReady,
     draftStorageKey,
+    editingRequestedInfo,
     kycQuery.isLoading,
     profile?.status,
     profileForm,
@@ -760,12 +789,16 @@ const AccountKyc = () => {
   ]);
 
   const openRequirements = useMemo(
-    () =>
-      profile?.requirements?.filter((requirement) =>
-        ["required", "needs_more_info", "rejected"].includes(requirement.status),
-      ) ?? [],
+    () => profile?.requirements?.filter((requirement) => isOpenKycRequirementStatus(requirement.status)) ?? [],
     [profile?.requirements],
   );
+  const profileStatus = profile?.status ?? null;
+
+  useEffect(() => {
+    if (!profileStatus || profileStatus !== "needs_more_info" || openRequirements.length === 0) {
+      setEditingRequestedInfo(false);
+    }
+  }, [openRequirements.length, profile?.id, profileStatus]);
 
   const updateProfile = (field: keyof ProfileForm, value: string) => {
     setProfileForm((current) => ({ ...current, [field]: value }));
@@ -1146,40 +1179,14 @@ const AccountKyc = () => {
     setStep((currentStep) => Math.max(currentStep - 1, 0));
   };
 
-  const submitMutation = useMutation({
-    mutationFn: async (payload: KycSubmissionPayload) =>
-      submitKycProfile({
-        userId: user?.id as string,
-        token: token as string,
-        payload,
-      }),
-    onSuccess: async (response) => {
-      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
-      draftHydratedRef.current = false;
-      setMessage(response.message || "KYC/KYB profile submitted and is pending review.");
-      setFormError("");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["kyc-profile", user?.id, token] }),
-        refreshSession(),
-      ]);
-    },
-    onError: (error) => {
-      setFormError(error instanceof Error ? error.message : "Unable to submit KYC/KYB profile.");
-    },
-  });
-
-  const handleSubmit = () => {
-    if (!validateCurrentStep()) {
-      setFormError("Complete the face check and consent before submitting.");
-      return;
-    }
-
+  const buildCurrentKycPayload = (): KycSubmissionPayload => {
     const documents =
       applicantType === "business"
         ? buildBusinessDocuments(businessForm, profileForm.countryCode, documentEvidence("business"))
         : buildPersonDocuments(profileForm, "applicant", documentEvidence("applicant"));
     const ownership = Number(beneficialOwnerForm.ownershipPercentage);
-    const payload: KycSubmissionPayload = {
+
+    return {
       applicant_type: applicantType,
       legal_name: profileForm.legalName.trim(),
       date_of_birth: applicantType === "individual" ? normalizeDateValue(profileForm.dateOfBirth) : null,
@@ -1273,11 +1280,159 @@ const AccountKyc = () => {
         ),
       },
     };
-
-    submitMutation.mutate(payload);
   };
 
-  const lockedProfile = profile && isLockedKycStatus(profile.status) ? profile : null;
+  const buildProfileResubmissionPayload = () => {
+    const { documents: _documents, related_persons: _relatedPersons, ...profilePayload } = buildCurrentKycPayload();
+
+    return profilePayload;
+  };
+
+  const buildRelatedPersonResubmissionPayload = (requirement: KycRequirement) => {
+    if (requirement.subject_type !== "related_person") return undefined;
+
+    const relationshipType = metadataString(requirement.metadata, "relationship_type");
+    const isBeneficialOwner = relationshipType.includes("beneficial") || relationshipType.includes("ubo");
+    const form = isBeneficialOwner ? beneficialOwnerForm : representativeForm;
+    const ownership = Number(beneficialOwnerForm.ownershipPercentage);
+
+    return {
+      relationship_type: relationshipType || (isBeneficialOwner ? "beneficial_owner" : "authorized_representative"),
+      legal_name: form.legalName.trim(),
+      date_of_birth: normalizeDateValue(form.dateOfBirth),
+      nationality_country_code: normalizeCountryCode(form.nationality),
+      residence_country_code: normalizeCountryCode(form.residence),
+      ownership_percentage: isBeneficialOwner && Number.isFinite(ownership) ? ownership : null,
+      address_line1: form.addressLine1.trim(),
+      city: form.city.trim(),
+      state: form.state.trim() || null,
+      postal_code: form.postalCode.trim() || null,
+      country_code: normalizeCountryCode(form.countryCode),
+      metadata: { role: relationshipType || (isBeneficialOwner ? "beneficial_owner" : "authorized_representative") },
+    };
+  };
+
+  const submitMutation = useMutation({
+    mutationFn: async (payload: KycSubmissionPayload) =>
+      submitKycProfile({
+        userId: user?.id as string,
+        token: token as string,
+        payload,
+      }),
+    onSuccess: async (response) => {
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
+      draftHydratedRef.current = false;
+      setMessage(response.message || "KYC/KYB profile submitted and is pending review.");
+      setFormError("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["kyc-profile", user?.id, token] }),
+        refreshSession(),
+      ]);
+    },
+    onError: (error) => {
+      setFormError(error instanceof Error ? error.message : "Unable to submit KYC/KYB profile.");
+    },
+  });
+
+  const requirementResubmitMutation = useMutation({
+    mutationFn: async ({
+      requirement,
+      file,
+      note,
+    }: {
+      requirement: KycRequirement;
+      file?: File | null;
+      note?: string;
+    }) => {
+      if (!user?.id || !token) {
+        throw new Error("Please sign in before resubmitting KYC/KYB information.");
+      }
+
+      let document: KycDocumentPayload | undefined;
+
+      if (isDocumentRequirement(requirement)) {
+        if (!file) {
+          throw new Error("Choose a replacement document before submitting this requirement.");
+        }
+
+        const uploadResponse = await uploadKycDocument({
+          file,
+          metadata: {
+            resubmission_requirement_id: requirement.id,
+            resubmission_requirement_key: requirement.key,
+            document_type: requirementDocumentType(requirement),
+          },
+          subjectType: "applicant",
+          token,
+          type: requirementDocumentType(requirement),
+          userId: user.id,
+        });
+
+        document = uploadResponse.document;
+      }
+
+      return resubmitKycRequirement({
+        requirementId: requirement.id,
+        token,
+        userId: user.id,
+        payload: {
+          document,
+          metadata: {
+            source: "origin_wallet_platform",
+            requirement_key: requirement.key,
+          },
+          note: note?.trim() || null,
+          profile: isDocumentRequirement(requirement) ? undefined : buildProfileResubmissionPayload(),
+          related_person: buildRelatedPersonResubmissionPayload(requirement),
+        },
+      });
+    },
+    onSuccess: async (response, variables) => {
+      setMessage(response.message || "KYC/KYB requirement resubmitted.");
+      setFormError("");
+      setRequirementFiles((current) => ({ ...current, [variables.requirement.id]: null }));
+      setRequirementNotes((current) => ({ ...current, [variables.requirement.id]: "" }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["kyc-profile", user?.id, token] }),
+        refreshSession(),
+      ]);
+    },
+    onError: (error) => {
+      setFormError(error instanceof Error ? error.message : "Unable to resubmit this KYC/KYB requirement.");
+    },
+    onSettled: () => {
+      setResubmittingRequirementId(null);
+    },
+  });
+
+  const handleRequirementResubmit = (requirement: KycRequirement) => {
+    setFormError("");
+    setResubmittingRequirementId(requirement.id);
+    requirementResubmitMutation.mutate({
+      file: requirementFiles[requirement.id] ?? null,
+      note: requirementNotes[requirement.id] ?? "",
+      requirement,
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!validateCurrentStep()) {
+      setFormError("Complete the face check and consent before submitting.");
+      return;
+    }
+
+    submitMutation.mutate(buildCurrentKycPayload());
+  };
+
+  const isKycReadOnly = isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo;
+  const lockedProfile = profile && isKycReadOnly ? profile : null;
+  const lockedStatusOnly = isKycReadOnly && !lockedProfile;
+
+  const startRequestedInfoEdit = () => {
+    setEditingRequestedInfo(true);
+    setStep(1);
+    setFormError("");
+  };
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] p-6 dark:bg-[#161a20]">
@@ -1293,7 +1448,7 @@ const AccountKyc = () => {
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
-            <StepIndicator currentStep={step} labels={stepLabels} />
+            {!isKycReadOnly ? <StepIndicator currentStep={step} labels={stepLabels} /> : null}
 
             {kycQuery.isLoading ? (
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
@@ -1316,10 +1471,27 @@ const AccountKyc = () => {
             ) : null}
 
             {lockedProfile ? (
-              <LockedKycSummary profile={lockedProfile} />
+              <LockedKycSummary
+                canSubmitInfoUpdate={false}
+                isPending={requirementResubmitMutation.isPending}
+                onEditRequestedInfo={startRequestedInfoEdit}
+                onFileChange={(requirement, file) =>
+                  setRequirementFiles((current) => ({ ...current, [requirement.id]: file }))
+                }
+                onNoteChange={(requirement, note) =>
+                  setRequirementNotes((current) => ({ ...current, [requirement.id]: note }))
+                }
+                onResubmit={handleRequirementResubmit}
+                profile={lockedProfile}
+                requirementFiles={requirementFiles}
+                requirementNotes={requirementNotes}
+                resubmittingRequirementId={resubmittingRequirementId}
+              />
             ) : null}
 
-            {!lockedProfile && step === 0 ? (
+            {lockedStatusOnly ? <LockedKycStatusOnlySummary status={profile?.status ?? user?.kycStatus} /> : null}
+
+            {!isKycReadOnly && step === 0 ? (
               <section className="space-y-4">
                 <SectionTitle title="Choose profile type" />
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1342,7 +1514,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {!lockedProfile && step === 1 ? (
+            {!isKycReadOnly && step === 1 ? (
               <section className="space-y-5">
                 <SectionTitle title={applicantType === "business" ? "Business and people details" : "Personal details"} />
                 <Field label="Legal name" value={profileForm.legalName} onChange={(value) => updateProfile("legalName", value)} />
@@ -1415,7 +1587,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {!lockedProfile && step === 2 ? (
+            {!isKycReadOnly && step === 2 ? (
               <section className="space-y-5">
                 <SectionTitle title="Address and risk data" />
                 <AddressFields
@@ -1453,7 +1625,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {!lockedProfile && step === 3 ? (
+            {!isKycReadOnly && step === 3 ? (
               <section className="space-y-5">
                 <SectionTitle title="Documents" />
                 {applicantType === "individual" ? (
@@ -1593,7 +1765,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {!lockedProfile && step === 4 ? (
+            {!isKycReadOnly && step === 4 ? (
               <section className="space-y-5">
                 <SectionTitle title="Face check and consent" />
                 {applicantType === "individual" ? (
@@ -1640,7 +1812,7 @@ const AccountKyc = () => {
                 <label className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-sm text-gray-700">
                   <Checkbox checked={verificationConsent} onCheckedChange={(checked) => setVerificationConsent(checked === true)} />
                   <span>
-                    I confirm the information is accurate and consent to identity, document, face, AML, and provider
+                    I confirm the information is accurate and consent to identity, document, face, AML, and Nium
                     onboarding checks.
                   </span>
                 </label>
@@ -1648,7 +1820,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {!lockedProfile && step === 5 ? (
+            {!isKycReadOnly && step === 5 ? (
               <section className="space-y-4">
                 <SectionTitle title="Review and submit" />
                 <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-white/10 dark:bg-white/5">
@@ -1715,19 +1887,22 @@ const AccountKyc = () => {
             </CardHeader>
             <CardContent>
               {openRequirements.length ? (
-                <ul className="space-y-3 text-sm">
-                  {openRequirements.map((requirement) => (
-                    <li key={requirement.key} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
-                      <div className="font-medium">{requirement.label}</div>
-                      <div className="text-xs">{requirement.status.replace(/_/g, " ")}</div>
-                      {requirement.rejection_reason || requirement.review_note ? (
-                        <div className="mt-2 text-xs leading-5">
-                          {requirement.rejection_reason || requirement.review_note}
-                        </div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                <RequirementActionList
+                  canSubmitInfoUpdate={!isKycReadOnly}
+                  isPending={requirementResubmitMutation.isPending}
+                  onEditRequestedInfo={startRequestedInfoEdit}
+                  onFileChange={(requirement, file) =>
+                    setRequirementFiles((current) => ({ ...current, [requirement.id]: file }))
+                  }
+                  onNoteChange={(requirement, note) =>
+                    setRequirementNotes((current) => ({ ...current, [requirement.id]: note }))
+                  }
+                  onResubmit={handleRequirementResubmit}
+                  requirements={openRequirements}
+                  requirementFiles={requirementFiles}
+                  requirementNotes={requirementNotes}
+                  resubmittingRequirementId={resubmittingRequirementId}
+                />
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   No open requirements yet. Submit your profile to start review.
@@ -1741,9 +1916,158 @@ const AccountKyc = () => {
   );
 };
 
-const isLockedKycStatus = (status?: string | null) => lockedKycStatuses.has(String(status ?? "").toLowerCase());
+const LockedKycStatusOnlySummary = ({ status }: { status?: string | null }) => (
+  <section className="space-y-5">
+    <div className={`rounded-2xl border p-5 ${statusTone(status)}`}>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em]">Review status</div>
+          <h3 className="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">
+            KYC/KYB profile submitted
+          </h3>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+            Your profile is waiting for operations review. The submitted information is locked unless a reviewer asks
+            for an update.
+          </p>
+        </div>
+        <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold capitalize shadow-sm dark:bg-white/10">
+          {formatStatusLabel(status, "submitted")}
+        </div>
+      </div>
+    </div>
+  </section>
+);
 
-const LockedKycSummary = ({ profile }: { profile: KycProfile }) => {
+type RequirementActionListProps = {
+  canSubmitInfoUpdate: boolean;
+  isPending: boolean;
+  onEditRequestedInfo?: () => void;
+  onFileChange: (requirement: KycRequirement, file: File | null) => void;
+  onNoteChange: (requirement: KycRequirement, note: string) => void;
+  onResubmit: (requirement: KycRequirement) => void;
+  requirements: KycRequirement[];
+  requirementFiles: Record<number, File | null>;
+  requirementNotes: Record<number, string>;
+  resubmittingRequirementId: number | null;
+};
+
+const RequirementActionList = ({
+  canSubmitInfoUpdate,
+  isPending,
+  onEditRequestedInfo,
+  onFileChange,
+  onNoteChange,
+  onResubmit,
+  requirements,
+  requirementFiles,
+  requirementNotes,
+  resubmittingRequirementId,
+}: RequirementActionListProps) => (
+  <ul className="space-y-3 text-sm">
+    {requirements.map((requirement) => {
+      const documentRequired = isDocumentRequirement(requirement);
+      const reason =
+        requirement.rejection_reason ||
+        requirement.review_note ||
+        metadataString(requirement.metadata, "reason") ||
+        metadataString(requirement.metadata, "review_note");
+      const submittingThisRequirement = isPending && resubmittingRequirementId === requirement.id;
+
+      return (
+        <li key={`${requirement.id}-${requirement.key}`} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-medium">{requirement.label}</div>
+              <div className="text-xs capitalize">{String(requirement.status).replace(/_/g, " ")}</div>
+            </div>
+            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold capitalize text-amber-800">
+              {documentRequired ? "Document" : "Information"}
+            </span>
+          </div>
+          {reason ? <div className="mt-2 text-xs leading-5">{reason}</div> : null}
+
+          <div className="mt-3 space-y-2">
+            {documentRequired ? (
+              <>
+                <Input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.webm,image/*,application/pdf,video/*"
+                  className="border-amber-200 bg-white text-slate-950 file:mr-3 file:rounded-full file:border-0 file:bg-amber-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-amber-900"
+                  onChange={(event) => onFileChange(requirement, event.target.files?.[0] ?? null)}
+                />
+                <textarea
+                  value={requirementNotes[requirement.id] ?? ""}
+                  onChange={(event) => onNoteChange(requirement, event.target.value)}
+                  placeholder="Optional note for the reviewer"
+                  className="min-h-20 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-green-600"
+                />
+                <Button
+                  type="button"
+                  className="w-full rounded-full bg-green-600 text-white hover:bg-green-700"
+                  disabled={isPending || !requirementFiles[requirement.id]}
+                  onClick={() => onResubmit(requirement)}
+                >
+                  {submittingThisRequirement ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Submit replacement document
+                </Button>
+              </>
+            ) : canSubmitInfoUpdate ? (
+              <>
+                <div className="rounded-lg bg-white/70 p-2 text-xs leading-5">
+                  Update the requested fields in the form, then submit this item for review.
+                </div>
+                <textarea
+                  value={requirementNotes[requirement.id] ?? ""}
+                  onChange={(event) => onNoteChange(requirement, event.target.value)}
+                  placeholder="Optional note for the reviewer"
+                  className="min-h-20 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-green-600"
+                />
+                <Button
+                  type="button"
+                  className="w-full rounded-full bg-green-600 text-white hover:bg-green-700"
+                  disabled={isPending}
+                  onClick={() => onResubmit(requirement)}
+                >
+                  {submittingThisRequirement ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Submit this update
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg bg-white/70 p-2 text-xs leading-5">
+                  Open the requested information form, correct the data, then submit this item.
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-full border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                  onClick={onEditRequestedInfo}
+                >
+                  Edit requested information
+                </Button>
+              </>
+            )}
+          </div>
+        </li>
+      );
+    })}
+  </ul>
+);
+
+type LockedKycSummaryProps = Omit<RequirementActionListProps, "requirements"> & { profile: KycProfile };
+
+const LockedKycSummary = ({
+  canSubmitInfoUpdate,
+  isPending,
+  onEditRequestedInfo,
+  onFileChange,
+  onNoteChange,
+  onResubmit,
+  profile,
+  requirementFiles,
+  requirementNotes,
+  resubmittingRequirementId,
+}: LockedKycSummaryProps) => {
   const profileName =
     profile.applicant_type === "business"
       ? profile.business_name || profile.legal_name || "Business profile"
@@ -1753,9 +2077,19 @@ const LockedKycSummary = ({ profile }: { profile: KycProfile }) => {
       ? profile.registered_country_code || profile.country_code
       : profile.residence_country_code || profile.nationality_country_code || profile.country_code;
   const openRequirements =
-    profile.requirements?.filter((requirement) =>
-      ["open", "pending", "needs_more_info", "requested"].includes(String(requirement.status ?? "").toLowerCase()),
-    ) ?? [];
+    profile.requirements?.filter((requirement) => isOpenKycRequirementStatus(requirement.status)) ?? [];
+  const isApproved = isVerifiedKycStatus(profile.status);
+  const hasOpenRequirements = openRequirements.length > 0;
+  const title = hasOpenRequirements
+    ? "More information requested"
+    : isApproved
+      ? "KYC/KYB profile approved"
+      : "KYC/KYB profile submitted";
+  const description = hasOpenRequirements
+    ? "Operations needs a few updates before the review can continue. Only the requested items below need to be corrected or resubmitted."
+    : isApproved
+      ? "This profile has been reviewed and approved. No further customer action is required."
+      : "Your profile is waiting for operations review. The submitted information is locked unless a reviewer asks for an update.";
 
   return (
     <section className="space-y-5">
@@ -1763,16 +2097,13 @@ const LockedKycSummary = ({ profile }: { profile: KycProfile }) => {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.18em]">Review status</div>
-            <h3 className="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">
-              KYC/KYB profile submitted
-            </h3>
+            <h3 className="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{title}</h3>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-              Operations has received this profile. The form is locked while the profile is under review, and new
-              requirements will appear here if more information is needed.
+              {description}
             </p>
           </div>
           <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold capitalize shadow-sm dark:bg-white/10">
-            {String(profile.status).replace(/_/g, " ")}
+            {formatStatusLabel(profile.status)}
           </div>
         </div>
       </div>
@@ -1785,20 +2116,26 @@ const LockedKycSummary = ({ profile }: { profile: KycProfile }) => {
         <SummaryRow label="Reviewed" value={formatDate(profile.reviewed_at)} />
       </div>
 
-      {openRequirements.length ? (
+      {hasOpenRequirements ? (
         <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          <div className="font-semibold">Open requirements</div>
-          {openRequirements.map((requirement) => (
-            <div key={requirement.key} className="rounded-xl border border-amber-200 bg-white/70 p-3">
-              <div className="font-medium">{requirement.label}</div>
-              <div className="text-xs capitalize">{String(requirement.status).replace(/_/g, " ")}</div>
-              {requirement.rejection_reason || requirement.review_note ? (
-                <div className="mt-2 text-xs leading-5">
-                  {requirement.rejection_reason || requirement.review_note}
-                </div>
-              ) : null}
-            </div>
-          ))}
+          <div>
+            <div className="font-semibold">Open requirements</div>
+            <p className="mt-1 text-xs leading-5">
+              Submit only the item requested by the reviewer. Submitted replacements will return to review status.
+            </p>
+          </div>
+          <RequirementActionList
+            canSubmitInfoUpdate={canSubmitInfoUpdate}
+            isPending={isPending}
+            onEditRequestedInfo={onEditRequestedInfo}
+            onFileChange={onFileChange}
+            onNoteChange={onNoteChange}
+            onResubmit={onResubmit}
+            requirements={openRequirements}
+            requirementFiles={requirementFiles}
+            requirementNotes={requirementNotes}
+            resubmittingRequirementId={resubmittingRequirementId}
+          />
         </div>
       ) : null}
     </section>

@@ -1,4 +1,5 @@
 import { requestApi } from "@/services/apiClient";
+import { filterPrimaryProviders, isPrimaryProvider } from "@/lib/primaryProvider";
 
 export interface ProviderSummary {
   id: number;
@@ -72,9 +73,16 @@ export interface ProviderRateResponse {
   };
 }
 
-export const getProviders = () => requestApi<{ data: ProviderSummary[] }>("/providers");
+export const getProviders = async () => {
+  const payload = await requestApi<{ data: ProviderSummary[] }>("/providers");
 
-export const getProviderRates = (params: {
+  return {
+    ...payload,
+    data: filterPrimaryProviders(payload?.data ?? []),
+  };
+};
+
+export const getProviderRates = async (params: {
   token: string;
   sourceCurrency: string;
   targetCurrency: string;
@@ -86,9 +94,14 @@ export const getProviderRates = (params: {
     source_amount: String(params.sourceAmount),
   });
 
-  return requestApi<ProviderRateResponse>(`/member/provider-rates?${query.toString()}`, {
+  const payload = await requestApi<ProviderRateResponse>(`/member/provider-rates?${query.toString()}`, {
     token: params.token,
   });
+
+  return {
+    ...payload,
+    data: (payload.data ?? []).filter((rate) => isPrimaryProvider(rate.provider)),
+  };
 };
 
 export const getFxOrders = (params: { token: string; userId: string | number; page?: number }) =>

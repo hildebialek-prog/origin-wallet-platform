@@ -82,11 +82,11 @@ const Footer = () => {
                 >
                   info@khoinguyentechnology.com
                 </a>
-                . Origin Wallet is a financial technology platform focused on provider-connected
+                . Origin Wallet is a financial technology platform focused on Nium-backed
                 cross-border payment workflows. Service availability, regulatory treatment, and
                 scope may vary by jurisdiction. The platform is currently onboarding early users
-                and expanding provider integrations, including support for providers such as
-                Airwallex, Wise, and Currenxie where available.
+                and aligning wallet, account, FX, beneficiary, and transfer workflows to Nium
+                where available.
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">

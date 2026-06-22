@@ -77,7 +77,7 @@ const Login = () => {
         <Card className="border border-indigo-100/70 bg-white/96 shadow-[0_28px_80px_rgba(79,70,229,0.14)] backdrop-blur">
           <CardHeader className="space-y-4 pb-3 text-center">
             <div className="flex justify-center">
-              <img src="/logo/knt-logo.svg" alt="Origin Wallet" className="h-16 w-auto" />
+              <img src="/logo/logo.jpg" alt="Origin Wallet" className="h-16 w-16 rounded-2xl object-cover" />
             </div>
             <div className="space-y-2">
               <CardTitle className="text-2xl font-bold text-slate-900">

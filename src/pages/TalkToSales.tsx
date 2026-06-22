@@ -284,7 +284,7 @@ const TalkToSales = () => {
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(160deg,#071611,#0f382a_58%,#10231c)]" />
           <div className="relative z-10 flex min-h-full flex-col">
             <Link to="/" className="inline-flex items-center gap-3 self-start">
-              <img src="/logo/knt-logo.svg" alt="Origin Wallet" className="h-12 w-auto brightness-0 invert" />
+              <img src="/logo/logo.jpg" alt="Origin Wallet" className="h-12 w-12 rounded-2xl object-cover" />
               <span className="text-xl font-black leading-tight tracking-normal">
                 Origin
                 <br />

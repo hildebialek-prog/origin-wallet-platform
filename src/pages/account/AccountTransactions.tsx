@@ -22,6 +22,7 @@ import {
   type Transaction,
 } from "@/services/moneyMovementService";
 import { formatAmount, formatDateTime, statusBadgeClassName } from "@/lib/money";
+import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 const directionClassName = (direction?: string | null) => {
   const normalized = String(direction ?? "").toLowerCase();
@@ -59,7 +60,7 @@ const AccountTransactions = () => {
     },
   });
 
-  const providers = providersQuery.data ?? [];
+  const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
   const transactions = transactionsQuery.data ?? [];
 
   const providerById = useMemo(() => {
@@ -115,7 +116,7 @@ const AccountTransactions = () => {
               Transactions
             </h1>
             <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-              Review provider-synced wallet activity, transfer postings, fees, and settlement references.
+              Review Nium-synced wallet activity, transfer postings, fees, and settlement references.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -186,7 +187,7 @@ const AccountTransactions = () => {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               className="h-11 rounded-full border-[#d7d7d2] bg-white pl-11 text-[1rem] dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:placeholder:text-gray-500"
-              placeholder="Search transaction ID, reference, or provider"
+              placeholder="Search transaction ID, reference, or Nium status"
             />
           </div>
         </div>
@@ -197,7 +198,7 @@ const AccountTransactions = () => {
               <div className="grid grid-cols-[160px_1fr_1fr_130px_130px_44px] border-b border-[#d7d7d2] px-5 py-4 text-sm font-semibold text-[#0f2442] dark:border-white/10 dark:text-gray-200">
                 <div>Date</div>
                 <div>Description</div>
-                <div>Provider</div>
+                <div>Infrastructure</div>
                 <div>Status</div>
                 <div className="text-right">Amount</div>
                 <div />
@@ -228,7 +229,7 @@ const AccountTransactions = () => {
                           fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
-                          {provider?.name || `Provider #${transaction.provider_id}`}
+                          {provider?.name || PRIMARY_PROVIDER_NAME}
                         </span>
                       </div>
                       <div>
@@ -254,7 +255,7 @@ const AccountTransactions = () => {
                       {transactionsQuery.isLoading ? "Loading transactions..." : "No transaction data available"}
                     </p>
                     <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-                      Sync a provider or submit a transfer to populate wallet activity.
+                      Sync Nium data or submit a transfer to populate wallet activity.
                     </p>
                     <Button asChild className="mt-5 rounded-full bg-[#16a34a] px-5 font-semibold text-white hover:bg-[#15803d]">
                       <Link to="/account/transfers">Move funds</Link>

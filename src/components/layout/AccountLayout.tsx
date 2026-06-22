@@ -84,13 +84,13 @@ const AccountLayout = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f8f6] dark:bg-[#111318] lg:pl-64">
-      {/* Sidebar - Currenxie style */}
+      {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 bg-[#1a1d21] text-white shadow-sm lg:flex lg:flex-col">
         <div className="p-6 flex items-center gap-2 border-b border-white/10">
           <img
-            src="/logo/knt-logo.svg"
+            src="/logo/logo.jpg"
             alt="Origin Wallet"
-            className="h-8 w-auto brightness-0 invert"
+            className="h-9 w-9 rounded-xl object-cover"
           />
           <span className="font-semibold text-lg">Origin Wallet</span>
         </div>

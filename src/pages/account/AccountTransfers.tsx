@@ -35,6 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { getProviders, type ProviderSummary } from "@/services/fxOrderService";
+import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import {
   cancelTransfer,
   createTransfer,
@@ -57,6 +58,7 @@ import {
   statusBadgeClassName,
   toNumber,
 } from "@/lib/money";
+import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 
 type WizardStep = "payee" | "details" | "review" | "result";
 
@@ -107,10 +109,10 @@ const wizardSteps: { key: WizardStep; label: string }[] = [
   { key: "result", label: "Submit" },
 ];
 
-const canSubmitProvider = (status?: string | null) => ["draft", "approved"].includes(String(status ?? "").toLowerCase());
-const canCancel = (status?: string | null) => ["draft", "approval_required", "approved"].includes(String(status ?? "").toLowerCase());
+const canSubmitProvider = (status?: string | null) => ["draft", "approved"].includes(normalizeStatus(status));
+const canCancel = (status?: string | null) => ["draft", "approval_required", "approved"].includes(normalizeStatus(status));
 const canSync = (status?: string | null) =>
-  ["pending", "processing", "submitted", "sent", "provider_pending"].includes(String(status ?? "").toLowerCase());
+  ["pending", "processing", "submitted", "sent", "provider_pending"].includes(normalizeStatus(status));
 
 const blockedStatuses = new Set(["failed", "rejected", "cancelled", "canceled", "inactive", "disabled"]);
 
@@ -156,9 +158,9 @@ const AccountTransfers = () => {
     queryFn: async () => getTransfers({ userId: user?.id as string, token: token as string }),
   });
 
-  const providers = providersQuery.data ?? [];
+  const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
   const transferProviders = providers.filter((provider) => provider.supports_transfers);
-  const beneficiaries = beneficiariesQuery.data ?? [];
+  const beneficiaries = useMemo(() => beneficiariesQuery.data ?? [], [beneficiariesQuery.data]);
   const balances = balancesQuery.data ?? [];
   const bankAccounts = bankAccountsQuery.data ?? [];
   const transfers = transfersQuery.data ?? [];
@@ -191,11 +193,11 @@ const AccountTransfers = () => {
   const effectiveTargetAmount =
     targetAmountNumber > 0 ? targetAmountNumber : sourceAmountNumber > 0 && fxRateNumber > 0 ? sourceAmountNumber * fxRateNumber : 0;
   const selectedPurpose = purposeOptions.find((purpose) => purpose.code === form.purposeCode);
-  const verifiedForTransfers = ["verified", "approved"].includes(String(user?.kycStatus ?? "").toLowerCase());
+  const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
 
   const eligibleBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
-    const normalizedStatus = String(beneficiary.status ?? "").toLowerCase();
+    const normalizedStatus = normalizeStatus(beneficiary.status);
     return provider?.supports_transfers && !blockedStatuses.has(normalizedStatus);
   });
 
@@ -260,10 +262,10 @@ const AccountTransfers = () => {
 
   const validateDetails = () => {
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
-    if (!selectedProvider) return "Select a transfer-capable provider.";
+    if (!selectedProvider) return "Nium transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
     if (effectiveSourceAmount <= 0) return "Enter a sending amount, or enter receiving amount together with an FX rate.";
-    if (!selectedBalance) return "No synced balance is available for the selected provider and source currency.";
+    if (!selectedBalance) return "No synced Nium balance is available for the selected source currency.";
     if (toNumber(selectedBalance.available_balance) < effectiveSourceAmount) return "Available balance is not enough for this payment.";
     if (!form.purposeCode) return "Select a payment purpose.";
     if (form.scheduled && !form.scheduledDate) return "Select a scheduled payment date.";
@@ -326,8 +328,8 @@ const AccountTransfers = () => {
         title: "Payment request created",
         description:
           transfer.status === "approval_required"
-            ? "Admin approval is required before provider submission."
-            : `${transfer.transfer_no} is ready for provider submission.`,
+            ? "Admin approval is required before Nium submission."
+            : `${transfer.transfer_no} is ready for Nium submission.`,
       });
     },
     onError: (error) => {
@@ -342,7 +344,7 @@ const AccountTransfers = () => {
     onSuccess: async (payload) => {
       setCreatedTransfer(payload.transfer);
       await refreshTransfers();
-      toast({ title: "Transfer submitted", description: payload.message || "Provider submission completed." });
+      toast({ title: "Transfer submitted", description: payload.message || "Nium submission completed." });
     },
     onError: (error) => {
       toast({
@@ -386,7 +388,7 @@ const AccountTransfers = () => {
               Move funds
             </h1>
             <p className="mt-2 max-w-3xl text-[1.02rem] leading-7 text-[#62708a] dark:text-gray-400">
-              Send a single payment through a connected provider with balance, beneficiary, approval, and provider submission checks.
+              Send a single payment through Nium with balance, beneficiary, approval, and submission checks.
             </p>
           </div>
           <Button
@@ -416,10 +418,10 @@ const AccountTransfers = () => {
 
         {transferProviders.length === 0 && (
           <Notice
-            title="No transfer-capable provider is ready yet."
+            title="Nium transfer rail is not ready yet."
             description={
               <>
-                Connect a provider that supports transfers before moving funds.{" "}
+                Complete Nium setup before moving funds.{" "}
                 <Link to="/account/integrations" className="font-semibold underline underline-offset-4">
                   Manage integrations
                 </Link>
@@ -547,7 +549,7 @@ const AccountTransfers = () => {
                       {transfersQuery.isLoading ? "Loading transfers..." : "No transfers yet"}
                     </p>
                     <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-                      Created transfer requests will appear here with approval and provider status.
+                      Created transfer requests will appear here with approval and Nium status.
                     </p>
                   </div>
                 )}
@@ -581,7 +583,7 @@ const PayeeStep = ({
         Who are you sending money to?
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Search approved recipients by name, email, country, provider, account, or currency.
+        Search approved recipients by name, email, country, account, or currency.
       </p>
     </div>
 
@@ -644,7 +646,7 @@ const PayeeStep = ({
             {loading ? "Loading beneficiaries..." : "No usable beneficiary found"}
           </p>
           <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-            Add and verify a beneficiary before creating live provider payouts.
+            Add and verify a beneficiary before creating live Nium payouts.
           </p>
           <Button asChild className="mt-5 h-11 rounded-full bg-[#16a34a] px-6 text-white hover:bg-[#15803d]">
             <Link to="/account/beneficiaries">Add beneficiary</Link>
@@ -712,11 +714,11 @@ const DetailsStep = ({
           selectedLabel={
             selectedSourceAccount
               ? sourceAccountLabel(selectedSourceAccount)
-              : "Use provider wallet balance"
+              : "Use Nium wallet balance"
           }
           onChange={(value) => onChange({ ...form, sourceBankAccountId: value === "none" ? "" : value })}
         >
-          <SelectItem value="none">Use provider wallet balance</SelectItem>
+          <SelectItem value="none">Use Nium wallet balance</SelectItem>
           {providerBankAccounts.map((account) => (
             <SelectItem key={account.id} value={String(account.id)}>
               {sourceAccountLabel(account)}
@@ -876,7 +878,7 @@ const ReviewStep = ({
         Review before submitting
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Confirm payee, funding source, amount, fee, reference, and provider readiness before creating the live request.
+        Confirm payee, funding source, amount, fee, reference, and Nium readiness before creating the live request.
       </p>
     </div>
 
@@ -884,7 +886,7 @@ const ReviewStep = ({
       <SectionTitle icon={<Building2 className="h-5 w-5" />} title="Recipient" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <ReviewItem label="Beneficiary" value={beneficiary?.full_name ?? "-"} />
-        <ReviewItem label="Provider" value={provider?.name ?? "-"} />
+        <ReviewItem label="Infrastructure" value={provider?.name ?? PRIMARY_PROVIDER_NAME} />
         <ReviewItem label="Bank" value={beneficiary?.bank_name || beneficiary?.swift_bic || "-"} />
         <ReviewItem label="Account / IBAN" value={maskAccount(beneficiary?.account_number || beneficiary?.iban)} />
       </div>
@@ -897,7 +899,7 @@ const ReviewStep = ({
         <ReviewItem label="Recipient receives" value={formatAmount(effectiveTargetAmount || form.targetAmount, form.targetCurrency)} />
         <ReviewItem label="FX rate" value={form.fxRate || "-"} />
         <ReviewItem label="Total fee" value={formatAmount(form.feeAmount || 0, form.feeCurrency)} />
-        <ReviewItem label="Funding source" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Provider wallet balance"} />
+        <ReviewItem label="Funding source" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Nium wallet balance"} />
         <ReviewItem label="Available balance" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
         <ReviewItem label="Purpose" value={purposeLabel} />
         <ReviewItem label="Reference" value={form.referenceText || "-"} />
@@ -941,7 +943,7 @@ const ResultStep = ({
         Payment request created
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        The request is saved in Origin Wallet. Submit it to the provider when approval rules allow.
+        The request is saved in Origin Wallet. Submit it to Nium when approval rules allow.
       </p>
     </div>
 
@@ -956,7 +958,7 @@ const ResultStep = ({
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <ReviewItem label="Provider" value={provider?.name ?? `Provider #${transfer.provider_id}`} />
+          <ReviewItem label="Infrastructure" value={provider?.name ?? PRIMARY_PROVIDER_NAME} />
           <ReviewItem label="Beneficiary" value={beneficiary?.full_name ?? `Beneficiary #${transfer.beneficiary_id}`} />
           <ReviewItem label="Send" value={formatAmount(transfer.source_amount, transfer.source_currency)} />
           <ReviewItem label="Receive" value={formatAmount(transfer.target_amount, transfer.target_currency)} />
@@ -966,7 +968,7 @@ const ResultStep = ({
 
         {transfer.status === "approval_required" ? (
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Admin approval is required before this payment can be submitted to the provider.
+            Admin approval is required before this payment can be submitted to Nium.
           </div>
         ) : null}
 
@@ -985,7 +987,7 @@ const ResultStep = ({
         onClick={onSubmitToProvider}
       >
         {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SendHorizonal className="mr-2 h-4 w-4" />}
-        Submit to provider
+        Submit to Nium
       </Button>
       <Button
         variant="outline"
@@ -1020,9 +1022,9 @@ const PaymentSummary = ({
       <CardTitle className="text-lg text-[#0f2442] dark:text-white">Payment summary</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4 text-sm">
-      <SummaryLine label="Provider" value={provider?.name ?? "Not selected"} />
+      <SummaryLine label="Infrastructure" value={provider?.name ?? PRIMARY_PROVIDER_NAME} />
       <SummaryLine label="Payee" value={beneficiary?.full_name ?? "Not selected"} />
-      <SummaryLine label="Funding" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Provider wallet balance"} />
+      <SummaryLine label="Funding" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Nium wallet balance"} />
       <SummaryLine label="Available" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
       <SummaryLine label="Send" value={sourceAmount > 0 ? formatAmount(sourceAmount, form.sourceCurrency) : "-"} />
       <SummaryLine label="Receive" value={targetAmount > 0 ? formatAmount(targetAmount, form.targetCurrency) : "-"} />
@@ -1073,7 +1075,7 @@ const TransferRow = ({
             fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
           />
           <div className="min-w-0">
-            <p className="truncate font-medium text-[#0f2442] dark:text-white">{provider?.name || `Provider #${transfer.provider_id}`}</p>
+            <p className="truncate font-medium text-[#0f2442] dark:text-white">{provider?.name || PRIMARY_PROVIDER_NAME}</p>
             <p className="truncate text-xs text-[#62708a] dark:text-gray-400">
               {transfer.beneficiary?.full_name || beneficiary?.full_name || `Beneficiary #${transfer.beneficiary_id}`}
             </p>

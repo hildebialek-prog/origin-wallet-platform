@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { countryOptions } from "@/lib/money";
+import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import { getProviderReference, requestProviderConnect } from "@/services/providerAccountService";
 
 const countryCurrencyMap: Record<string, string> = {
@@ -120,7 +121,7 @@ const AccountVirtualAccountRequest = () => {
     queryFn: async () => getProviderReference({ token: token as string }),
   });
 
-  const providers = (providersQuery.data ?? []).filter((provider) => provider.status === "active");
+  const providers = useMemo(() => (providersQuery.data ?? []).filter((provider) => provider.status === "active"), [providersQuery.data]);
   const selectedProvider = providers.find((provider) => provider.code === providerCode);
   const selectedCountry = virtualAccountCountryOptions.find((country) => country.code === countryCode);
   const accountType = selectedCountry?.isMultiCurrency ? "Multi-currency virtual account" : "Local virtual account";
@@ -133,6 +134,12 @@ const AccountVirtualAccountRequest = () => {
         .sort((left, right) => left.name.localeCompare(right.name)),
     [],
   );
+
+  useEffect(() => {
+    if (!providerCode && providers.length > 0) {
+      setProviderCode(providers[0].code);
+    }
+  }, [providerCode, providers]);
 
   useEffect(() => {
     if (!selectedCountry) return;
@@ -158,7 +165,7 @@ const AccountVirtualAccountRequest = () => {
   const requestMutation = useMutation({
     mutationFn: async () => {
       if (!providerCode || !alias.trim()) {
-        throw new Error("Provider and account alias are required.");
+        throw new Error("Nium account setup and account alias are required.");
       }
 
       if (requestCurrencies.length === 0) {
@@ -230,22 +237,13 @@ const AccountVirtualAccountRequest = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Provider</Label>
-            <Select value={providerCode} onValueChange={setProviderCode}>
-              <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#151b24] dark:text-white">
-                <SelectValue placeholder="Select provider">
-                  {providerCode ? selectedProvider?.name : undefined}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {providers.map((provider) => (
-                  <SelectItem key={provider.code} value={provider.code}>
-                    {provider.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="rounded-2xl border border-[#d7d7d2] bg-white px-4 py-3 dark:border-white/10 dark:bg-[#151b24]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#62708a] dark:text-gray-400">
+              Infrastructure rail
+            </p>
+            <p className="mt-1 text-[1rem] font-semibold text-[#0f2442] dark:text-white">
+              {selectedProvider?.name ?? PRIMARY_PROVIDER_NAME}
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
