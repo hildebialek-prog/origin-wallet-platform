@@ -22,7 +22,7 @@ import {
   type Transaction,
 } from "@/services/moneyMovementService";
 import { formatAmount, formatDateTime, statusBadgeClassName } from "@/lib/money";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 const directionClassName = (direction?: string | null) => {
   const normalized = String(direction ?? "").toLowerCase();
@@ -85,7 +85,7 @@ const AccountTransactions = () => {
         transaction.reference_text,
         transaction.transaction_type,
         transaction.direction,
-        provider?.name,
+        getProviderDisplayName(provider),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
@@ -116,7 +116,7 @@ const AccountTransactions = () => {
               Transactions
             </h1>
             <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-              Review Nium-synced wallet activity, transfer postings, fees, and settlement references.
+              Review synced wallet activity, transfer postings, fees, and settlement references.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -129,7 +129,7 @@ const AccountTransactions = () => {
                 className="h-11 rounded-full border-[#d7d7d2] bg-white px-5 font-semibold text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#151b24] dark:text-white"
               >
                 {syncMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                Sync {provider.name}
+                Sync {getProviderDisplayName(provider)}
               </Button>
             ))}
             <Button
@@ -187,7 +187,7 @@ const AccountTransactions = () => {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               className="h-11 rounded-full border-[#d7d7d2] bg-white pl-11 text-[1rem] dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:placeholder:text-gray-500"
-              placeholder="Search transaction ID, reference, or Nium status"
+              placeholder="Search transaction ID, reference, or wallet status"
             />
           </div>
         </div>
@@ -229,7 +229,7 @@ const AccountTransactions = () => {
                           fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
-                          {provider?.name || PRIMARY_PROVIDER_NAME}
+                          {provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}
                         </span>
                       </div>
                       <div>
@@ -255,7 +255,7 @@ const AccountTransactions = () => {
                       {transactionsQuery.isLoading ? "Loading transactions..." : "No transaction data available"}
                     </p>
                     <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-                      Sync Nium data or submit a transfer to populate wallet activity.
+                      Sync wallet data or submit a transfer to populate wallet activity.
                     </p>
                     <Button asChild className="mt-5 rounded-full bg-[#16a34a] px-5 font-semibold text-white hover:bg-[#15803d]">
                       <Link to="/account/transfers">Move funds</Link>

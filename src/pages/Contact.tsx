@@ -41,19 +41,19 @@ const Contact = () => {
     "@context": "https://schema.org",
     "@type": "ContactPage",
     name: "Contact Origin Wallet",
-    url: "https://khoinguyenoriginwallet.com/contact",
+    url: "https://originwallet.com/contact",
     description:
       "Contact Origin Wallet for product enquiries, partnerships, support, security follow-up, and cross-border payment workflow discussions.",
     mainEntity: {
       "@type": "Organization",
       name: "Origin Wallet",
-      email: "info@khoinguyentechnology.com",
-      url: "https://khoinguyenoriginwallet.com/",
+      email: "support@originwallet.com",
+      url: "https://originwallet.com/",
       contactPoint: [
         {
           "@type": "ContactPoint",
           contactType: "customer support",
-          email: "info@khoinguyentechnology.com",
+          email: "support@originwallet.com",
           availableLanguage: ["en", "vi"],
         },
       ],
@@ -286,40 +286,31 @@ const Contact = () => {
                   ORIGIN WALLET
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, a
-                  technology company based in Ha Noi, Viet Nam, building Nium-backed
-                  financial workflows and cross-border product experiences.
+                  Origin Wallet is an independent global payments platform built for
+                  multi-currency workflows, international transfers, and cross-border product
+                  experiences.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-border bg-card p-8">
                 <div className="mb-3 flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-accent" />
-                  <h3 className="font-bold">Company details</h3>
+                  <h3 className="font-bold">Platform details</h3>
                 </div>
                 <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
                   <p>
-                    <strong className="text-foreground">Legal entity:</strong> CONG TY CO PHAN CONG
-                    NGHE KHOI NGUYEN
-                  </p>
-                  <p>
-                    <strong className="text-foreground">International name:</strong> KHOI NGUYEN
-                    TECHNOLOGY JOINT STOCK COMPANY
-                  </p>
-                  <p>
-                    <strong className="text-foreground">Tax ID:</strong> 0111409165
+                    <strong className="text-foreground">Platform name:</strong> Origin Wallet
                   </p>
                   <p>
                     <strong className="text-foreground">Email:</strong>{" "}
-                    info@khoinguyentechnology.com
+                    support@originwallet.com
                   </p>
                   <p>
-                    <strong className="text-foreground">Address:</strong> So 23 ngach 157/6 Duc
-                    Giang, To 18, Phuong Viet Hung, Ha Noi, Viet Nam
+                    <strong className="text-foreground">Region:</strong> Global payment workflows
                   </p>
                   <p>
-                    <strong className="text-foreground">Company website:</strong>{" "}
-                    khoinguyentechnology.com
+                    <strong className="text-foreground">Website:</strong>{" "}
+                    originwallet.com
                   </p>
                 </div>
               </div>

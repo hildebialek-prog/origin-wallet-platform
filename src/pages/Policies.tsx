@@ -15,18 +15,18 @@ const sections = [
       { heading: "6. Your Rights", text: "Depending on your jurisdiction, you may have rights to access, correct, delete, or restrict processing of your personal data. Contact us to exercise these rights." },
       { heading: "7. Cookies", text: "We use cookies and similar technologies to improve your experience, analyze usage, and personalize content. You can manage cookie preferences through your browser settings." },
       { heading: "8. Changes to This Policy", text: "We may update this Privacy Policy from time to time. We will notify you of significant changes by posting a notice on our website or sending you a direct notification." },
-      { heading: "9. Contact", text: "For questions about this Privacy Policy, please contact us through the contact page on our website or by email at info@khoinguyentechnology.com." },
+      { heading: "9. Contact", text: "For questions about this Privacy Policy, please contact us through the contact page on our website or by email at support@originwallet.com." },
     ],
   },
   {
     id: "terms",
     title: "Terms of Service",
     content: [
-      { heading: "1. Agreement", text: "By accessing or using Origin Wallet services, you agree to be bound by these Terms of Service. Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY. If you do not agree to these terms, please do not use our services." },
-      { heading: "2. Services", text: "Origin Wallet provides a technology platform for cross-border payments, multi-currency workflows, and Nium-backed financial operations. Services described on our website are subject to availability and may vary by jurisdiction." },
+      { heading: "1. Agreement", text: "By accessing or using Origin Wallet services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services." },
+      { heading: "2. Services", text: "Origin Wallet provides a technology platform for cross-border payments, multi-currency workflows, and financial operations. Services described on our website are subject to availability and may vary by jurisdiction." },
       { heading: "3. Eligibility", text: "You must be at least 18 years old and legally capable of entering into contracts to use our services. We may require identity verification depending on the services and amounts involved." },
       { heading: "4. User Responsibilities", text: "You are responsible for providing accurate information, maintaining the security of your account credentials, and complying with applicable laws. You must not use our services for illegal activities." },
-      { heading: "5. Fees and Pricing", text: "Fees, quotes, and exchange-rate outcomes may vary depending on the Nium corridor, workflow, payment method, and transaction amount. Pricing shown on our public website is illustrative unless explicitly stated otherwise." },
+      { heading: "5. Fees and Pricing", text: "Fees, quotes, and exchange-rate outcomes may vary depending on the corridor, workflow, payment method, and transaction amount. Pricing shown on our public website is illustrative unless explicitly stated otherwise." },
       { heading: "6. Transfers", text: "Transfer times are estimates and may vary. We are not responsible for delays caused by third-party financial institutions, compliance checks, or circumstances beyond our control." },
       { heading: "7. Limitation of Liability", text: "To the maximum extent permitted by law, the operator of the Origin Wallet platform shall not be liable for indirect, incidental, or consequential damages arising from the use of our services." },
       { heading: "8. Intellectual Property", text: "All content, trademarks, and intellectual property on the Origin Wallet platform are owned by or licensed to the platform operator." },
@@ -44,7 +44,7 @@ const sections = [
       { heading: "Regulatory Status", text: "Regulatory treatment, service scope, and availability may vary by jurisdiction. Any specific licenses, approvals, or regulated service relationships should be understood only as explicitly stated by the platform operator." },
       { heading: "Third-Party Links", text: "Our website may contain links to third-party websites. We are not responsible for the content or privacy practices of these external sites." },
       { heading: "Service Availability", text: "We do not guarantee uninterrupted access to our services. We may modify, suspend, or discontinue any aspect of our services at any time without notice." },
-      { heading: "Platform Operator", text: "Origin Wallet is operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, Tax ID 0111409165, with registered address at So 23 ngach 157/6 Duc Giang, To 18, Phuong Viet Hung, Ha Noi, Viet Nam. Legal obligations and liabilities relating to the platform rest with that operating entity." },
+      { heading: "Platform Operator", text: "Origin Wallet maintains the platform experience, product flows, customer support, and operating controls for the services described on this website." },
     ],
   },
 ];
@@ -88,8 +88,7 @@ const Policies = () => {
         <div className="container-tight mx-auto text-center">
           <h1 className="text-4xl font-extrabold mb-2">Legal & Policies</h1>
           <p className="mx-auto max-w-2xl leading-relaxed text-primary-foreground/70">
-            Legal, privacy, and operating terms for the Origin Wallet platform operated by KHOI
-            NGUYEN TECHNOLOGY JOINT STOCK COMPANY.
+            Legal, privacy, and operating terms for the Origin Wallet platform.
           </p>
         </div>
       </section>
@@ -141,7 +140,7 @@ const Policies = () => {
 
               <div className="border-t border-border pt-8">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  These documents are maintained for the Origin Wallet platform operated by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY, Tax ID 0111409165. Last updated: March 2026. For questions about these policies, please visit our contact page or email info@khoinguyentechnology.com.
+                  These documents are maintained for the Origin Wallet platform. Last updated: March 2026. For questions about these policies, please visit our contact page.
                 </p>
               </div>
             </div>

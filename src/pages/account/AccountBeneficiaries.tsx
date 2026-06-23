@@ -46,7 +46,7 @@ import {
   type BeneficiaryPayload,
 } from "@/services/moneyMovementService";
 import { countryOptions, currencyOptions, formatDateTime, statusBadgeClassName } from "@/lib/money";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 type BeneficiaryStep = "basic" | "accountType" | "bank" | "review";
 
@@ -317,7 +317,7 @@ const AccountBeneficiaries = () => {
       beneficiary.iban,
       beneficiary.currency,
       beneficiary.country_code,
-      provider?.name,
+      getProviderDisplayName(provider),
     ]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
@@ -328,7 +328,7 @@ const AccountBeneficiaries = () => {
   };
 
   const validateBasic = () => {
-    if (!form.providerId) return "Nium beneficiary rail is not available yet.";
+    if (!form.providerId) return "Beneficiary rail is not available yet.";
     if (!form.fullName.trim()) return "Vendor name is required.";
     if (!form.countryCode) return "Country or region is required.";
     if (!form.beneficiaryType) return "Vendor legal type is required.";
@@ -338,7 +338,7 @@ const AccountBeneficiaries = () => {
 
   const validateBank = () => {
     if (form.accountRoute !== "bank") {
-      return "Nium account recipients will be enabled after Nium account-recipient APIs are confirmed.";
+      return "Wallet account recipients will be enabled after account-recipient APIs are confirmed.";
     }
 
     if (!form.currency) return "Currency is required.";
@@ -355,7 +355,7 @@ const AccountBeneficiaries = () => {
       step === "basic"
         ? validateBasic()
         : step === "accountType" && form.accountRoute === "provider"
-          ? "Nium account recipients will be enabled after Nium account-recipient APIs are confirmed."
+          ? "Wallet account recipients will be enabled after account-recipient APIs are confirmed."
           : step === "bank"
             ? validateBank()
             : "";
@@ -473,9 +473,9 @@ const AccountBeneficiaries = () => {
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
-                <p className="font-semibold">Nium beneficiary rail is not ready yet.</p>
+                <p className="font-semibold">Beneficiary rail is not ready yet.</p>
                 <p className="mt-1 text-sm">
-                  Complete Nium setup before adding beneficiaries.{" "}
+                  Complete account setup before adding beneficiaries.{" "}
                   <Link to="/account/integrations" className="font-semibold underline underline-offset-4">
                     Manage integrations
                   </Link>
@@ -529,7 +529,7 @@ const AccountBeneficiaries = () => {
                           fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
-                          {provider?.name || PRIMARY_PROVIDER_NAME}
+                          {provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}
                         </span>
                       </div>
                       <div className="min-w-0">
@@ -699,7 +699,7 @@ const BasicVendorStep = ({
           Infrastructure rail
         </p>
         <p className="mt-1 text-[1rem] font-semibold text-[#0f2442] dark:text-white">
-          {selectedProvider?.name ?? PRIMARY_PROVIDER_NAME}
+          {selectedProvider ? getProviderDisplayName(selectedProvider) : PRIMARY_PROVIDER_NAME}
         </p>
       </div>
 
@@ -844,7 +844,7 @@ const AccountTypeStep = ({
     <div className="text-center">
       <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#0f2442] dark:text-white">Choose account type</h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Bank account is the supported live payout route. Nium account recipients can be enabled after Nium docs confirm the endpoint.
+        Bank account is the supported live payout route. Wallet account recipients can be enabled after the account-recipient endpoint is confirmed.
       </p>
     </div>
     <div className="mx-auto max-w-2xl space-y-4">
@@ -861,9 +861,9 @@ const AccountTypeStep = ({
           <UserRound className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-[#0f2442] dark:text-white">Nium account</p>
+          <p className="font-semibold text-[#0f2442] dark:text-white">Wallet account</p>
           <p className="mt-1 text-sm text-[#62708a] dark:text-gray-400">
-            Transfer to an internal Nium account when Nium APIs support this route.
+            Transfer to an internal wallet account when this route is supported.
           </p>
         </div>
         <ArrowRight className="h-5 w-5 text-[#62708a]" />
@@ -1048,14 +1048,14 @@ const ReviewBeneficiaryStep = ({
     <div className="text-center">
       <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#0f2442] dark:text-white">Review vendor details</h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Confirm these details before Origin Wallet sends the beneficiary request through Nium.
+        Confirm these details before Origin Wallet sends the beneficiary request.
       </p>
     </div>
 
     <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 dark:border-white/10 dark:bg-[#10141b]">
       <SectionTitle icon={<Building2 className="h-5 w-5" />} title="Basic information" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ReviewItem label="Infrastructure" value={provider?.name ?? PRIMARY_PROVIDER_NAME} />
+        <ReviewItem label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
         <ReviewItem label="Vendor name" value={form.fullName || "-"} />
         <ReviewItem label="Legal type" value={beneficiaryTypeLabels[form.beneficiaryType]} />
         <ReviewItem label="Relationship" value={vendorRelationshipLabels[form.vendorType]} />
@@ -1070,7 +1070,7 @@ const ReviewBeneficiaryStep = ({
     <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 dark:border-white/10 dark:bg-[#10141b]">
       <SectionTitle icon={<Banknote className="h-5 w-5" />} title="Bank account information" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ReviewItem label="Account route" value={form.accountRoute === "bank" ? "Bank account" : "Nium account"} />
+        <ReviewItem label="Account route" value={form.accountRoute === "bank" ? "Bank account" : "Wallet account"} />
         <ReviewItem label="Currency" value={<span translate="no">{form.currency}</span>} />
         <ReviewItem label="Account holder" value={form.companyName || form.fullName || "-"} />
         <ReviewItem label="Account type" value={bankAccountTypeLabels[form.bankAccountType]} />

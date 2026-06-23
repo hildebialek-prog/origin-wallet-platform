@@ -106,7 +106,7 @@ const getKycSetupSteps = (profile: KycProfile | null, accountStatus?: string | n
     },
     {
       done: profileVerified,
-      label: "Nium onboarding",
+      label: "Account onboarding",
       href: "/account/integrations",
       disabled: !profileVerified,
     },
@@ -165,7 +165,7 @@ const AccountDashboard = () => {
               </p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {balances.length
-                  ? `${balances.length} synced balance records across your Nium accounts.`
+                  ? `${balances.length} synced balance records across your wallet accounts.`
                   : "Your total balance will appear here once synced."}
               </p>
             </div>
@@ -248,10 +248,10 @@ const AccountDashboard = () => {
                           <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{account.currency}</span>
                           <div>
                             <p className="font-semibold text-gray-900 dark:text-white">
-                              {account.account_name || account.external_account_id || "Nium account"}
+                              {account.account_name || account.external_account_id || "Origin Wallet account"}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {account.country_code || "Nium"} - {account.currency}
+                              {account.country_code || "Wallet"} - {account.currency}
                             </p>
                           </div>
                         </div>
@@ -309,7 +309,7 @@ const AccountDashboard = () => {
                 <StatusRow label="Account" value={formatStatusLabel(user?.status || "pending")} status={user?.status || "pending"} />
                 <StatusRow label="KYC/KYB" value={formatStatusLabel(kycStatus)} status={kycStatus} />
                 <StatusRow
-                  label="Nium"
+                  label="Origin Wallet"
                   value={formatStatusLabel(onboarding?.selected_provider_account_status || "not_started")}
                   status={onboarding?.selected_provider_account_status || "not_started"}
                 />
@@ -375,7 +375,7 @@ const AccountDashboard = () => {
                 </CardTitle>
                 <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
                   {beneficiaries.length
-                    ? "Manage recipient details before initiating Nium transfers."
+                    ? "Manage recipient details before initiating transfers."
                     : "Add beneficiaries to send payments in more than 20 currencies to accounts worldwide."}
                 </p>
               </CardHeader>

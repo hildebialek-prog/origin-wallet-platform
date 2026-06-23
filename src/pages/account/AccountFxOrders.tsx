@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 
 const currencyOptions = ["USD", "EUR", "GBP", "AUD", "CAD", "CHF", "JPY", "KRW", "NZD", "SGD", "THB", "VND"];
@@ -170,7 +170,7 @@ const AccountFxOrders = () => {
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       if (!canCreateOrder || !selectedProvider) {
-        throw new Error("Nium FX rail, currency pair, and valid source amount are required first.");
+        throw new Error("FX rail, currency pair, and valid source amount are required first.");
       }
 
       return createFxOrder({
@@ -226,7 +226,7 @@ const AccountFxOrders = () => {
               FX Orders
             </h1>
             <p className="mt-2 max-w-3xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-              Submit a Nium FX instruction for operations review. Orders stay pending until Origin Wallet confirms them.
+              Submit an FX instruction for operations review. Orders stay pending until Origin Wallet confirms them.
             </p>
           </div>
           <Button
@@ -282,7 +282,7 @@ const AccountFxOrders = () => {
                     />
                   ) : null}
                   <span className="font-semibold text-[#0f2442] dark:text-white">
-                    {selectedProvider?.name ?? PRIMARY_PROVIDER_NAME}
+                    {selectedProvider ? getProviderDisplayName(selectedProvider) : PRIMARY_PROVIDER_NAME}
                   </span>
                 </div>
               </div>
@@ -352,7 +352,7 @@ const AccountFxOrders = () => {
                           fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                       ) : null}
-                      <p className="font-semibold text-[#0f2442] dark:text-white">{selectedProvider?.name || "-"}</p>
+                      <p className="font-semibold text-[#0f2442] dark:text-white">{selectedProvider ? getProviderDisplayName(selectedProvider) : "-"}</p>
                     </div>
                   </div>
                   <div>
@@ -447,7 +447,7 @@ const AccountFxOrders = () => {
                       {ordersQuery.isLoading ? "Loading FX orders..." : "No FX orders yet"}
                     </p>
                     <p className="mt-2 text-sm text-[#6b6b6b] dark:text-gray-400">
-                      Submitted Nium instructions will appear here while they wait for admin confirmation.
+                      Submitted FX instructions will appear here while they wait for admin confirmation.
                     </p>
                   </div>
                 )}
@@ -485,10 +485,10 @@ const OrderRow = ({
       />
       <div className="min-w-0">
         <p className="truncate font-semibold text-[#202020] dark:text-white">
-          {order.provider?.name || PRIMARY_PROVIDER_NAME}
+          {order.provider ? getProviderDisplayName(order.provider) : PRIMARY_PROVIDER_NAME}
         </p>
         <p className="mt-1 truncate text-xs text-[#6b6b6b] dark:text-gray-400">
-          {order.provider?.code || "Nium platform"}
+          {order.provider?.code || "Origin Wallet platform"}
         </p>
       </div>
     </div>

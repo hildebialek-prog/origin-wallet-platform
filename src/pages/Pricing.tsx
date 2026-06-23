@@ -90,13 +90,13 @@ const Pricing = () => {
             </h1>
             <p className="mx-auto mb-4 max-w-3xl text-lg leading-relaxed text-primary-foreground/70">
               Origin Wallet is designed to surface pricing, rates, and transfer outcomes more
-              clearly across Nium-backed financial workflows. The examples below are
+              clearly across financial workflows. The examples below are
               illustrative and intended to show how fee visibility should feel inside the product.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-primary-foreground/80">
               {[
                 "Illustrative pricing views",
-                "Nium-aware workflow design",
+                "Workflow-aware pricing design",
                 "Balances, quotes, and transfers",
               ].map((item) => (
                 <span
@@ -336,7 +336,7 @@ const Pricing = () => {
           </h2>
           <p className="mx-auto mb-8 max-w-md text-primary-foreground/70">
             Review the calculator, compare example corridors, and talk with us about
-            Nium-backed financial workflows.
+            Origin Wallet financial workflows.
           </p>
           <Link to="/contact">
             <Button variant="hero" size="lg">

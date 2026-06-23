@@ -84,7 +84,7 @@ const Security = () => {
             <h2 className="mb-4 text-3xl font-extrabold">Our security principles</h2>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
               The platform approach is built around secure handling of financial workflows,
-              role-based access, and clearer control points across Nium-backed systems.
+              role-based access, and clearer control points across Origin Wallet systems.
             </p>
           </motion.div>
 

@@ -1,19 +1,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const siteUrl = "https://khoinguyenoriginwallet.com";
+const siteUrl = "https://originwallet.com";
 const distDir = path.resolve("dist");
 const sourceHtmlPath = path.join(distDir, "index.html");
 
 const routes = [
   {
     path: "/",
-    title: "Origin Wallet | Global Payments Platform by KHOI NGUYEN TECHNOLOGY",
+    title: "Origin Wallet | Global Payments Platform",
     description:
-      "Origin Wallet is a global payments platform by KHOI NGUYEN TECHNOLOGY for multi-currency wallets, international transfers, business payments, and provider-connected financial operations.",
+      "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, business payments, and compliant financial operations.",
     headline: "Origin Wallet global payments platform",
     summary:
-      "Origin Wallet helps businesses and individuals manage global payments, multi-currency workflows, international transfers, and provider-connected financial operations.",
+      "Origin Wallet helps businesses and individuals manage global payments, multi-currency workflows, international transfers, and financial operations.",
   },
   {
     path: "/personal",
@@ -53,18 +53,18 @@ const routes = [
   },
   {
     path: "/business",
-    title: "Origin Wallet Business | Global Business Payments & Provider Workflows",
+    title: "Origin Wallet Business | Global Business Payments & Wallet Workflows",
     description:
-      "Origin Wallet Business supports supplier payments, collections, payout operations, and API-led financial workflows across multiple providers.",
+      "Origin Wallet Business supports supplier payments, collections, payout operations, and API-led financial workflows.",
     headline: "Origin Wallet Business",
     summary:
-      "Business payments, supplier workflows, collections, and provider-connected operations through Origin Wallet.",
+      "Business payments, supplier workflows, collections, and wallet operations through Origin Wallet.",
   },
   {
     path: "/business/suppliers",
     title: "Global Supplier Payments Platform | Origin Wallet Business Suppliers",
     description:
-      "Manage supplier payments globally with Origin Wallet Business through clearer payable workflows and provider-connected operations.",
+      "Manage supplier payments globally with Origin Wallet Business through clearer payable workflows and wallet operations.",
     headline: "Global supplier payments with Origin Wallet",
     summary:
       "Supplier payment workflows for teams managing cross-border payables and operational visibility.",
@@ -76,7 +76,7 @@ const routes = [
       "Receive international payments for business with Origin Wallet through structured inbound payment workflows and clearer visibility.",
     headline: "Receive international payments for business",
     summary:
-      "Origin Wallet Business Receive supports collections, inbound money movement, and visibility across provider-connected workflows.",
+      "Origin Wallet Business Receive supports collections, inbound money movement, and visibility across wallet workflows.",
   },
   {
     path: "/business/batch-payments",
@@ -91,10 +91,10 @@ const routes = [
     path: "/business/api",
     title: "Origin Wallet API | Payment API Integrations & Finance Workflow Platform",
     description:
-      "Explore the Origin Wallet API for payment integrations, provider orchestration, embedded finance workflows, and operational connectivity.",
+      "Explore the Origin Wallet API for payment infrastructure, embedded finance workflows, and operational connectivity.",
     headline: "Origin Wallet API and integrations",
     summary:
-      "API and integration workflows for businesses building provider-connected payment operations.",
+      "API and integration workflows for businesses building payment operations.",
   },
   {
     path: "/pricing",
@@ -161,16 +161,12 @@ const buildSchema = (route) => {
         "@type": "Organization",
         "@id": `${siteUrl}/#organization`,
         name: "Origin Wallet",
-        alternateName: ["Origin Wallet Global Payments", "KHOI NGUYEN Origin Wallet"],
+        alternateName: ["Origin Wallet Global Payments", "Origin Wallet Global"],
         url: `${siteUrl}/`,
         logo: `${siteUrl}/logo/logo.jpg`,
         image: `${siteUrl}/content/banner.jpg`,
         description:
-          "Origin Wallet is a global payments platform by KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY.",
-        parentOrganization: {
-          "@type": "Organization",
-          name: "KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY",
-        },
+          "Origin Wallet is a global payments platform for multi-currency wallets and international payment workflows.",
       },
       {
         "@type": "WebSite",
@@ -211,10 +207,18 @@ const escapeHtml = (value) =>
     .replaceAll('"', "&quot;");
 
 const renderFallbackMarkup = (route) => `
-    <main style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; max-width: 960px; margin: 0 auto; padding: 48px 20px; color: #111827;">
-      <p style="display:inline-block; margin:0 0 16px; padding:8px 14px; border-radius:999px; background:#e8f3ec; color:#17935c; font-weight:600; font-size:14px;">Origin Wallet</p>
-      <h1 style="margin:0 0 16px; font-size:48px; line-height:1.05;">${escapeHtml(route.headline)}</h1>
-      <p style="margin:0; max-width:760px; font-size:18px; line-height:1.75; color:#4b5563;">${escapeHtml(route.summary)}</p>
+    <main style="position:relative; min-height:100vh; font-family:'Plus Jakarta Sans', Arial, sans-serif; color:#ffffff; background:#071611; overflow:hidden;">
+      <div style="position:absolute; inset:0; background-image:linear-gradient(90deg, rgba(7,22,17,.94), rgba(7,22,17,.78), rgba(7,22,17,.36)), url('/content/banner.jpg'); background-size:cover; background-position:center; opacity:.96;"></div>
+      <section style="position:relative; max-width:1120px; margin:0 auto; padding:44px 24px 72px;">
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:92px;">
+          <img src="/logo/logo.jpg" alt="Origin Wallet" style="width:52px; height:52px; border-radius:16px; object-fit:cover; box-shadow:0 18px 45px rgba(0,0,0,.24);" />
+          <div style="font-weight:800; font-size:22px; line-height:1.05;">Origin<br />Wallet</div>
+        </div>
+        <p style="display:inline-block; margin:0 0 18px; padding:8px 14px; border-radius:999px; background:rgba(20,164,84,.16); color:#86efac; font-weight:700; font-size:13px; letter-spacing:.08em; text-transform:uppercase;">Global payments platform</p>
+        <h1 style="margin:0 0 18px; max-width:760px; font-size:56px; line-height:1.03; letter-spacing:0; font-weight:800;">${escapeHtml(route.headline)}</h1>
+        <p style="margin:0 0 34px; max-width:720px; font-size:19px; line-height:1.75; color:rgba(255,255,255,.82);">${escapeHtml(route.summary)}</p>
+        <p style="margin:0; color:rgba(255,255,255,.68); font-size:14px;">Loading secure app...</p>
+      </section>
     </main>`;
 
 const replaceSingle = (html, pattern, replacement) => {

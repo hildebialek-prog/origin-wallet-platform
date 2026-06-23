@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://khoinguyenoriginwallet.com/sitemap.xml
+Sitemap: https://originwallet.com/sitemap.xml

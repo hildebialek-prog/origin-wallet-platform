@@ -170,7 +170,7 @@ const AccountProfile = () => {
                       onChange={(event) => setFullName(event.target.value)}
                       className="h-12 border-[#d7d7d2] pl-10"
                       readOnly={hasSubmittedKycProfile}
-                      placeholder="Nguyen Van A"
+                      placeholder="Alex Tran"
                     />
                   </div>
                 </div>

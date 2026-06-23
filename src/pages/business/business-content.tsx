@@ -168,9 +168,9 @@ export const businessFeatures: BusinessFeature[] = [
     navDescription: "Connect your systems",
     heroTitle: "Connect finance workflows into your systems",
     heroDescription:
-      "Show how business payment operations can connect to internal systems through integration-led flows, Nium connectivity, automation, and cleaner operational design.",
+      "Show how business payment operations can connect to internal systems through integration-led flows, automation, and cleaner operational design.",
     sectionDescription:
-      "This page is aimed at businesses that want a more connected operating model across payments, reconciliation, internal tooling, or product-led finance workflows with a clearer Nium-backed platform story.",
+      "This page is aimed at businesses that want a more connected operating model across payments, reconciliation, internal tooling, or product-led finance workflows with a clearer platform story.",
     useCases: [
       "ERP and finance tooling",
       "Internal operations platforms",
@@ -183,7 +183,7 @@ export const businessFeatures: BusinessFeature[] = [
       "A clearer automation story",
       "Designed for operational system connectivity",
       "Useful for product and engineering review",
-      "Stronger Nium-backed platform positioning",
+      "Stronger Origin Wallet platform positioning",
     ],
     steps: [
       "Review the relevant business workflow",
@@ -268,19 +268,19 @@ export const BusinessFeaturePage = ({ feature }: { feature: BusinessFeature }) =
           "@type": "ListItem",
           position: 1,
           name: "Origin Wallet",
-          item: "https://khoinguyenoriginwallet.com/",
+          item: "https://originwallet.com/",
         },
         {
           "@type": "ListItem",
           position: 2,
           name: "Business",
-          item: "https://khoinguyenoriginwallet.com/business",
+          item: "https://originwallet.com/business",
         },
         {
           "@type": "ListItem",
           position: 3,
           name: feature.navLabel,
-          item: `https://khoinguyenoriginwallet.com${path}`,
+          item: `https://originwallet.com${path}`,
         },
       ],
     },

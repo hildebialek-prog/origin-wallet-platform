@@ -130,14 +130,14 @@ const TalkToSales = () => {
       "@context": "https://schema.org",
       "@type": "ContactPage",
       name: "Talk to Origin Wallet sales",
-      url: "https://khoinguyenoriginwallet.com/talk-to-sales",
+      url: "https://originwallet.com/talk-to-sales",
       description:
         "Answer a few questions so Origin Wallet can recommend the right cross-border payment, FX, and API workflow for your business.",
       mainEntity: {
         "@type": "Organization",
         name: "Origin Wallet",
-        email: "info@khoinguyentechnology.com",
-        url: "https://khoinguyenoriginwallet.com/",
+        email: "support@originwallet.com",
+        url: "https://originwallet.com/",
       },
     }),
     [],

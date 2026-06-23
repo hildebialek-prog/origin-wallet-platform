@@ -46,7 +46,7 @@ const useCases = [
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
   },
   {
-    quote: "API-led financial operations for software teams building embedded finance, reconciliation, and Nium-backed payment experiences.",
+    quote: "API-led financial operations for software teams building embedded finance, reconciliation, and payment experiences.",
     name: "SaaS Platforms",
     role: "API and integration-led finance workflows",
     avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
@@ -55,22 +55,22 @@ const useCases = [
 
 const partnerHighlights = [
   {
-    id: "nium",
+    id: "origin-wallet",
     label: "Primary Infrastructure",
-    name: "Nium",
-    badge: "Nium Rail",
-    title: "Origin Wallet routes wallet infrastructure through Nium",
+    name: "Origin Wallet",
+    badge: "Wallet Rail",
+    title: "Origin Wallet routes payment infrastructure through one operating layer",
     description:
-      "Nium is the primary infrastructure layer for customer onboarding, wallets, balances, FX quotes, beneficiaries, transfers, and provider-grade operational sync.",
+      "Origin Wallet provides one operating layer for customer onboarding, wallets, balances, FX quotes, beneficiaries, transfers, and operational sync.",
     tags: [
-      "Nium-backed accounts",
-      "Nium quotes and transfers",
+      "Wallet accounts",
+      "Quotes and transfers",
       "Single infrastructure rail",
     ],
     points: [
       "Use one production rail instead of asking customers to choose infrastructure options.",
-      "Keep KYC/KYB, beneficiaries, virtual accounts, FX, and transfers aligned to the Nium account model.",
-      "Reduce operational risk by keeping API keys, webhooks, and sync jobs scoped to one provider integration.",
+      "Keep KYC/KYB, beneficiaries, virtual accounts, FX, and transfers aligned to one account model.",
+      "Reduce operational risk by keeping API keys, webhooks, and sync jobs scoped to one integration.",
     ],
     accentClassName: "text-accent",
     iconWrapClassName: "border border-[#10162B] bg-[#0B1022] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
@@ -80,7 +80,7 @@ const partnerHighlights = [
     textWrapClassName: "pr-3",
     logo: (
       <div className="flex items-center gap-3">
-        <span className="text-3xl font-black tracking-tight text-white">Nium</span>
+        <span className="text-3xl font-black tracking-tight text-white">Origin</span>
         <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
           Live rail
         </span>
@@ -95,15 +95,15 @@ const Index = () => {
       "@context": "https://schema.org",
       "@type": "Organization",
       name: "Origin Wallet",
-      alternateName: ["Origin Wallet Global Payments", "KHOI NGUYEN Origin Wallet"],
-      url: "https://khoinguyenoriginwallet.com/",
-      logo: "https://khoinguyenoriginwallet.com/logo/logo.jpg",
-      image: "https://khoinguyenoriginwallet.com/content/banner.jpg",
+      alternateName: ["Origin Wallet Global Payments", "Origin Wallet Global"],
+      url: "https://originwallet.com/",
+      logo: "https://originwallet.com/logo/logo.jpg",
+      image: "https://originwallet.com/content/banner.jpg",
       description:
-        "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, and Nium-backed business payment operations.",
+        "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, and business payment operations.",
       parentOrganization: {
         "@type": "Organization",
-        name: "KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY",
+        name: "Origin Wallet",
       },
     },
     {
@@ -111,12 +111,12 @@ const Index = () => {
       "@type": "WebSite",
       name: "Origin Wallet",
       alternateName: "Origin Wallet Global Payments",
-      url: "https://khoinguyenoriginwallet.com/",
+      url: "https://originwallet.com/",
       description:
-        "Origin Wallet helps businesses and individuals manage global payments, balances, and Nium-backed financial workflows.",
+        "Origin Wallet helps businesses and individuals manage global payments, balances, and financial workflows.",
       potentialAction: {
         "@type": "SearchAction",
-        target: "https://khoinguyenoriginwallet.com/?q={search_term_string}",
+        target: "https://originwallet.com/?q={search_term_string}",
         "query-input": "required name=search_term_string",
       },
     },
@@ -125,8 +125,8 @@ const Index = () => {
   return (
     <div>
       <Seo
-        title="Origin Wallet | Global Payments Platform by KHOI NGUYEN TECHNOLOGY"
-        description="Origin Wallet is a global payments platform by KHOI NGUYEN TECHNOLOGY for multi-currency wallets, international transfers, business payments, and Nium-backed financial operations."
+        title="Origin Wallet | Global Payments Platform"
+        description="Origin Wallet is a global payments platform for multi-currency wallets, international transfers, business payments, and financial operations."
         path="/"
         image="/content/banner.jpg"
         schema={seoSchema}
@@ -157,19 +157,18 @@ const Index = () => {
                 </span>
               </h1>
               <p className="text-xl sm:text-2xl text-white/92 max-w-2xl leading-relaxed mb-10">
-                Origin Wallet helps businesses and individuals manage global payments, balances, international transfers, and Nium-backed financial operations through clearer workflows and secure APIs.
+                Origin Wallet helps businesses and individuals manage global payments, balances, international transfers, and financial operations through clearer workflows and secure APIs.
               </p>
               <p className="mb-10 max-w-3xl text-base leading-8 text-white/78 sm:text-lg">
                 Origin Wallet is building an embedded finance orchestration layer that connects businesses to
-                Nium infrastructure through a unified product, wallet, and API experience.
+                payment infrastructure through a unified product, wallet, and API experience.
               </p>
               <p className="mb-10 max-w-3xl text-sm leading-7 text-white/70">
-                Operated by <span className="font-semibold text-white">KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY</span>,
-                Origin Wallet focuses on global payments, multi-currency workflows, and Nium-backed financial operations.
+                Origin Wallet focuses on global payments, multi-currency workflows, and financial operations.
               </p>
               <div className="mb-10 flex flex-wrap gap-3 text-sm text-white/75">
                 {[
-                  "Nium infrastructure rail",
+                  "Origin Wallet infrastructure rail",
                   "Secure API integrations",
                   "Wallets, balances, and transfers",
                 ].map((item) => (
@@ -345,12 +344,12 @@ const Index = () => {
               Why choose Origin Wallet for global payments
             </h2>
             <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
-              Origin Wallet is designed to unify Nium connectivity, operational visibility,
+              Origin Wallet is designed to unify payment connectivity, operational visibility,
               multi-currency wallet management, and cross-border money movement inside one platform flow.
             </p>
             <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-muted-foreground">
               Our platform is designed to drive cross-border transaction volume by simplifying
-              Nium-backed financial operations for businesses and software-led teams.
+              financial operations for businesses and software-led teams.
             </p>
           </motion.div>
 
@@ -359,8 +358,8 @@ const Index = () => {
               {
                 icon: Layers3,
                 step: "01",
-                title: "Activate Nium",
-                desc: "Bring Nium onboarding, wallet, quote, beneficiary, and transfer operations into one operating layer.",
+                title: "Activate account setup",
+                desc: "Bring onboarding, wallet, quote, beneficiary, and transfer operations into one operating layer.",
               },
               {
                 icon: Workflow,
@@ -447,7 +446,7 @@ const Index = () => {
               { icon: Building2, title: "Business Payments", desc: "Support supplier payments, treasury workflows, and distributed business operations.", color: "bg-purple-500", href: "/business" },
               { icon: CreditCard, title: "Virtual Cards", desc: "Support digital spending workflows with clearer visibility and controls.", color: "bg-orange-500", href: "/personal" },
               { icon: TrendingUp, title: "FX Tools", desc: "Review rates and conversion details before confirming international transfers.", color: "bg-pink-500", href: "/pricing" },
-              { icon: Shield, title: "Provider Orchestration", desc: "Coordinate onboarding, balances, and payment workflows across multiple financial providers.", color: "bg-indigo-500", href: "/business/api" },
+              { icon: Shield, title: "Origin Wallet Infrastructure", desc: "Coordinate onboarding, balances, and payment workflows through one production rail.", color: "bg-indigo-500", href: "/business/api" },
             ].map((service, i) => (
               <motion.div
                 key={service.title}
@@ -479,14 +478,14 @@ const Index = () => {
         <div className="relative z-10 container-wide mx-auto px-4 text-center">
           <motion.div {...fadeUp}>
             <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
-              Build unified financial operations on Nium
+              Build unified financial operations on Origin Wallet
             </h2>
             <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
-              Our platform integrates with Nium via secure APIs to support cross-border wallets, balances, and payment workflows.
+              Our platform uses secure APIs to support cross-border wallets, balances, and payment workflows.
             </p>
             <p className="mx-auto mb-8 max-w-3xl text-sm leading-7 text-white/65">
               Built around a single infrastructure rail so onboarding, account setup, webhooks,
-              rates, beneficiaries, and transfers can stay aligned to the same Nium operating model.
+              rates, beneficiaries, and transfers can stay aligned to the same operating model.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">
@@ -549,7 +548,7 @@ const Index = () => {
             </h2>
             <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
               Explore a more transparent way to manage cross-border payments, balances, and
-              Nium-backed financial workflows.
+              Origin Wallet financial workflows.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/contact">

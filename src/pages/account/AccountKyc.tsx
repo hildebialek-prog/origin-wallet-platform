@@ -1812,7 +1812,7 @@ const AccountKyc = () => {
                 <label className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-sm text-gray-700">
                   <Checkbox checked={verificationConsent} onCheckedChange={(checked) => setVerificationConsent(checked === true)} />
                   <span>
-                    I confirm the information is accurate and consent to identity, document, face, AML, and Nium
+                    I confirm the information is accurate and consent to identity, document, face, AML, and Origin Wallet
                     onboarding checks.
                   </span>
                 </label>

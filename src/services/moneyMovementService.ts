@@ -1,6 +1,6 @@
 import { requestApi } from "@/services/apiClient";
 import type { ProviderSummary } from "@/services/fxOrderService";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName } from "@/lib/primaryProvider";
 
 export type ApiListPayload<T> = T[] | { data?: T[] };
 
@@ -274,4 +274,4 @@ export const syncProviderTransactions = (params: AuthenticatedParams & { provide
   );
 
 export const getProviderName = (providers: ProviderSummary[], providerId?: number | null) =>
-  providers.find((provider) => provider.id === providerId)?.name ?? (providerId ? PRIMARY_PROVIDER_NAME : "-");
+  providerId ? getProviderDisplayName(providers.find((provider) => provider.id === providerId)) : "-";

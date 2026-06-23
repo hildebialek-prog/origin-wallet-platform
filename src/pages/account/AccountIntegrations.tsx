@@ -36,7 +36,7 @@ import {
   type LinkResponse,
   type ProviderIntegrationItem,
 } from "@/services/providerAccountService";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayCode, getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 const openExternalUrl = (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
@@ -122,20 +122,20 @@ const getProviderSummary = (
   capability?: ProviderCapability,
 ) => {
   if (!isProfileComplete) {
-    return "Complete your profile first before starting Nium onboarding.";
+    return "Complete your profile first before starting account onboarding.";
   }
 
   const status = normalizeStatus(item.provider_account?.status);
   if (status && ["pending", "submitted", "under_review"].includes(status)) {
-    return "Your Nium onboarding is in review. We will unlock live wallet actions after the account is approved.";
+    return "Your account onboarding is in review. We will unlock live wallet actions after the account is approved.";
   }
 
   if (status === "active") {
-    return "Nium is connected and ready for the wallet features available on your account.";
+    return "Origin Wallet is connected and ready for the wallet features available on your account.";
   }
 
   if (status && ["rejected", "failed"].includes(status)) {
-    return "Nium onboarding needs attention. Contact support or retry when a fresh onboarding link becomes available.";
+    return "Account onboarding needs attention. Contact support or retry when a fresh onboarding link becomes available.";
   }
 
   if (normalizeStatus(item.integration_request?.status) === "pending" || item.request_pending) {
@@ -143,14 +143,14 @@ const getProviderSummary = (
   }
 
   if (item.can_connect && item.link_available) {
-    return "Nium onboarding is available now. Continue to Nium to complete the connection flow.";
+    return "Account onboarding is available now. Continue to complete the connection flow.";
   }
 
   if (item.can_request_connect) {
-    return "A manual Nium enablement request can be sent from this screen.";
+    return "A manual account enablement request can be sent from this screen.";
   }
 
-  return "Nium is not available for your account yet.";
+  return "Account setup is not available for your account yet.";
 };
 
 const getLinkTarget = (
@@ -166,7 +166,7 @@ const AccountIntegrations = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [requestProvider, setRequestProvider] = useState<ProviderIntegrationItem | null>(null);
-  const [requestNote, setRequestNote] = useState("Please enable Nium for my account.");
+  const [requestNote, setRequestNote] = useState("Please enable Origin Wallet account access.");
   const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
   const [handledCompletionKey, setHandledCompletionKey] = useState<string | null>(null);
 
@@ -212,7 +212,9 @@ const AccountIntegrations = () => {
     },
     onSuccess: async (payload, item) => {
       const nextMessage =
-        payload?.onboarding?.message || payload?.message || `${item.provider.name || PRIMARY_PROVIDER_NAME} onboarding started successfully.`;
+        payload?.onboarding?.message ||
+        payload?.message ||
+        `${getProviderDisplayName(item.provider)} onboarding started successfully.`;
       setRuntimeMessage(nextMessage);
       await refreshIntegrationState();
 
@@ -222,12 +224,12 @@ const AccountIntegrations = () => {
       }
 
       toast({
-        title: item.provider.name,
+        title: getProviderDisplayName(item.provider),
         description: nextMessage,
       });
     },
     onError: async (error) => {
-      const message = error instanceof Error ? error.message : "Unable to start Nium onboarding.";
+      const message = error instanceof Error ? error.message : "Unable to start account onboarding.";
       await handleAuthError(message);
       toast({
         variant: "destructive",
@@ -249,10 +251,10 @@ const AccountIntegrations = () => {
     onSuccess: async (payload) => {
       toast({
         title: "Request submitted",
-        description: payload?.message || "Nium connection request submitted successfully.",
+        description: payload?.message || "Account connection request submitted successfully.",
       });
       setRequestProvider(null);
-      setRequestNote("Please enable Nium for my account.");
+      setRequestNote("Please enable Origin Wallet account access.");
       await refreshIntegrationState();
     },
     onError: async (error) => {
@@ -293,12 +295,12 @@ const AccountIntegrations = () => {
     onSuccess: async (payload) => {
       toast({
         title: "Onboarding updated",
-        description: payload?.message || "Nium onboarding completion was processed successfully.",
+        description: payload?.message || "Account onboarding completion was processed successfully.",
       });
       await refreshIntegrationState();
     },
     onError: async (error) => {
-      const message = error instanceof Error ? error.message : "Unable to complete Nium onboarding.";
+      const message = error instanceof Error ? error.message : "Unable to complete account onboarding.";
       await handleAuthError(message);
       toast({
         variant: "destructive",
@@ -359,7 +361,7 @@ const AccountIntegrations = () => {
       : onboarding?.selected_provider_account_status ?? null;
   const onboardingMessage =
     isProfileComplete && isIncompleteProfileMessage(onboarding?.message)
-      ? "Profile verified. Start Nium onboarding to enable account infrastructure."
+      ? "Profile verified. Start account onboarding to enable account infrastructure."
       : onboarding?.message;
 
   return (
@@ -369,7 +371,7 @@ const AccountIntegrations = () => {
           <div className="space-y-3">
             <h1 className="text-[3.2rem] font-bold tracking-[-0.04em] text-[#111111] dark:text-white">Integrations</h1>
             <p className="max-w-3xl text-[1.05rem] text-[#6c6c68] dark:text-gray-400">
-              Review your Nium setup, start onboarding, and request access when a manual onboarding link still needs to be assigned to your account.
+              Review your account setup, start onboarding, and request access when a manual onboarding link still needs to be assigned to your account.
             </p>
           </div>
 
@@ -384,7 +386,7 @@ const AccountIntegrations = () => {
             ) : (
               <RefreshCcw className="mr-2 h-4 w-4" />
             )}
-            Refresh Nium setup
+            Refresh account setup
           </Button>
         </div>
 
@@ -393,9 +395,9 @@ const AccountIntegrations = () => {
             <div className="flex items-start gap-3">
               <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
               <div className="space-y-1">
-                <p className="font-semibold">Complete your profile before connecting Nium.</p>
+                <p className="font-semibold">Complete your profile before activating your account.</p>
                 <p className="text-sm">
-                  {onboardingMessage || "Profile completion is required before Nium onboarding can continue."}{" "}
+                  {onboardingMessage || "Profile completion is required before account onboarding can continue."}{" "}
                   <Link to="/account/settings/profile" className="font-semibold underline underline-offset-4">
                     Update profile
                   </Link>
@@ -414,7 +416,7 @@ const AccountIntegrations = () => {
                 <p className="text-sm text-[#5f5f5a] dark:text-gray-400">{runtimeMessage || onboardingMessage}</p>
                 {selectedProviderStatus && (
                   <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#7a7a74] dark:text-gray-500">
-                    Nium status: {selectedProviderStatus}
+                    Account status: {selectedProviderStatus}
                   </p>
                 )}
               </div>
@@ -433,7 +435,7 @@ const AccountIntegrations = () => {
                     ? integrationsQuery.error.message
                     : providersQuery.error instanceof Error
                       ? providersQuery.error.message
-                      : "Something went wrong while loading Nium setup data."}
+                      : "Something went wrong while loading account setup data."}
                 </p>
               </div>
             </div>
@@ -460,7 +462,7 @@ const AccountIntegrations = () => {
 
                     <div className="min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-3">
-                        <h2 className="text-[1.2rem] font-semibold text-[#232323] dark:text-white">{item.provider.name}</h2>
+                        <h2 className="text-[1.2rem] font-semibold text-[#232323] dark:text-white">{getProviderDisplayName(item.provider)}</h2>
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${badge.className}`}>
                           {badge.label}
                         </span>
@@ -476,8 +478,10 @@ const AccountIntegrations = () => {
                       </p>
 
                       <div className="flex flex-wrap gap-3 text-sm text-[#6f6f6b] dark:text-gray-400">
-                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Code: {item.provider.code}</span>
-                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Nium status: {item.provider.status}</span>
+                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
+                          Code: {getProviderDisplayCode(item.provider.code)}
+                        </span>
+                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Account status: {item.provider.status}</span>
                         {item.integration_request?.requested_at && (
                           <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
                             Requested: {new Date(item.integration_request.requested_at).toLocaleDateString()}
@@ -518,7 +522,7 @@ const AccountIntegrations = () => {
                         ) : (
                           <ExternalLink className="mr-2 h-4 w-4" />
                         )}
-                        {item.integration_link?.link_label || "Connect Nium"}
+                        {item.integration_link?.link_label || "Continue setup"}
                       </Button>
                     )}
 
@@ -532,7 +536,7 @@ const AccountIntegrations = () => {
                             return;
                           }
                           setRequestProvider(item);
-                          setRequestNote(item.integration_request?.note || "Please enable Nium for my account.");
+                          setRequestNote(item.integration_request?.note || "Please enable Origin Wallet account access.");
                         }}
                       >
                         <SendHorizonal className="mr-2 h-4 w-4" />
@@ -584,7 +588,7 @@ const AccountIntegrations = () => {
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center gap-3 p-6 text-[#6f6f6b] dark:text-gray-400">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Loading Nium integration...
+                Loading account integration...
               </CardContent>
             </Card>
           )}
@@ -592,7 +596,7 @@ const AccountIntegrations = () => {
           {!integrationsQuery.isLoading && !integrationsQuery.error && providerItems.length === 0 && (
             <Card className="rounded-2xl border border-dashed border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="p-6 text-[#6f6f6b] dark:text-gray-400">
-                Nium onboarding is not available for this account yet.
+                Account onboarding is not available for this account yet.
               </CardContent>
             </Card>
           )}
@@ -602,23 +606,23 @@ const AccountIntegrations = () => {
       <Dialog open={!!requestProvider} onOpenChange={(open) => !open && !requestConnectMutation.isPending && setRequestProvider(null)}>
         <DialogContent className="rounded-3xl border-[#d7d7d2] bg-white sm:max-w-xl dark:border-white/10 dark:bg-[#1b2027]">
           <DialogHeader>
-            <DialogTitle className="text-[#111111] dark:text-white">Request Nium access</DialogTitle>
+            <DialogTitle className="text-[#111111] dark:text-white">Request account access</DialogTitle>
             <DialogDescription>
               {requestProvider
-                ? `Send a request to enable ${requestProvider.provider.name || PRIMARY_PROVIDER_NAME} for your account.`
-                : "Send a request to enable Nium for your account."}
+                ? "Send a request to enable Origin Wallet for your account."
+                : "Send a request to enable Origin Wallet for your account."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <p className="text-sm text-[#6f6f6b] dark:text-gray-400">
-              The note is optional, but it helps explain what you need from the Nium connection.
+              The note is optional, but it helps explain what you need from the account connection.
             </p>
             <Textarea
               value={requestNote}
               onChange={(event) => setRequestNote(event.target.value)}
               rows={5}
-              placeholder="Please enable Nium for my account."
+              placeholder="Please enable Origin Wallet account access."
               className="rounded-2xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#11161d]"
             />
           </div>

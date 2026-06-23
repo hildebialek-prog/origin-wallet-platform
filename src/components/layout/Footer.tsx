@@ -69,28 +69,28 @@ const Footer = () => {
               <p className="mb-2">
                 Operated by{" "}
                 <strong className="text-primary-foreground/70">
-                  KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY
+                  Origin Wallet
                 </strong>
               </p>
               <p>
-                Legal entity: CONG TY CO PHAN CONG NGHE KHOI NGUYEN. Tax ID: 0111409165.
+                Independent global payment experience for multi-currency workflows.
                 Registered address: So 23 ngach 157/6 Duc Giang, To 18, Phuong Viet Hung,
                 Ha Noi, Viet Nam. Contact:{" "}
                 <a
-                  href="mailto:info@khoinguyentechnology.com"
+                  href="mailto:support@originwallet.com"
                   className="text-primary-foreground/70 underline-offset-4 transition-colors hover:text-primary-foreground hover:underline"
                 >
-                  info@khoinguyentechnology.com
+                  support@originwallet.com
                 </a>
-                . Origin Wallet is a financial technology platform focused on Nium-backed
+                . Origin Wallet is a financial technology platform focused on secure
                 cross-border payment workflows. Service availability, regulatory treatment, and
                 scope may vary by jurisdiction. The platform is currently onboarding early users
-                and aligning wallet, account, FX, beneficiary, and transfer workflows to Nium
-                where available.
+                and aligning wallet, account, FX, beneficiary, and transfer workflows into one
+                operating layer where available.
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">
-              Copyright {new Date().getFullYear()} KHOI NGUYEN TECHNOLOGY JOINT STOCK COMPANY. All rights reserved.
+              Copyright {new Date().getFullYear()} Origin Wallet. All rights reserved.
             </div>
           </div>
         </div>

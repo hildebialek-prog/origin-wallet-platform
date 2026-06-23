@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getProviders, type ProviderSummary } from "@/services/fxOrderService";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import {
   getBalances,
   syncProviderBalances,
@@ -64,7 +64,7 @@ const AccountBalances = () => {
     return [
       balance.currency,
       balance.external_account_id,
-      provider?.name,
+      getProviderDisplayName(provider),
       provider?.code,
     ]
       .filter(Boolean)
@@ -101,7 +101,7 @@ const AccountBalances = () => {
                   <p className="mt-1 text-xs text-[#7a879c] dark:text-gray-500">
                     {balances.length
                       ? `${balances.length} balance records across ${totalCurrencies} currencies`
-                      : "Sync Nium balances to display wallet funds."}
+                      : "Sync wallet balances to display funds."}
                   </p>
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#ecfdf3] dark:bg-[#16a34a]/10">
@@ -114,7 +114,7 @@ const AccountBalances = () => {
           <Card className="border border-[#d7d7d2] bg-white shadow-sm dark:border-white/10 dark:bg-[#151b24]">
             <CardContent className="space-y-4 p-6">
               <div>
-                <p className="text-sm font-medium text-[#62708a] dark:text-gray-400">Nium sync</p>
+                <p className="text-sm font-medium text-[#62708a] dark:text-gray-400">Wallet sync</p>
                 <p className="mt-1 text-xl font-bold text-[#0f2442] dark:text-white">Refresh live balances</p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -128,11 +128,11 @@ const AccountBalances = () => {
                       className="h-10 rounded-full border-[#d7d7d2] bg-white px-4 text-sm font-semibold text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white"
                     >
                       {syncMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                      {provider.name}
+                      {getProviderDisplayName(provider)}
                     </Button>
                   ))
                 ) : (
-                  <p className="text-sm text-[#62708a] dark:text-gray-400">No Nium balance sync is configured yet.</p>
+                  <p className="text-sm text-[#62708a] dark:text-gray-400">No wallet balance sync is configured yet.</p>
                 )}
               </div>
               {syncError ? <p className="text-sm font-medium text-red-600">{syncError}</p> : null}
@@ -145,7 +145,7 @@ const AccountBalances = () => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
-              placeholder="Search currency, account, or Nium reference"
+              placeholder="Search currency, account, or wallet reference"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               className="h-11 w-full rounded-full border border-[#d7d7d2] bg-white pl-10 pr-4 text-sm transition-colors focus:border-[#16a34a] focus:outline-none focus:ring-2 focus:ring-[#16a34a]/20 dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:placeholder:text-gray-500"
@@ -205,7 +205,7 @@ const AccountBalances = () => {
                             fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                           />
                           <span className="text-sm font-medium text-[#0f2442] dark:text-white">
-                            {provider?.name || PRIMARY_PROVIDER_NAME}
+                            {provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}
                           </span>
                         </div>
                       </td>
@@ -234,7 +234,7 @@ const AccountBalances = () => {
                 {balancesQuery.isLoading ? "Loading balances..." : "No balance data available"}
               </p>
               <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-                Complete Nium setup and sync balances before initiating live transfers.
+                Complete account setup and sync balances before initiating live transfers.
               </p>
               <Button asChild className="mt-5 rounded-full bg-[#16a34a] px-5 font-semibold text-white hover:bg-[#15803d]">
                 <Link to="/account/integrations">

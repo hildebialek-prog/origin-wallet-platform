@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { countryOptions } from "@/lib/money";
-import { PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import { getProviderReference, requestProviderConnect } from "@/services/providerAccountService";
 
 const countryCurrencyMap: Record<string, string> = {
@@ -165,7 +165,7 @@ const AccountVirtualAccountRequest = () => {
   const requestMutation = useMutation({
     mutationFn: async () => {
       if (!providerCode || !alias.trim()) {
-        throw new Error("Nium account setup and account alias are required.");
+        throw new Error("Account setup and account alias are required.");
       }
 
       if (requestCurrencies.length === 0) {
@@ -221,7 +221,7 @@ const AccountVirtualAccountRequest = () => {
           Request virtual account
         </h1>
         <p className="mb-10 max-w-2xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-          Submit the required receiving account setup details. Operations can complete this manually now and map it to Nium virtual account APIs once the official integration is enabled.
+          Submit the required receiving account setup details. Operations can complete this manually now and map it to virtual account APIs once the official integration is enabled.
         </p>
 
         <div className="max-w-[36rem] space-y-6">
@@ -242,7 +242,7 @@ const AccountVirtualAccountRequest = () => {
               Infrastructure rail
             </p>
             <p className="mt-1 text-[1rem] font-semibold text-[#0f2442] dark:text-white">
-              {selectedProvider?.name ?? PRIMARY_PROVIDER_NAME}
+              {selectedProvider ? getProviderDisplayName(selectedProvider) : PRIMARY_PROVIDER_NAME}
             </p>
           </div>
 
