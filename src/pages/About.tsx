@@ -509,7 +509,7 @@ const About = () => {
                 },
                 {
                   label: "Registered address",
-                  value: "Viet Hung Ward, Ha Noi, Viet Nam",
+                  value: "Unit 2610, APEC Plaza, 49 Hoi Yuen Road, Kwun Tong, Hong Kong",
                   tone: "text-white",
                 },
               ].map((item) => (

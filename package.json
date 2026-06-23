@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "npm@10.9.2",
   "description": "Origin Wallet - Ví điện tử dựa trên nền tảng, gốc rễ, bền vững",
-  "author": "KHOI NGUYEN TECHNOLOGY JSC",
+  "author": "Origin Wallet",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/prerender.mjs",

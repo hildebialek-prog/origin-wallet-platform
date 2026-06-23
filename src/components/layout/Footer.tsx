@@ -74,8 +74,8 @@ const Footer = () => {
               </p>
               <p>
                 Independent global payment experience for multi-currency workflows.
-                Registered address: So 23 ngach 157/6 Duc Giang, To 18, Phuong Viet Hung,
-                Ha Noi, Viet Nam. Contact:{" "}
+                Registered address: Unit 2610, APEC Plaza, 49 Hoi Yuen Road, Kwun Tong,
+                Hong Kong. Contact:{" "}
                 <a
                   href="mailto:support@originwallet.com"
                   className="text-primary-foreground/70 underline-offset-4 transition-colors hover:text-primary-foreground hover:underline"
