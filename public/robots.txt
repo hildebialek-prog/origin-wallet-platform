@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://originwallet.com/sitemap.xml
+Sitemap: https://originwallet.asia/sitemap.xml

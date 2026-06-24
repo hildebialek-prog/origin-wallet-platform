@@ -41,19 +41,19 @@ const Contact = () => {
     "@context": "https://schema.org",
     "@type": "ContactPage",
     name: "Contact Origin Wallet",
-    url: "https://originwallet.com/contact",
+    url: "https://originwallet.asia/contact",
     description:
       "Contact Origin Wallet for product enquiries, partnerships, support, security follow-up, and cross-border payment workflow discussions.",
     mainEntity: {
       "@type": "Organization",
       name: "Origin Wallet",
-      email: "support@originwallet.com",
-      url: "https://originwallet.com/",
+      email: "support@originwallet.asia",
+      url: "https://originwallet.asia/",
       contactPoint: [
         {
           "@type": "ContactPoint",
           contactType: "customer support",
-          email: "support@originwallet.com",
+          email: "support@originwallet.asia",
           availableLanguage: ["en", "vi"],
         },
       ],
@@ -303,14 +303,14 @@ const Contact = () => {
                   </p>
                   <p>
                     <strong className="text-foreground">Email:</strong>{" "}
-                    support@originwallet.com
+                    support@originwallet.asia
                   </p>
                   <p>
                     <strong className="text-foreground">Region:</strong> Global payment workflows
                   </p>
                   <p>
                     <strong className="text-foreground">Website:</strong>{" "}
-                    originwallet.com
+                    originwallet.asia
                   </p>
                 </div>
               </div>

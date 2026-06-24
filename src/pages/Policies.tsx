@@ -15,7 +15,7 @@ const sections = [
       { heading: "6. Your Rights", text: "Depending on your jurisdiction, you may have rights to access, correct, delete, or restrict processing of your personal data. Contact us to exercise these rights." },
       { heading: "7. Cookies", text: "We use cookies and similar technologies to improve your experience, analyze usage, and personalize content. You can manage cookie preferences through your browser settings." },
       { heading: "8. Changes to This Policy", text: "We may update this Privacy Policy from time to time. We will notify you of significant changes by posting a notice on our website or sending you a direct notification." },
-      { heading: "9. Contact", text: "For questions about this Privacy Policy, please contact us through the contact page on our website or by email at support@originwallet.com." },
+      { heading: "9. Contact", text: "For questions about this Privacy Policy, please contact us through the contact page on our website or by email at support@originwallet.asia." },
     ],
   },
   {

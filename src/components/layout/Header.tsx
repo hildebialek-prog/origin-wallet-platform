@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown, LogIn, LogOut, User, Languages } from "lucide-react";
+import { Menu, X, ChevronDown, LogIn, LogOut, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import LanguageSelector from "@/components/LanguageSelector";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
@@ -121,14 +120,13 @@ const Header = () => {
         </nav>
 
         <div className="hidden xl:flex items-center gap-2">
-          <LanguageSelector compact />
           <Link to="/pricing">
             <Button variant="ghost" size="sm" className="px-3">
               Compare fees
             </Button>
           </Link>
           <Link to="/talk-to-sales">
-            <Button variant="outline" size="sm" className="px-3">
+            <Button variant="hero" size="sm" className="rounded-lg px-4 text-white shadow-[0_14px_32px_-20px_rgba(16,185,129,0.95)]">
               Talk to sales
             </Button>
           </Link>
@@ -174,16 +172,6 @@ const Header = () => {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden border-b border-border bg-card xl:hidden"
           >
-            <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-4 dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30">
-              <div className="mb-3 flex items-center gap-2">
-                <Languages className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-semibold text-blue-900 dark:text-blue-300">Select language</span>
-              </div>
-              <div className="w-full">
-                <LanguageSelector variant="mobile" />
-              </div>
-            </div>
-
             <nav className="space-y-1 px-4 py-4">
               {navItems.map((item) => (
                 <div key={item.label}>

@@ -147,7 +147,7 @@ Avoid using `click here`, `learn more`, or repeated generic CTA anchors when a k
 
 After each deploy:
 
-1. Submit `https://khoinguyenoriginwallet.com/sitemap.xml`
+1. Submit `https://originwallet.asia/sitemap.xml`
 2. Request indexing for `/`
 3. Request indexing for `/business`
 4. Request indexing for `/personal`

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const siteUrl = "https://originwallet.com";
+const siteUrl = "https://originwallet.asia";
 
 type SeoProps = {
   title: string;

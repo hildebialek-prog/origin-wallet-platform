@@ -33,7 +33,7 @@ const Layout = () => {
         <div className="relative">
           <button
             onClick={() => setShowLangMenu(!showLangMenu)}
-            className={`w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all flex items-center justify-center ${
+            className={`flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/45 bg-[radial-gradient(circle_at_30%_20%,#1fd190_0%,#0f9f63_42%,#071615_100%)] text-white shadow-[0_20px_48px_-20px_rgba(16,185,129,0.9)] ring-1 ring-emerald-200/20 transition-all hover:scale-110 hover:shadow-[0_24px_56px_-18px_rgba(16,185,129,0.95)] ${
               isTranslating ? 'animate-pulse' : ''
             }`}
             title="Change language"
@@ -56,16 +56,16 @@ const Layout = () => {
               />
               
               {/* Menu - Center on mobile, right on desktop */}
-              <div className="absolute bottom-16 right-0 md:right-0 w-64 sm:w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <div className="absolute bottom-16 right-0 z-50 w-64 overflow-hidden rounded-2xl border border-emerald-200/60 bg-white shadow-[0_24px_70px_-32px_rgba(2,9,8,0.8)] animate-in fade-in slide-in-from-bottom-2 duration-200 sm:w-56 dark:border-emerald-900/60 dark:bg-gray-900">
+                <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                  <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-100">
                     Select Language
                   </p>
                   <button
                     onClick={() => setShowLangMenu(false)}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="rounded-full p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
                   >
-                    <X className="w-4 h-4 text-gray-500" />
+                    <X className="h-4 w-4 text-emerald-900 dark:text-emerald-200" />
                   </button>
                 </div>
                 <div className="p-2 max-h-[70vh] overflow-y-auto">
@@ -75,8 +75,8 @@ const Layout = () => {
                       onClick={() => handleLanguageChange(lang.code)}
                       className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
                         lang.code === currentLanguage
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                          : 'text-gray-900 hover:bg-emerald-50 dark:text-white dark:hover:bg-emerald-900/20'
                       }`}
                     >
                       <span className="text-2xl">{lang.flag}</span>
@@ -85,7 +85,7 @@ const Layout = () => {
                         <span className="text-xs text-gray-500 dark:text-gray-400">{lang.nativeName}</span>
                       </div>
                       {lang.code === currentLanguage && (
-                        <svg className="w-5 h-5 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="ml-auto h-5 w-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -94,9 +94,9 @@ const Layout = () => {
                 </div>
                 
                 {/* Language info */}
-                <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                    <Globe className="w-3 h-3" />
+                <div className="border-t border-emerald-100 bg-emerald-50/55 px-4 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                  <p className="flex items-center gap-1 text-xs text-emerald-900/65 dark:text-emerald-100/70">
+                    <Globe className="h-3 w-3" />
                     Translated by Google
                   </p>
                 </div>

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const siteUrl = "https://originwallet.com";
+const siteUrl = "https://originwallet.asia";
 const distDir = path.resolve("dist");
 const sourceHtmlPath = path.join(distDir, "index.html");
 

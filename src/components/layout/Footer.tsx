@@ -77,10 +77,10 @@ const Footer = () => {
                 Registered address: Unit 2610, APEC Plaza, 49 Hoi Yuen Road, Kwun Tong,
                 Hong Kong. Contact:{" "}
                 <a
-                  href="mailto:support@originwallet.com"
+                  href="mailto:support@originwallet.asia"
                   className="text-primary-foreground/70 underline-offset-4 transition-colors hover:text-primary-foreground hover:underline"
                 >
-                  support@originwallet.com
+                  support@originwallet.asia
                 </a>
                 . Origin Wallet is a financial technology platform focused on secure
                 cross-border payment workflows. Service availability, regulatory treatment, and

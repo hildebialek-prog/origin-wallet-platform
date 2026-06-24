@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Users,
   ChevronDown,
-  Play,
   Layers3,
   Network,
   Workflow,
@@ -96,9 +95,9 @@ const Index = () => {
       "@type": "Organization",
       name: "Origin Wallet",
       alternateName: ["Origin Wallet Global Payments", "Origin Wallet Global"],
-      url: "https://originwallet.com/",
-      logo: "https://originwallet.com/logo/logo.jpg",
-      image: "https://originwallet.com/content/banner.jpg",
+      url: "https://originwallet.asia/",
+      logo: "https://originwallet.asia/logo/logo.jpg",
+      image: "https://originwallet.asia/content/banner.jpg",
       description:
         "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, and business payment operations.",
       parentOrganization: {
@@ -111,12 +110,12 @@ const Index = () => {
       "@type": "WebSite",
       name: "Origin Wallet",
       alternateName: "Origin Wallet Global Payments",
-      url: "https://originwallet.com/",
+      url: "https://originwallet.asia/",
       description:
         "Origin Wallet helps businesses and individuals manage global payments, balances, and financial workflows.",
       potentialAction: {
         "@type": "SearchAction",
-        target: "https://originwallet.com/?q={search_term_string}",
+        target: "https://originwallet.asia/?q={search_term_string}",
         "query-input": "required name=search_term_string",
       },
     },
@@ -132,68 +131,55 @@ const Index = () => {
         schema={seoSchema}
         pageName="Origin Wallet"
       />
-      <section className="relative min-h-screen flex items-center overflow-hidden">
+      <section className="relative flex min-h-screen items-center overflow-hidden bg-[#020908]">
         <div
           className="absolute inset-0 z-0"
           style={{
             backgroundImage: `url(${heroBg})`,
             backgroundSize: "cover",
-            backgroundPosition: "center",
+            backgroundPosition: "center right",
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/88 via-black/70 to-black/45 z-10" />
+        <div className="absolute inset-0 z-10 bg-[linear-gradient(90deg,rgba(2,9,8,0.97)_0%,rgba(2,18,15,0.93)_34%,rgba(2,18,15,0.66)_62%,rgba(2,9,8,0.28)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 z-10 h-44 bg-gradient-to-t from-[#020908] to-transparent" />
 
-        <div className="relative z-20 container-wide mx-auto px-4 sm:px-6 lg:px-8 py-32">
-          <div className="max-w-4xl rounded-[32px] border border-white/10 bg-slate-950/32 p-6 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] backdrop-blur-md sm:p-8 lg:p-10">
-            <motion.div {...fadeUp}>
-              <span className="inline-block px-4 py-1.5 bg-accent text-white text-sm font-semibold rounded-full mb-6">
-                Origin Wallet Global Payments Platform
-              </span>
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.95] mb-8">
-                ORIGIN WALLET
-                <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-yellow-400">
-                  GLOBAL PAYMENTS
-                </span>
-              </h1>
-              <p className="text-xl sm:text-2xl text-white/92 max-w-2xl leading-relaxed mb-10">
-                Origin Wallet helps businesses and individuals manage global payments, balances, international transfers, and financial operations through clearer workflows and secure APIs.
+        <div className="relative z-20 container-wide mx-auto px-4 py-32 sm:px-6 lg:px-8 lg:py-40">
+          <motion.div {...fadeUp} className="max-w-5xl">
+            <span className="mb-8 inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-5 py-2 text-sm font-bold uppercase tracking-[0.18em] text-emerald-200 shadow-[0_18px_60px_-34px_rgba(16,185,129,0.9)]">
+              Origin Wallet Global Payments Platform
+            </span>
+            <h1 className="max-w-5xl text-5xl font-black leading-[0.9] text-white drop-shadow-[0_10px_34px_rgba(0,0,0,0.55)] sm:text-6xl lg:text-7xl xl:text-8xl">
+              Move money globally with one
+              <span className="block text-emerald-300">Origin Wallet.</span>
+            </h1>
+            <p className="mt-8 max-w-2xl text-lg font-medium leading-8 text-white/90 drop-shadow-[0_8px_28px_rgba(0,0,0,0.58)] sm:text-xl">
+              Manage global payments, multi-currency balances, international transfers, virtual accounts,
+              beneficiaries, and financial operations through a single secure platform.
+            </p>
+
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <Link to="/auth">
+                <Button variant="hero" size="lg" className="rounded-full px-8 text-base shadow-[0_18px_50px_-22px_rgba(16,185,129,0.95)]">
+                  Get started <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/contact">
+                <Button variant="hero-outline" size="lg" className="rounded-full border-white/40 px-8 text-base text-white hover:bg-white hover:text-slate-950">
+                  Contact sales
+                </Button>
+              </Link>
+            </div>
+
+            <div className="mt-12 max-w-3xl border-l-2 border-emerald-300 bg-black/20 py-1 pl-5 backdrop-blur-[1px]">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                Built for operational finance teams
               </p>
-              <p className="mb-10 max-w-3xl text-base leading-8 text-white/78 sm:text-lg">
-                Origin Wallet is building an embedded finance orchestration layer that connects businesses to
-                payment infrastructure through a unified product, wallet, and API experience.
+              <p className="mt-3 text-base font-medium leading-7 text-white/80">
+                One account experience for collections, payouts, FX workflow, customer onboarding, and
+                API-led payment operations.
               </p>
-              <p className="mb-10 max-w-3xl text-sm leading-7 text-white/70">
-                Origin Wallet focuses on global payments, multi-currency workflows, and financial operations.
-              </p>
-              <div className="mb-10 flex flex-wrap gap-3 text-sm text-white/75">
-                {[
-                  "Origin Wallet infrastructure rail",
-                  "Secure API integrations",
-                  "Wallets, balances, and transfers",
-                ].map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-white/15 bg-white/10 px-4 py-2 backdrop-blur-sm"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-4">
-                <Link to="/contact">
-                  <Button variant="hero" size="lg" className="text-base px-8">
-                    <Play className="w-4 h-4 mr-2" /> Request Access
-                  </Button>
-                </Link>
-                <Link to="/business/api">
-                  <Button variant="hero-outline" size="lg" className="text-base px-8">
-                    Book Demo
-                  </Button>
-                </Link>
-              </div>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}

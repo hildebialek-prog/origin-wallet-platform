@@ -3,8 +3,8 @@
   publish = "dist"
 
 [[redirects]]
-  from = "https://www.khoinguyenoriginwallet.com/*"
-  to = "https://khoinguyenoriginwallet.com/:splat"
+  from = "https://www.originwallet.asia/*"
+  to = "https://originwallet.asia/:splat"
   status = 301
   force = true
 
