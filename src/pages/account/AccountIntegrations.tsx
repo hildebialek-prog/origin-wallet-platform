@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
@@ -187,13 +187,13 @@ const AccountIntegrations = () => {
     [providersQuery.data],
   );
 
-  const refreshIntegrationState = async () => {
+  const refreshIntegrationState = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["provider-integrations", user?.id, token] }),
       queryClient.invalidateQueries({ queryKey: ["providers-reference"] }),
       refreshSession(),
     ]);
-  };
+  }, [queryClient, refreshSession, token, user?.id]);
 
   const handleAuthError = async (message: string) => {
     if (message.includes("401") || message.includes("403")) {
@@ -338,6 +338,12 @@ const AccountIntegrations = () => {
 
     setHandledCompletionKey(completionKey);
 
+    if (providerCode.toLowerCase() === "nium") {
+      setRuntimeMessage("Nium onboarding status is controlled by verified backend responses. Refreshing account status.");
+      void refreshIntegrationState();
+      return;
+    }
+
     completionMutation.mutate({
       providerCode,
       status,
@@ -345,7 +351,7 @@ const AccountIntegrations = () => {
       externalAccountId,
       accountName,
     });
-  }, [completionMutation, handledCompletionKey, searchParams, token, user?.id]);
+  }, [completionMutation, handledCompletionKey, refreshIntegrationState, searchParams, token, user?.id]);
 
   const providerItems = integrationsQuery.data ?? [];
   const integrationKycVerified = providerItems.some((item) => item.internal_kyc_verified);
@@ -481,7 +487,22 @@ const AccountIntegrations = () => {
                         <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
                           Code: {getProviderDisplayCode(item.provider.code)}
                         </span>
-                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">Account status: {item.provider.status}</span>
+                        <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
+                          Account status: {item.provider_account?.status || "not started"}
+                        </span>
+                        {item.provider_account?.provider_status && (
+                          <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
+                            Nium status: {formatStatusLabel(item.provider_account.provider_status)}
+                            {item.provider_account.provider_sub_status
+                              ? ` / ${formatStatusLabel(item.provider_account.provider_sub_status)}`
+                              : ""}
+                          </span>
+                        )}
+                        {item.provider_account?.rfi_status === "requested" && (
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                            Additional information required
+                          </span>
+                        )}
                         {item.integration_request?.requested_at && (
                           <span className="rounded-full bg-[#f5f5f2] px-3 py-1 dark:bg-white/5">
                             Requested: {new Date(item.integration_request.requested_at).toLocaleDateString()}

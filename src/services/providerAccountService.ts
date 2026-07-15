@@ -13,6 +13,11 @@ export interface IntegrationProvider {
 export interface ProviderAccount {
   id: number;
   status: string;
+  provider_status?: string | null;
+  provider_sub_status?: string | null;
+  compliance_status?: string | null;
+  rfi_status?: string | null;
+  odd_status?: string | null;
   external_customer_id?: string | null;
   external_account_id?: string | null;
   account_name?: string | null;
@@ -104,8 +109,15 @@ export const completeProviderAccount = (params: AuthenticatedParams & {
   externalCustomerId?: string | null;
   externalAccountId?: string | null;
   accountName?: string | null;
-}) =>
-  requestApi<LinkResponse>(
+}) => {
+  if (
+    params.providerCode.toLowerCase() === "nium" &&
+    (params.status || params.externalCustomerId || params.externalAccountId)
+  ) {
+    return Promise.reject(new Error("Nium status and provider IDs can only be updated by the backend."));
+  }
+
+  return requestApi<LinkResponse>(
     `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/complete`,
     {
       method: "POST",
@@ -118,3 +130,4 @@ export const completeProviderAccount = (params: AuthenticatedParams & {
       },
     },
   );
+};
