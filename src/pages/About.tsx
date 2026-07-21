@@ -509,7 +509,7 @@ const About = () => {
                 },
                 {
                   label: "Registered address",
-                  value: "Unit 2610, APEC Plaza, 49 Hoi Yuen Road, Kwun Tong, Hong Kong",
+                  value: "FLAT/ROOM 1618B, 16/F, PIONEER CENTRE, 750 NATHAN ROAD, MONGKOK, KOWLOON, HONG KONG",
                   tone: "text-white",
                 },
               ].map((item) => (

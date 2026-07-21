@@ -74,8 +74,8 @@ const Footer = () => {
               </p>
               <p>
                 Independent global payment experience for multi-currency workflows.
-                Registered address: Unit 2610, APEC Plaza, 49 Hoi Yuen Road, Kwun Tong,
-                Hong Kong. Contact:{" "}
+                Registered address: FLAT/ROOM 1618B, 16/F, PIONEER CENTRE, 750 NATHAN
+                ROAD, MONGKOK, KOWLOON, HONG KONG. Contact:{" "}
                 <a
                   href="mailto:support@originwallet.asia"
                   className="text-primary-foreground/70 underline-offset-4 transition-colors hover:text-primary-foreground hover:underline"
