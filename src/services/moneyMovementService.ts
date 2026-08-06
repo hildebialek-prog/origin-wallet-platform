@@ -74,6 +74,7 @@ export interface Transfer {
   provider_id: number;
   source_bank_account_id?: number | null;
   beneficiary_id?: number | null;
+  fx_quote_id?: number | null;
   external_transfer_id?: string | null;
   external_payment_id?: string | null;
   transfer_type: string;
@@ -148,6 +149,7 @@ export interface TransferPayload {
   provider_id: number;
   source_bank_account_id?: number | null;
   beneficiary_id: number;
+  fx_quote_id?: number | null;
   transfer_type: string;
   source_currency: string;
   target_currency: string;
@@ -161,6 +163,28 @@ export interface TransferPayload {
   client_reference?: string | null;
   raw_data?: Record<string, unknown>;
 }
+
+export interface FxQuote {
+  id: number;
+  source_currency: string;
+  target_currency: string;
+  source_amount: string | number;
+  target_amount: string | number;
+  net_rate?: string | number | null;
+  fee_amount?: string | number | null;
+  expires_at?: string | null;
+}
+
+export const createFxQuote = (params: AuthenticatedParams & { payload: {
+  provider_id: number;
+  source_currency: string;
+  target_currency: string;
+  source_amount: number;
+} }) => requestApi<FxQuote>(`/user/users/${params.userId}/fx-quotes`, {
+  method: "POST",
+  token: params.token,
+  body: params.payload,
+});
 
 type AuthenticatedParams = {
   token: string;

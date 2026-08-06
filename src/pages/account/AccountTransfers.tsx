@@ -10,7 +10,6 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
-  FileText,
   Loader2,
   RefreshCcw,
   Search,
@@ -70,19 +69,16 @@ type TransferForm = {
   sourceCurrency: string;
   targetCurrency: string;
   sourceAmount: string;
-  targetAmount: string;
-  fxRate: string;
-  feeAmount: string;
   feeCurrency: string;
   purposeCode: string;
   referenceText: string;
-  invoiceFileName: string;
+  draftReference: string;
   notifyRecipient: boolean;
   scheduled: boolean;
   scheduledDate: string;
 };
 
-const defaultForm: TransferForm = {
+const newTransferForm = (): TransferForm => ({
   providerId: "",
   beneficiaryId: "",
   sourceBankAccountId: "",
@@ -90,17 +86,14 @@ const defaultForm: TransferForm = {
   sourceCurrency: "USD",
   targetCurrency: "VND",
   sourceAmount: "",
-  targetAmount: "",
-  fxRate: "",
-  feeAmount: "0",
   feeCurrency: "USD",
   purposeCode: "business_payment",
   referenceText: "",
-  invoiceFileName: "",
+  draftReference: crypto.randomUUID(),
   notifyRecipient: true,
   scheduled: false,
   scheduledDate: "",
-};
+});
 
 const wizardSteps: { key: WizardStep; label: string }[] = [
   { key: "payee", label: "Choose payee" },
@@ -119,7 +112,7 @@ const blockedStatuses = new Set(["failed", "rejected", "cancelled", "canceled", 
 const AccountTransfers = () => {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<TransferForm>(defaultForm);
+  const [form, setForm] = useState<TransferForm>(() => newTransferForm());
   const [step, setStep] = useState<WizardStep>("payee");
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
@@ -186,12 +179,8 @@ const AccountTransfers = () => {
   const sourceCurrencies = balanceCurrencies.length ? balanceCurrencies : currencyOptions;
   const selectedBalance = providerBalances.find((balance) => balance.currency === form.sourceCurrency);
   const sourceAmountNumber = toNumber(form.sourceAmount);
-  const targetAmountNumber = toNumber(form.targetAmount);
-  const fxRateNumber = toNumber(form.fxRate);
-  const effectiveSourceAmount =
-    sourceAmountNumber > 0 ? sourceAmountNumber : targetAmountNumber > 0 && fxRateNumber > 0 ? targetAmountNumber / fxRateNumber : 0;
-  const effectiveTargetAmount =
-    targetAmountNumber > 0 ? targetAmountNumber : sourceAmountNumber > 0 && fxRateNumber > 0 ? sourceAmountNumber * fxRateNumber : 0;
+  const effectiveSourceAmount = sourceAmountNumber;
+  const effectiveTargetAmount = 0;
   const selectedPurpose = purposeOptions.find((purpose) => purpose.code === form.purposeCode);
   const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
 
@@ -229,7 +218,7 @@ const AccountTransfers = () => {
   };
 
   const resetPayment = () => {
-    setForm(defaultForm);
+    setForm(newTransferForm());
     setSearch("");
     setFormError("");
     setCreatedTransfer(null);
@@ -264,7 +253,7 @@ const AccountTransfers = () => {
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
     if (!selectedProvider) return "Transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
-    if (effectiveSourceAmount <= 0) return "Enter a sending amount, or enter receiving amount together with an FX rate.";
+    if (effectiveSourceAmount <= 0) return "Enter a sending amount.";
     if (!selectedBalance) return "No synced wallet balance is available for the selected source currency.";
     if (toNumber(selectedBalance.available_balance) < effectiveSourceAmount) return "Available balance is not enough for this payment.";
     if (!form.purposeCode) return "Select a payment purpose.";
@@ -299,19 +288,14 @@ const AccountTransfers = () => {
           source_currency: form.sourceCurrency,
           target_currency: form.targetCurrency,
           source_amount: effectiveSourceAmount,
-          target_amount: effectiveTargetAmount > 0 ? effectiveTargetAmount : null,
-          fx_rate: form.fxRate ? Number(form.fxRate) : null,
-          fee_amount: form.feeAmount ? Number(form.feeAmount) : 0,
-          fee_currency: form.feeCurrency,
           purpose_code: form.purposeCode,
           reference_text: form.referenceText.trim() || null,
-          client_reference: `OW-${Date.now()}`,
+          client_reference: `OW-${form.draftReference}`,
           raw_data: {
             source: "origin_wallet_web",
             flow: "customer_single_payment",
             provider_code: selectedProvider?.code ?? null,
             beneficiary_name: selectedBeneficiary?.full_name ?? null,
-            invoice_file_name: form.invoiceFileName || null,
             notify_recipient: form.notifyRecipient,
             scheduled_payment: form.scheduled,
             scheduled_date: form.scheduled ? form.scheduledDate : null,
@@ -692,7 +676,7 @@ const DetailsStep = ({
         Complete payment details
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Enter either the sending amount or receiving amount. FX rate is required when the receiving amount drives the payment.
+        Enter the sending amount. The backend obtains the authoritative Nium rate, fee, and receiving amount.
       </p>
     </div>
 
@@ -735,28 +719,13 @@ const DetailsStep = ({
             onAmountChange={(value) => onChange({ ...form, sourceAmount: value })}
             onCurrencyChange={onSourceCurrencyChange}
           />
-          <AmountField
-            label="Recipient receives"
-            value={form.targetAmount}
-            currency={form.targetCurrency}
-            currencies={currencyOptions}
-            onAmountChange={(value) => onChange({ ...form, targetAmount: value })}
-            onCurrencyChange={(value) => onChange({ ...form, targetCurrency: value })}
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <FormInput label="FX rate" value={form.fxRate} inputMode="decimal" onChange={(value) => onChange({ ...form, fxRate: value })} />
-          <FormInput label="Total fee" value={form.feeAmount} inputMode="decimal" onChange={(value) => onChange({ ...form, feeAmount: value })} />
           <FormSelect
-            label="Fee currency"
-            value={form.feeCurrency}
-            selectedLabel={<span translate="no">{form.feeCurrency}</span>}
-            onChange={(value) => onChange({ ...form, feeCurrency: value })}
+            label="Recipient currency"
+            value={form.targetCurrency}
+            selectedLabel={<span translate="no">{form.targetCurrency}</span>}
+            onChange={(value) => onChange({ ...form, targetCurrency: value })}
           >
-            {currencyOptions.map((currency) => (
-              <CurrencySelectItem key={currency} value={currency} />
-            ))}
+            {currencyOptions.map((currency) => <CurrencySelectItem key={currency} value={currency} />)}
           </FormSelect>
         </div>
 
@@ -764,8 +733,7 @@ const DetailsStep = ({
           Estimated send:{" "}
           <strong className="text-[#0f2442] dark:text-white">{formatAmount(effectiveSourceAmount || form.sourceAmount, form.sourceCurrency)}</strong>
           <span className="px-2">→</span>
-          estimated receive:{" "}
-          <strong className="text-[#0f2442] dark:text-white">{formatAmount(effectiveTargetAmount || form.targetAmount, form.targetCurrency)}</strong>
+          authoritative quote requested at creation
         </div>
       </div>
     </div>
@@ -794,22 +762,6 @@ const DetailsStep = ({
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Invoice or supporting document</Label>
-          <label className="flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-[#d7d7d2] bg-white px-4 text-sm font-medium text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white">
-            <FileText className="h-4 w-4 text-[#16a34a]" />
-            <span className="truncate">{form.invoiceFileName || "Upload optional file"}</span>
-            <input
-              type="file"
-              className="hidden"
-              onChange={(event) => onChange({ ...form, invoiceFileName: event.target.files?.[0]?.name ?? "" })}
-            />
-          </label>
-          <p className="text-xs text-[#7a879c]">
-            File metadata is stored with the payment request until a dedicated document-upload endpoint is connected.
-          </p>
-        </div>
-
         <div className="space-y-3">
           <ToggleLine
             checked={form.notifyRecipient}
@@ -896,14 +848,12 @@ const ReviewStep = ({
       <SectionTitle icon={<WalletCards className="h-5 w-5" />} title="Payment" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <ReviewItem label="You send" value={formatAmount(effectiveSourceAmount, form.sourceCurrency)} />
-        <ReviewItem label="Recipient receives" value={formatAmount(effectiveTargetAmount || form.targetAmount, form.targetCurrency)} />
-        <ReviewItem label="FX rate" value={form.fxRate || "-"} />
-        <ReviewItem label="Total fee" value={formatAmount(form.feeAmount || 0, form.feeCurrency)} />
+        <ReviewItem label="Recipient currency" value={form.targetCurrency} />
+        <ReviewItem label="Pricing" value="Authoritative provider quote applied by backend" />
         <ReviewItem label="Funding source" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Wallet balance"} />
         <ReviewItem label="Available balance" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
         <ReviewItem label="Purpose" value={purposeLabel} />
         <ReviewItem label="Reference" value={form.referenceText || "-"} />
-        <ReviewItem label="Invoice" value={form.invoiceFileName || "-"} />
         <ReviewItem label="Recipient notification" value={form.notifyRecipient ? "Enabled" : "Disabled"} />
         <ReviewItem label="Schedule" value={form.scheduled ? form.scheduledDate : "Immediate request"} />
       </div>
@@ -1027,8 +977,8 @@ const PaymentSummary = ({
       <SummaryLine label="Funding" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Wallet balance"} />
       <SummaryLine label="Available" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
       <SummaryLine label="Send" value={sourceAmount > 0 ? formatAmount(sourceAmount, form.sourceCurrency) : "-"} />
-      <SummaryLine label="Receive" value={targetAmount > 0 ? formatAmount(targetAmount, form.targetCurrency) : "-"} />
-      <SummaryLine label="Fee" value={formatAmount(form.feeAmount || 0, form.feeCurrency)} />
+      <SummaryLine label="Receive" value={targetAmount > 0 ? formatAmount(targetAmount, form.targetCurrency) : "Provider quoted"} />
+      <SummaryLine label="Fee" value="Provider quoted" />
     </CardContent>
   </Card>
 );
