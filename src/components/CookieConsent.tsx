@@ -32,7 +32,7 @@ const CookieConsent = () => {
           <div className="container-tight mx-auto bg-card border border-border rounded-2xl shadow-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <p className="text-sm text-muted-foreground flex-1">
               We use cookies to improve your experience. By continuing to use this site, you agree to our{" "}
-              <a href="/policies#privacy" className="underline text-foreground hover:text-accent transition-colors">
+              <a href="/privacy" className="underline text-foreground hover:text-accent transition-colors">
                 cookie policy
               </a>.
             </p>

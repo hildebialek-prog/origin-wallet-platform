@@ -224,7 +224,7 @@ const Security = () => {
             </Button>
           </Link>
           <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-primary-foreground/75">
-            <Link to="/policies" className="hover:text-white hover:underline">
+            <Link to="/terms" className="hover:text-white hover:underline">
               Legal & policies
             </Link>
             <Link to="/help" className="hover:text-white hover:underline">

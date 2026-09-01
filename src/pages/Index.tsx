@@ -93,15 +93,15 @@ const Index = () => {
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      name: "Origin Wallet",
-      alternateName: ["Origin Wallet Global Payments", "Origin Wallet Global"],
-      url: "https://originwallet.asia/",
+      name: "HONG KONG MACHINING GROUP CO., LIMITED",
+      alternateName: ["Origin Wallet", "Origin Wallet Global Payments"],
+      url: "https://hongkongmachininggroup.com/",
       logo: "https://originwallet.asia/logo/logo.jpg",
       image: "https://originwallet.asia/content/banner.jpg",
       description:
-        "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, and business payment operations.",
-      parentOrganization: {
-        "@type": "Organization",
+        "HONG KONG MACHINING GROUP CO., LIMITED operates the Origin Wallet platform for multi-currency wallets, international transfers, and business payment workflows.",
+      brand: {
+        "@type": "Brand",
         name: "Origin Wallet",
       },
     },

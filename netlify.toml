@@ -80,7 +80,22 @@
 
 [[redirects]]
   from = "/policies"
-  to = "/policies/index.html"
+  to = "/terms"
+  status = 301
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/disclaimer"
+  to = "/disclaimer/index.html"
   status = 200
 
 [[redirects]]

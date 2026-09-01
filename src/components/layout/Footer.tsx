@@ -16,9 +16,9 @@ const footerLinks = {
     { label: "FAQs", href: "/help" },
   ],
   Legal: [
-    { label: "Privacy policy", href: "/policies#privacy" },
-    { label: "Terms of service", href: "/policies#terms" },
-    { label: "Disclaimer", href: "/policies#disclaimer" },
+    { label: "Terms & Conditions", href: "/terms" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Disclaimer", href: "/disclaimer" },
   ],
 };
 
@@ -69,11 +69,12 @@ const Footer = () => {
               <p className="mb-2">
                 Operated by{" "}
                 <strong className="text-primary-foreground/70">
-                  Origin Wallet
+                  HONG KONG MACHINING GROUP CO., LIMITED
                 </strong>
               </p>
               <p>
-                Independent global payment experience for multi-currency workflows.
+                Origin Wallet is the Company's platform and brand for multi-currency and cross-border payment workflows.
+                Registration / Tax ID: 7192410.{" "}
                 Registered address: FLAT/ROOM 1618B, 16/F, PIONEER CENTRE, 750 NATHAN
                 ROAD, MONGKOK, KOWLOON, HONG KONG. Contact:{" "}
                 <a
@@ -82,15 +83,13 @@ const Footer = () => {
                 >
                   support@originwallet.asia
                 </a>
-                . Origin Wallet is a financial technology platform focused on secure
-                cross-border payment workflows. Service availability, regulatory treatment, and
-                scope may vary by jurisdiction. The platform is currently onboarding early users
-                and aligning wallet, account, FX, beneficiary, and transfer workflows into one
-                operating layer where available.
+                . Certain financial and payment functions are delivered or supported by third-party providers,
+                including Nium, under their applicable terms. Neither Origin Wallet nor the Company is represented
+                on this website as a bank, licensed financial institution, custodian, or regulated payment institution.
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">
-              Copyright {new Date().getFullYear()} Origin Wallet. All rights reserved.
+              Copyright {new Date().getFullYear()} HONG KONG MACHINING GROUP CO., LIMITED. All rights reserved.
             </div>
           </div>
         </div>

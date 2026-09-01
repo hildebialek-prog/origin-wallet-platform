@@ -322,7 +322,7 @@ const Contact = () => {
                     { icon: HelpCircle, label: "Help center", href: "/help" },
                     { icon: MessageCircle, label: "FAQs", href: "/help" },
                     { icon: Shield, label: "Security", href: "/security" },
-                    { icon: MapPin, label: "Legal & policies", href: "/policies" },
+                    { icon: MapPin, label: "Terms & Conditions", href: "/terms" },
                   ].map((link) => (
                     <Link
                       key={link.label}

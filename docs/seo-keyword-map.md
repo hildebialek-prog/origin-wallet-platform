@@ -97,7 +97,9 @@ Target pages:
 | `/help` | origin wallet help center | FAQs, support articles | support |
 | `/security` | origin wallet security | platform controls, trust, safeguards | trust |
 | `/contact` | contact origin wallet | sales, support, partnerships | conversion |
-| `/policies` | origin wallet legal | privacy policy, terms, disclaimer | trust |
+| `/terms` | origin wallet terms | terms and conditions, legal terms | trust |
+| `/privacy` | origin wallet privacy | privacy policy, data practices | trust |
+| `/disclaimer` | origin wallet disclaimer | service disclaimer, platform information | trust |
 
 ## Content gaps to build next
 

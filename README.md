@@ -30,13 +30,12 @@ npm run dev
 
 ## Company
 
-**CÔNG TY CỔ PHẦN CÔNG NGHỆ KHỞI NGUYÊN**  
-Khoi Nguyen Technology Joint Stock Company
+**HONG KONG MACHINING GROUP CO., LIMITED**
 
-- Established: 2022
-- Coverage: 170+ countries
-- Currencies: 50+
+- Registration / Tax ID: 7192410
+- Registered address: FLAT/ROOM 1618B, 16/F, PIONEER CENTRE, 750 NATHAN ROAD, MONGKOK, KOWLOON, HONG KONG
+- Corporate website: https://hongkongmachininggroup.com/
 
 ## License
 
-© 2026 KHOI NGUYEN TECHNOLOGY JSC. All rights reserved.
+© 2026 HONG KONG MACHINING GROUP CO., LIMITED. All rights reserved.

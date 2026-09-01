@@ -142,13 +142,28 @@ const routes = [
       "Contact the Origin Wallet team about product access, support, partnerships, and platform questions.",
   },
   {
-    path: "/policies",
-    title: "Origin Wallet Legal & Policies | Privacy Policy, Terms & Disclaimer",
+    path: "/terms",
+    title: "Terms & Conditions | Origin Wallet",
     description:
-      "Review Origin Wallet legal information, privacy policy, terms of service, disclaimer, and platform operating details.",
-    headline: "Origin Wallet legal and policies",
-    summary:
-      "Privacy policy, terms of service, disclaimers, and operating details for Origin Wallet.",
+      "Read the terms governing access to and use of the Origin Wallet website and available payment and multi-currency services.",
+    headline: "Terms & Conditions",
+    summary: "Terms governing access to and use of the Origin Wallet website and available services.",
+  },
+  {
+    path: "/privacy",
+    title: "Privacy Policy | Origin Wallet",
+    description:
+      "Learn how Origin Wallet collects, uses, shares, retains, and protects information when you use its website and services.",
+    headline: "Privacy Policy",
+    summary: "How Origin Wallet handles information when you use its website and services.",
+  },
+  {
+    path: "/disclaimer",
+    title: "Disclaimer | Origin Wallet",
+    description:
+      "Review important information about Origin Wallet website content, service availability, transaction examples, and third-party information.",
+    headline: "Disclaimer",
+    summary: "Important context for Origin Wallet website content, availability, and transaction information.",
   },
 ];
 
@@ -160,13 +175,13 @@ const buildSchema = (route) => {
       {
         "@type": "Organization",
         "@id": `${siteUrl}/#organization`,
-        name: "Origin Wallet",
-        alternateName: ["Origin Wallet Global Payments", "Origin Wallet Global"],
+        name: "HONG KONG MACHINING GROUP CO., LIMITED",
+        alternateName: ["Origin Wallet", "Origin Wallet Global Payments"],
         url: `${siteUrl}/`,
         logo: `${siteUrl}/logo/logo.jpg`,
         image: `${siteUrl}/content/banner.jpg`,
         description:
-          "Origin Wallet is a global payments platform for multi-currency wallets and international payment workflows.",
+          "HONG KONG MACHINING GROUP CO., LIMITED operates the Origin Wallet platform for multi-currency and international payment workflows.",
       },
       {
         "@type": "WebSite",

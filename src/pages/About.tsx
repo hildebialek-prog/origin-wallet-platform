@@ -483,10 +483,10 @@ const About = () => {
                 Platform Operator
               </p>
               <h2 className="text-3xl font-black tracking-[-0.03em] text-white md:text-5xl">
-                Origin Wallet
+                HONG KONG MACHINING GROUP CO., LIMITED
               </h2>
               <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">
-                Origin Wallet is a cross-border finance experience focused on transparent product flows, operational clarity, and modern digital financial experiences.
+                The Company operates Origin Wallet as its platform and brand for cross-border finance workflows and modern digital payment experiences.
               </p>
               <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-slate-400 md:text-base">
                 We are currently onboarding early users and aligning platform operations to
@@ -495,21 +495,26 @@ const About = () => {
               </p>
             </div>
 
-            <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
+            <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-2 lg:grid-cols-4">
               {[
                 {
                   label: "Legal entity",
-                  value: "Origin Wallet",
+                  value: "HONG KONG MACHINING GROUP CO., LIMITED",
                   tone: "text-[#9fb0ff]",
                 },
                 {
-                  label: "Tax ID",
-                  value: "0111409165",
+                  label: "Registration / Tax ID",
+                  value: "7192410",
                   tone: "text-white",
                 },
                 {
                   label: "Registered address",
                   value: "FLAT/ROOM 1618B, 16/F, PIONEER CENTRE, 750 NATHAN ROAD, MONGKOK, KOWLOON, HONG KONG",
+                  tone: "text-white",
+                },
+                {
+                  label: "Corporate website",
+                  value: "hongkongmachininggroup.com",
                   tone: "text-white",
                 },
               ].map((item) => (
