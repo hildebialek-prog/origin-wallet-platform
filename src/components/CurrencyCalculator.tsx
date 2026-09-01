@@ -121,7 +121,7 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
             <span className="group relative">
               <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 text-xs bg-foreground text-background rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                A small fee to cover our operational costs. Always shown upfront.
+                An illustrative fee may be shown in the calculator. Final platform and third-party charges depend on the applicable quote and payment route.
               </span>
             </span>
           </span>
@@ -133,7 +133,7 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
             <span className="group relative">
               <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 text-xs bg-foreground text-background rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                We use the real mid-market rate with no hidden markup.
+                Displayed rates are illustrative reference rates. Final provider rates, fees, and outcomes are confirmed before submission.
               </span>
             </span>
           </span>
@@ -158,7 +158,7 @@ const CurrencyCalculator = ({ expanded = false }: Props) => {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Rate markup</span>
-              <span className="font-medium text-accent">None (mid-market rate)</span>
+              <span className="font-medium text-accent">Illustrative reference rate</span>
             </div>
           </div>
         )}

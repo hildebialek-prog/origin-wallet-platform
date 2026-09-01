@@ -57,7 +57,7 @@ const partnerHighlights = [
     id: "origin-wallet",
     label: "Primary Infrastructure",
     name: "Origin Wallet",
-    badge: "Wallet Rail",
+    badge: "Provider Rail",
     title: "Origin Wallet routes payment infrastructure through one operating layer",
     description:
       "Origin Wallet provides one operating layer for customer onboarding, wallets, balances, FX quotes, beneficiaries, transfers, and operational sync.",
@@ -67,7 +67,7 @@ const partnerHighlights = [
       "Single infrastructure rail",
     ],
     points: [
-      "Use one production rail instead of asking customers to choose infrastructure options.",
+      "Use supported provider infrastructure through one platform experience.",
       "Keep KYC/KYB, beneficiaries, virtual accounts, FX, and transfers aligned to one account model.",
       "Reduce operational risk by keeping API keys, webhooks, and sync jobs scoped to one integration.",
     ],
@@ -154,7 +154,7 @@ const Index = () => {
             </h1>
             <p className="mt-8 max-w-2xl text-lg font-medium leading-8 text-white/90 drop-shadow-[0_8px_28px_rgba(0,0,0,0.58)] sm:text-xl">
               Manage global payments, multi-currency balances, international transfers, virtual accounts,
-              beneficiaries, and financial operations through a single secure platform.
+              beneficiaries, and financial operations through a unified platform designed with security considerations.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -428,11 +428,11 @@ const Index = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: Send, title: "International Transfers", desc: "Move money across borders with clearer pricing and a guided transfer flow.", color: "bg-blue-500", href: "/personal/send" },
-              { icon: Wallet, title: "Multi-Currency Wallet", desc: "Hold and manage multiple currencies in one secure wallet experience.", color: "bg-green-500", href: "/personal/wallet" },
+              { icon: Wallet, title: "Multi-Currency Wallet", desc: "View and manage provider-supported multi-currency balances through the Origin Wallet interface.", color: "bg-green-500", href: "/personal/wallet" },
               { icon: Building2, title: "Business Payments", desc: "Support supplier payments, treasury workflows, and distributed business operations.", color: "bg-purple-500", href: "/business" },
               { icon: CreditCard, title: "Virtual Cards", desc: "Support digital spending workflows with clearer visibility and controls.", color: "bg-orange-500", href: "/personal" },
               { icon: TrendingUp, title: "FX Tools", desc: "Review rates and conversion details before confirming international transfers.", color: "bg-pink-500", href: "/pricing" },
-              { icon: Shield, title: "Origin Wallet Infrastructure", desc: "Coordinate onboarding, balances, and payment workflows through one production rail.", color: "bg-indigo-500", href: "/business/api" },
+              { icon: Shield, title: "Origin Wallet Infrastructure", desc: "Coordinate onboarding, balances, and payment workflows through supported provider infrastructure.", color: "bg-indigo-500", href: "/business/api" },
             ].map((service, i) => (
               <motion.div
                 key={service.title}
@@ -467,7 +467,7 @@ const Index = () => {
               Build unified financial operations on Origin Wallet
             </h2>
             <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
-              Our platform uses secure APIs to support cross-border wallets, balances, and payment workflows.
+              Our platform supports API-based connections for provider-connected balance and payment workflows.
             </p>
             <p className="mx-auto mb-8 max-w-3xl text-sm leading-7 text-white/65">
               Built around a single infrastructure rail so onboarding, account setup, webhooks,

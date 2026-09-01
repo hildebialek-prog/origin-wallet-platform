@@ -95,7 +95,7 @@ Target pages:
 | `/business/api` | origin wallet api | payment api integrations, finance workflow api | feature intent |
 | `/pricing` | origin wallet pricing | fees, exchange rates, transfer visibility | commercial + comparison |
 | `/help` | origin wallet help center | FAQs, support articles | support |
-| `/security` | origin wallet security | platform controls, trust, safeguards | trust |
+| `/security` | origin wallet security | platform practices, access management, operational review | trust |
 | `/contact` | contact origin wallet | sales, support, partnerships | conversion |
 | `/terms` | origin wallet terms | terms and conditions, legal terms | trust |
 | `/privacy` | origin wallet privacy | privacy policy, data practices | trust |

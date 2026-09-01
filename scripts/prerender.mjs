@@ -10,7 +10,7 @@ const routes = [
     path: "/",
     title: "Origin Wallet | Global Payments Platform",
     description:
-      "Origin Wallet is a global payments platform for multi-currency wallets, international transfers, business payments, and compliant financial operations.",
+      "Origin Wallet is a platform for multi-currency workflows, international transfers, business payments, and financial operations supported by third-party providers.",
     headline: "Origin Wallet global payments platform",
     summary:
       "Origin Wallet helps businesses and individuals manage global payments, multi-currency workflows, international transfers, and financial operations.",
@@ -35,12 +35,12 @@ const routes = [
   },
   {
     path: "/personal/wallet",
-    title: "Origin Wallet Multi-Currency Wallet | Balances, Hold & Manage Funds",
+    title: "Origin Wallet Multi-Currency Wallet | View & Manage Balances",
     description:
       "Manage balances with the Origin Wallet multi-currency wallet and review wallet activity through a clearer international money interface.",
     headline: "Origin Wallet multi-currency wallet",
     summary:
-      "Hold, manage, and review multi-currency balances in one Origin Wallet interface.",
+      "View and manage provider-supported multi-currency balances through the Origin Wallet interface.",
   },
   {
     path: "/personal/receive",
@@ -109,7 +109,7 @@ const routes = [
     path: "/security",
     title: "Origin Wallet Security | Platform Controls, Protection & Trust",
     description:
-      "Read about Origin Wallet security, platform controls, access management, encryption posture, and provider-aware operational safeguards.",
+      "Read about Origin Wallet security considerations, access management, operational review, and provider-aware platform practices.",
     headline: "Origin Wallet security",
     summary:
       "Security, protection, and trust information for Origin Wallet platform workflows.",

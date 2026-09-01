@@ -54,7 +54,7 @@ const buildAssistantReply = (question: string) => {
     tokens.includes("infrastructure") ||
     (tokens.includes("provider") && tokens.includes("connect"))
   ) {
-    return "Open Integrations to request account activation. After KYC/KYB is verified, Origin Wallet enables accounts, balances, beneficiaries, FX, and transfers through its payment infrastructure.";
+    return "Open Integrations to request account activation. After the relevant verification and provider requirements are completed, supported account, balance, beneficiary, FX, and transfer features may become available through Origin Wallet.";
   }
 
   const bestMatch = knowledgeBase

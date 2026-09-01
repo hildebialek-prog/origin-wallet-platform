@@ -6,8 +6,8 @@ A modern fintech web application for international money transfers and currency 
 
 - **Currency Calculator**: Real-time exchange rates with transparent fees
 - **Multi-language Support**: English, Vietnamese, Chinese, Japanese
-- **Global Coverage**: Send money to 170+ countries
-- **Secure & Fast**: Bank-grade security with competitive exchange rates
+- **Global Coverage**: Cross-border workflows are available for supported countries and corridors
+- **Security & Rates**: Security-focused platform design with provider-dependent exchange-rate visibility
 
 ## Tech Stack
 

@@ -74,7 +74,7 @@ const About = () => {
             <p className="text-primary-foreground/70 text-lg max-w-3xl mx-auto leading-relaxed">
               Origin Wallet is being built as an independent financial platform for managing
               cross-border payments, balances, onboarding workflows, and operational visibility
-              through cleaner product flows and secure integrations.
+              through cleaner product flows and provider-connected integrations.
             </p>
           </motion.div>
         </div>
@@ -386,7 +386,7 @@ const About = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: Globe, title: "Global Reach", desc: "Cross-border payment experiences for customers and businesses operating internationally.", color: "blue" },
-              { icon: Shield, title: "Security", desc: "Encryption, access controls, and operational safeguards designed for sensitive financial workflows.", color: "green" },
+              { icon: Shield, title: "Security considerations", desc: "Platform practices and access restrictions appropriate to supported financial workflows.", color: "green" },
               { icon: RefreshCw, title: "FX Visibility", desc: "Clearer rate and pricing views across international payment flows.", color: "purple" },
               { icon: Wallet, title: "Multi-Currency Wallet", desc: "A central place to manage balances and cross-currency workflows.", color: "orange" },
               { icon: CreditCard, title: "Virtual Cards", desc: "Support digital spending workflows with clearer visibility and controls.", color: "pink" },

@@ -10,7 +10,7 @@ const Business = () => {
     <div>
       <Seo
         title="Origin Wallet Business | Global Business Payments & Provider Workflows"
-        description="Origin Wallet Business supports supplier payments, collections, payout operations, and API-led financial workflows across multiple providers."
+        description="Origin Wallet Business supports provider-connected supplier payment, collection, payout, and API-led financial workflows."
         path="/business"
         image="/content/banner.jpg"
       />
@@ -21,7 +21,7 @@ const Business = () => {
               Business
             </span>
             <h1 className="mb-5 text-4xl font-extrabold sm:text-5xl lg:text-6xl">
-              Unified financial workflows across multiple providers
+              Unified workflows across supported payment infrastructure
             </h1>
             <p className="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-primary-foreground/72">
               Explore business journeys built around supplier payments, collections, payout
@@ -43,7 +43,7 @@ const Business = () => {
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-primary-foreground/80">
               {[
-                "Multi-provider connectivity",
+                "Provider-connected payment workflows",
                 "API-led finance workflows",
                 "Balances, payouts, and collections",
               ].map((item) => (
@@ -186,7 +186,7 @@ const Business = () => {
             <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
               The business platform is positioned for teams that need more than a basic wallet:
               companies, platforms, and product-led operators coordinating payments across
-              multiple corridors, providers, and internal workflows.
+              supported corridors, payment infrastructure, and internal workflows.
             </p>
           </motion.div>
 

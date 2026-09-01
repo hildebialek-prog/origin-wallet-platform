@@ -29,7 +29,7 @@ export const helpCategories: HelpCategory[] = [
       },
       {
         q: "How long does a transfer take?",
-        a: "Most transfers are completed within 1 to 2 business days, depending on destination, corridor support, and payment method.",
+        a: "Transfer timing varies by provider, corridor, currency, verification requirements, and recipient-bank processing. Review the estimate shown for the relevant transaction.",
       },
       {
         q: "Can I cancel a transfer?",
@@ -37,7 +37,7 @@ export const helpCategories: HelpCategory[] = [
       },
       {
         q: "What payment methods can I use?",
-        a: "Available funding methods can include bank transfer, debit card, or wallet balance depending on country and corridor support.",
+        a: "Available funding methods depend on the relevant provider, account configuration, country, and corridor. The methods available to you will be shown in the applicable flow.",
       },
       {
         q: "Is there a transfer limit?",
@@ -51,7 +51,7 @@ export const helpCategories: HelpCategory[] = [
     articles: [
       {
         q: "How much does a transfer cost?",
-        a: "Fees depend on the currency pair, corridor, and payment method. The exact fee should always be shown before you confirm.",
+        a: "Fees depend on the currency pair, corridor, provider, and payment method. Review the pricing information displayed for the relevant quote before confirmation.",
       },
       {
         q: "What exchange rate do you use?",
@@ -59,7 +59,7 @@ export const helpCategories: HelpCategory[] = [
       },
       {
         q: "Are there hidden fees?",
-        a: "No hidden fees should be charged. The platform is designed to show pricing before confirmation.",
+        a: "Origin Wallet aims to display known platform and provider pricing before confirmation. Other banks or payment participants may impose separate charges.",
       },
       {
         q: "How does pricing compare to banks?",
@@ -73,15 +73,15 @@ export const helpCategories: HelpCategory[] = [
     articles: [
       {
         q: "What is the multi-currency wallet?",
-        a: "It is a wallet experience that lets you view balances, receive funds, convert currencies, and send money through Origin Wallet infrastructure.",
+        a: "It is an interface for viewing provider-supported balances and accessing receiving, conversion, and transfer workflows where supported by the relevant provider.",
       },
       {
         q: "How do I add money to my wallet?",
-        a: "You can usually add funds via linked bank accounts, inbound receipts, or supported receiving details where available.",
+        a: "Funding or receiving options depend on the relevant provider, account configuration, country, and supported workflow.",
       },
       {
         q: "Can I receive money in my wallet?",
-        a: "Yes, once your profile and account setup are ready, you can use available receiving details in supported currencies.",
+        a: "Receiving details may be available after the relevant profile, provider, and account requirements are completed. Availability varies by account and supported currency.",
       },
       {
         q: "Why is my account still pending?",
@@ -103,7 +103,7 @@ export const helpCategories: HelpCategory[] = [
       },
       {
         q: "Do you offer an API?",
-        a: "Yes. API capabilities can support onboarding, balances, beneficiaries, transfers, and related payment workflows.",
+        a: "API capabilities may be available for approved business integrations and supported workflows. Contact the Origin Wallet team to confirm scope and eligibility.",
       },
       {
         q: "How do team permissions work?",

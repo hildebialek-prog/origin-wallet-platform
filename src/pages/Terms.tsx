@@ -32,7 +32,7 @@ const sections: LegalSection[] = [
     title: "Transactions and Payment Services",
     paragraphs: [
       "A transaction may be subject to verification, limits, cut-off times, currency availability, provider acceptance, recipient-bank processing, and other operational checks. A displayed quote or estimated delivery time may change until a transaction is accepted and confirmed by the relevant provider.",
-      "The Company or the relevant provider may decline, delay, cancel, reverse, or request additional information about a transaction where permitted and reasonably necessary for security, error correction, provider requirements, legal obligations, or risk management. Where appropriate and permitted, available status information will be provided through the platform or support channels.",
+      "The relevant provider may decline, delay, cancel, reverse, or request additional information about a transaction under its applicable terms. The Company may restrict platform access or relay provider requests and transaction-status information where appropriate. Where available, status information will be provided through the platform or support channels.",
     ],
   },
   {
@@ -64,7 +64,7 @@ const sections: LegalSection[] = [
   {
     title: "Intellectual Property",
     paragraphs: [
-      "The website, software, branding, text, graphics, and other platform content are owned by or licensed to the Company and are protected by applicable intellectual-property laws. We grant you a limited, revocable, non-exclusive, non-transferable right to use the services for their intended purpose while these Terms apply.",
+      "The website, software, branding, text, graphics, and other platform content are protected by applicable intellectual-property rights and may be owned by or licensed to the Company or relevant rights holders. We grant you a limited, revocable, non-exclusive, non-transferable right to use the services for their intended purpose while these Terms apply.",
     ],
   },
   {

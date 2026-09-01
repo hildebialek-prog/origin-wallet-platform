@@ -23,7 +23,7 @@ const fadeUp = {
 const securityFaqs = [
   {
     q: "How is platform data protected?",
-    a: "Sensitive data is intended to be handled through encrypted transport, controlled storage practices, and role-based access restrictions.",
+    a: "Security-related responsibilities and measures may differ across Origin Wallet platform components and third-party services.",
   },
   {
     q: "What happens if there is a security incident?",
@@ -31,7 +31,7 @@ const securityFaqs = [
   },
   {
     q: "Do you share data with third parties?",
-    a: "Platform workflows may require data sharing with trusted service providers and regulated partners where needed to support the financial operation.",
+    a: "Platform workflows may require data sharing with service providers and financial or payment partners where needed to support the relevant service.",
   },
   {
     q: "How do I report a security concern?",
@@ -57,7 +57,7 @@ const Security = () => {
     <div>
       <Seo
         title="Origin Wallet Security | Platform Controls, Protection & Trust"
-        description="Read about Origin Wallet security, platform controls, access management, encryption posture, and provider-aware operational safeguards."
+        description="Read about Origin Wallet security considerations, access management, operational review, and provider-aware platform practices."
         path="/security"
         image="/content/banner.jpg"
         schema={securitySchema}
@@ -70,9 +70,8 @@ const Security = () => {
               Security and control designed into the platform
             </h1>
             <p className="mx-auto max-w-3xl text-lg leading-relaxed text-primary-foreground/70">
-              Origin Wallet is being designed around secure product flows, access controls,
-              operational monitoring, and provider-aware compliance expectations for modern
-              financial operations.
+              Origin Wallet is being designed with security considerations, access restrictions,
+              operational review, and provider-aware requirements for modern financial workflows.
             </p>
           </motion.div>
         </div>
@@ -83,8 +82,8 @@ const Security = () => {
           <motion.div {...fadeUp} className="mb-12 text-center">
             <h2 className="mb-4 text-3xl font-extrabold">Our security principles</h2>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-              The platform approach is built around secure handling of financial workflows,
-              role-based access, and clearer control points across Origin Wallet systems.
+              The platform approach considers access restrictions, operational review, and clearer
+              control points across Origin Wallet workflows.
             </p>
           </motion.div>
 
@@ -92,33 +91,33 @@ const Security = () => {
             {[
               {
                 icon: Lock,
-                title: "Encryption at rest and in transit",
-                desc: "Sensitive information is intended to be protected through encrypted storage practices and secure transport.",
+                title: "Security practices",
+                desc: "Security-related responsibilities and measures may differ by platform component and service provider.",
               },
               {
                 icon: Eye,
                 title: "Privacy by design",
-                desc: "We aim to collect only the operational data required for platform workflows, reviews, and regulated partner requirements.",
+                desc: "We aim to collect information relevant to platform workflows, reviews, and applicable provider requirements.",
               },
               {
                 icon: AlertTriangle,
                 title: "Risk monitoring",
-                desc: "Operational monitoring and review states are designed to help identify unusual activity, exceptions, and workflow risks.",
+                desc: "Operational review states are designed to help surface exceptions and workflow risks.",
               },
               {
                 icon: Server,
                 title: "Infrastructure security",
-                desc: "Platform services are designed around resilient infrastructure, environment separation, and controlled operational changes.",
+                desc: "Specific infrastructure controls may differ across platform components and third-party providers.",
               },
               {
                 icon: Shield,
                 title: "Access controls",
-                desc: "Role-based permissions, auditability, and restricted system access help protect sensitive operational workflows.",
+                desc: "Access restrictions are applied according to platform roles and the capabilities available to each user.",
               },
               {
                 icon: CheckCircle2,
                 title: "Review posture",
-                desc: "Security posture is strengthened through continuous review, hardening, and improvement of platform behavior over time.",
+                desc: "Security-related information may be updated as the platform architecture and supported workflows change.",
               },
             ].map((item) => (
               <motion.div
@@ -149,9 +148,9 @@ const Security = () => {
           <motion.div {...fadeUp} className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "System posture", value: "Operational controls", color: "text-accent" },
-              { label: "Encryption", value: "AES-256 / TLS 1.3", color: "text-accent" },
-              { label: "Access model", value: "Role-based controls", color: "text-foreground" },
-              { label: "Monitoring", value: "Continuous", color: "text-accent" },
+              { label: "Transport protection", value: "Secure connection practices", color: "text-accent" },
+              { label: "Access model", value: "Access restrictions appropriate to platform roles", color: "text-foreground" },
+              { label: "Monitoring", value: "Operational review", color: "text-accent" },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-border bg-card p-6 text-center">
                 <div className="mb-2 text-sm text-muted-foreground">{item.label}</div>

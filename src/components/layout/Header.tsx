@@ -11,7 +11,7 @@ const navItems = [
     href: "/personal",
     children: [
       { label: "Send money", href: "/personal/send", desc: "Transfer internationally" },
-      { label: "Multi-currency wallet", href: "/personal/wallet", desc: "Hold and convert currencies" },
+      { label: "Multi-currency wallet", href: "/personal/wallet", desc: "View provider-supported balances" },
       { label: "Receive money", href: "/personal/receive", desc: "Get paid from anywhere" },
     ],
   },

@@ -70,10 +70,10 @@ export const personalFeatures: PersonalFeature[] = [
     icon: Wallet,
     title: "Multi-currency wallet",
     navLabel: "Multi-currency wallet",
-    navDescription: "Hold and convert currencies",
-    heroTitle: "Hold and manage money across currencies",
+    navDescription: "View provider-supported balances",
+    heroTitle: "View and manage provider-supported balances",
     heroDescription:
-      "Use a multi-currency wallet experience to manage balances, review conversions, and organize personal money movement more easily.",
+      "Use the Origin Wallet interface to view provider-supported balances and access conversion or transfer workflows where available.",
     sectionDescription:
       "The wallet experience is designed for people who need a simpler view of balances, conversions, and cross-currency activity in one place.",
     benefits: [
@@ -84,9 +84,9 @@ export const personalFeatures: PersonalFeature[] = [
     ],
     steps: [
       "Open your wallet dashboard",
-      "Add or receive funds into available balances",
+      "Access available receiving workflows supported by the relevant provider",
       "Review conversions between supported currencies",
-      "Use wallet balances for transfers or future spending flows",
+      "Access transfer or other supported workflows from available balance views",
     ],
     faqs: [
       {
@@ -115,16 +115,16 @@ export const personalFeatures: PersonalFeature[] = [
     sectionDescription:
       "Origin Wallet is designed to support inbound money movement for individuals who need clearer receiving flows and better visibility once funds arrive.",
     benefits: [
-      "A simpler experience for inbound payments",
+      "A simpler interface for supported inbound payment workflows",
       "Useful for freelancers and international earners",
-      "Designed to work alongside wallet balances",
+      "Designed to work with provider-supported balance views",
       "Clearer visibility into received funds",
     ],
     steps: [
       "Get your receiving details where available",
       "Share them with the sender",
       "Track when funds arrive",
-      "Hold, review, or use the funds in your wallet flow",
+      "Review available balance information and supported follow-on workflows",
     ],
     faqs: [
       {
@@ -132,12 +132,12 @@ export const personalFeatures: PersonalFeature[] = [
         a: "These flows are designed for individuals who need to collect funds from abroad or receive international personal income.",
       },
       {
-        q: "Do funds go straight into the wallet?",
+        q: "How do receiving workflows connect with balance views?",
         a: "Receiving flows are designed to connect with the wallet experience where supported, so balances and activity stay easier to manage.",
       },
       {
         q: "Can I use received funds later?",
-        a: "Yes. The overall product flow is designed so received balances can support future wallet or transfer activity where available.",
+        a: "Received balance information may support later provider-enabled wallet or transfer workflows where available.",
       },
     ],
   },
