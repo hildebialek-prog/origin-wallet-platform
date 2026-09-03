@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type HTMLInputTypeAttribute } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronsUpDown, Circle, Loader2, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/services/apiClient";
 import {
@@ -24,8 +24,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import {
   formatStatusLabel,
   getSemanticStatus,
@@ -688,7 +691,7 @@ const AccountKyc = () => {
         ? metadata.main_transaction_countries.map(String).join(",")
         : stringifyMetadata(metadata.main_transaction_countries),
       accountPurpose: stringifyMetadata(metadata.account_purpose),
-      registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration"]),
+      registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration", "certificate_of_incorporation"]),
       certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
       businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
       accountOpeningFormUrl: findDocumentUrl(profileDocs, ["account_opening_application_form"]),
@@ -1136,9 +1139,17 @@ const AccountKyc = () => {
       ? requiredFilled([form.idFrontUrl])
       : requiredFilled([form.idFrontUrl, form.idBackUrl]);
 
-    return requiredFilled([form.idDocumentNumber, form.proofOfAddressUrl]) && identityFiles &&
-      (!corporate || (isCountryCode(form.idIssuingCountry) && isDateValue(form.idIssuedAt))) &&
-      isDateValue(form.idExpiresAt);
+    if (!corporate) {
+      return requiredFilled([form.idDocumentNumber, form.proofOfAddressUrl]) && identityFiles &&
+        isDateValue(form.idExpiresAt);
+    }
+
+    return requiredFilled([form.idDocumentNumber]) && identityFiles &&
+      (form.idDocumentType !== "passport" || (
+        isCountryCode(form.idIssuingCountry) &&
+        isDateValue(form.idIssuedAt) &&
+        isDateValue(form.idExpiresAt)
+      ));
   };
 
   const validateCurrentStep = () => {
@@ -1203,10 +1214,7 @@ const AccountKyc = () => {
       return (
         requiredFilled([
           businessForm.registrationDocumentUrl,
-          businessForm.certificateOfIncorporationUrl,
           businessForm.businessAddressProofUrl,
-          businessForm.accountOpeningFormUrl,
-          businessForm.ownershipStructureUrl,
         ]) &&
         validIdentityDocuments(representativeForm, true) &&
         validIdentityDocuments(beneficialOwnerForm, true)
@@ -1688,16 +1696,19 @@ const AccountKyc = () => {
                 />
                 {applicantType === "business" ? (
                   <>
-                    <div className="rounded-2xl border border-gray-200 p-4">
-                      <h3 className="font-semibold text-gray-900">Expected account usage</h3>
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <SelectField label="Expected monthly volume" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
-                        <Field label="Average transaction value" value={businessForm.averageTransactionValue} onChange={(value) => updateBusiness("averageTransactionValue", value)} placeholder="For example, 5,000 USD" />
-                        <Field label="Monthly transaction count" value={businessForm.monthlyTransactionCount} onChange={(value) => updateBusiness("monthlyTransactionCount", value)} type="number" min="1" />
-                        <MultiSelectField label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={countryOptions} />
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
+                      <div className="border-b border-gray-100 pb-4 dark:border-white/10">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">Expected account usage</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Help us understand the company&apos;s expected payment activity.</p>
                       </div>
-                      <div className="mt-4">
-                        <Field label="Account purpose" value={businessForm.accountPurpose} onChange={(value) => updateBusiness("accountPurpose", value)} placeholder="Describe how the company will use the account" />
+                      <div className="mt-5 grid gap-x-5 gap-y-6 md:grid-cols-2">
+                        <SelectField label="Expected monthly transaction volume (USD)" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
+                        <Field label="Average transaction value (USD)" value={businessForm.averageTransactionValue} onChange={(value) => updateBusiness("averageTransactionValue", value)} placeholder="For example, 5,000" />
+                        <Field label="Monthly transaction count" value={businessForm.monthlyTransactionCount} onChange={(value) => updateBusiness("monthlyTransactionCount", value)} type="number" min="1" helperText="Number of transactions expected per month" />
+                        <SearchableMultiSelectField label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={countryOptions} />
+                      </div>
+                      <div className="mt-6">
+                        <TextareaField label="Account purpose" value={businessForm.accountPurpose} onChange={(value) => updateBusiness("accountPurpose", value)} placeholder="For example, collecting customer payments and paying overseas suppliers" helperText="Describe how the company will use the Origin Wallet account" />
                       </div>
                     </div>
                     <AddressFields
@@ -1741,87 +1752,33 @@ const AccountKyc = () => {
                   />
                 ) : (
                   <>
-                    <div className="rounded-2xl border border-gray-200 p-4">
-                      <h3 className="font-semibold text-gray-900">Business documents</h3>
-                      <div className="mt-4 grid gap-4">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
+                      <div className="border-b border-gray-100 pb-4 dark:border-white/10">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">Business documents</h3>
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">2 required</span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Upload clear, complete corporate documents for the Nium KYB review.</p>
+                      </div>
+                      <div className="mt-5 grid gap-5 md:grid-cols-2">
                         <FieldWithUpload
-                          label="Business registration certificate"
+                          label="Certificate of Incorporation / Business Registration"
                           value={businessForm.registrationDocumentUrl}
                           onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
-                          uploadLabel="Upload business certificate"
+                          uploadLabel="Upload incorporation or registration document"
                           uploading={uploadingDocument === captureKey("business", "business_registration")}
                           onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file)}
+                          required
                         />
                         <FieldWithUpload
-                          label="Certificate of Incorporation (CI)"
-                          value={businessForm.certificateOfIncorporationUrl}
-                          onChange={(value) => updateBusiness("certificateOfIncorporationUrl", value)}
-                          uploadLabel="Upload certificate of incorporation"
-                          uploading={uploadingDocument === captureKey("business", "certificate_of_incorporation")}
-                          onFile={(file) =>
-                            uploadBusinessDocument("certificate_of_incorporation", "certificateOfIncorporationUrl", file)
-                          }
-                        />
-                        <FieldWithUpload
-                          label="Proof of business address"
+                          label="Business address proof"
                           value={businessForm.businessAddressProofUrl}
                           onChange={(value) => updateBusiness("businessAddressProofUrl", value)}
                           uploadLabel="Upload business address proof"
                           uploading={uploadingDocument === captureKey("business", "proof_of_business_address")}
                           onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file)}
-                        />
-                        <FieldWithUpload
-                          label="Hand-held account opening application form"
-                          value={businessForm.accountOpeningFormUrl}
-                          onChange={(value) => updateBusiness("accountOpeningFormUrl", value)}
-                          uploadLabel="Upload hand-held account opening form photo"
-                          uploading={uploadingDocument === captureKey("business", "account_opening_application_form")}
-                          onFile={(file) =>
-                            uploadBusinessDocument("account_opening_application_form", "accountOpeningFormUrl", file, {
-                              requirement: "handheld_form_photo",
-                            })
-                          }
-                        />
-                        <FieldWithUpload
-                          label="Ownership structure or shareholder register"
-                          value={businessForm.ownershipStructureUrl}
-                          onChange={(value) => updateBusiness("ownershipStructureUrl", value)}
-                          uploadLabel="Upload ownership structure"
-                          uploading={uploadingDocument === captureKey("business", "ownership_structure")}
-                          onFile={(file) => uploadBusinessDocument("ownership_structure", "ownershipStructureUrl", file)}
-                        />
-                        <FieldWithUpload
-                          label="Foreign trade attachment (optional)"
-                          value={businessForm.tradeAttachmentUrl}
-                          onChange={(value) => updateBusiness("tradeAttachmentUrl", value)}
-                          uploadLabel="Upload foreign trade attachment"
-                          uploading={uploadingDocument === captureKey("business", "foreign_trade_attachment")}
-                          onFile={(file) => uploadBusinessDocument("foreign_trade_attachment", "tradeAttachmentUrl", file)}
-                        />
-                        <FieldWithUpload
-                          label="Agent ID document (optional)"
-                          value={businessForm.agentIdentityUrl}
-                          onChange={(value) => updateBusiness("agentIdentityUrl", value)}
-                          uploadLabel="Upload agent ID document"
-                          uploading={uploadingDocument === captureKey("business", "agent_identity_document")}
-                          onFile={(file) =>
-                            uploadBusinessDocument("agent_identity_document", "agentIdentityUrl", file, {
-                              subject: "agent",
-                            })
-                          }
-                        />
-                        <FieldWithUpload
-                          label="Historical trade materials (optional)"
-                          value={businessForm.historicalTradeMaterialsUrl}
-                          onChange={(value) => updateBusiness("historicalTradeMaterialsUrl", value)}
-                          uploadLabel="Upload historical trade materials"
-                          uploading={uploadingDocument === captureKey("business", "historical_trade_materials")}
-                          onFile={(file) => uploadBusinessDocument("historical_trade_materials", "historicalTradeMaterialsUrl", file)}
-                        />
-                        <Field
-                          label="Historical trade material comment (optional)"
-                          value={businessForm.historicalTradeComment}
-                          onChange={(value) => updateBusiness("historicalTradeComment", value)}
+                          required
+                          helperText="For example, a recent utility bill, bank statement, or government-issued address record."
                         />
                       </div>
                     </div>
@@ -1916,10 +1873,7 @@ const AccountKyc = () => {
                         label="Company materials"
                         value={[
                           businessForm.registrationDocumentUrl && "BR",
-                          businessForm.certificateOfIncorporationUrl && "CI",
                           businessForm.businessAddressProofUrl && "Address proof",
-                          businessForm.ownershipStructureUrl && "Ownership",
-                          businessForm.accountOpeningFormUrl && "Opening form",
                         ].filter(Boolean).join(", ") || "-"}
                       />
                     </>
@@ -2269,7 +2223,7 @@ const buildBusinessDocuments = (
   evidence: (captureType: string) => Partial<KycDocumentPayload>,
 ): KycDocumentPayload[] => {
   const issuingCountryCode = normalizeCountryCode(countryCode) || null;
-  const documents: KycDocumentPayload[] = [
+  return [
     {
       type: "business_registration",
       file_url: form.registrationDocumentUrl.trim(),
@@ -2277,48 +2231,12 @@ const buildBusinessDocuments = (
       ...evidence("business_registration"),
     },
     {
-      type: "certificate_of_incorporation",
-      file_url: form.certificateOfIncorporationUrl.trim(),
-      issuing_country_code: issuingCountryCode,
-      ...evidence("certificate_of_incorporation"),
-    },
-    {
       type: "proof_of_business_address",
       file_url: form.businessAddressProofUrl.trim(),
       issuing_country_code: issuingCountryCode,
       ...evidence("proof_of_business_address"),
     },
-    {
-      type: "account_opening_application_form",
-      file_url: form.accountOpeningFormUrl.trim(),
-      issuing_country_code: issuingCountryCode,
-      metadata: { requirement: "handheld_form_photo" },
-      ...evidence("account_opening_application_form"),
-    },
-    {
-      type: "ownership_structure",
-      file_url: form.ownershipStructureUrl.trim(),
-      issuing_country_code: issuingCountryCode,
-      ...evidence("ownership_structure"),
-    },
   ];
-
-  [
-    { type: "foreign_trade_attachment", fileUrl: form.tradeAttachmentUrl.trim() },
-    { type: "agent_identity_document", fileUrl: form.agentIdentityUrl.trim() },
-    { type: "historical_trade_materials", fileUrl: form.historicalTradeMaterialsUrl.trim() },
-  ].forEach((document) => {
-    if (!document.fileUrl) return;
-
-    documents.push({
-      type: document.type,
-      file_url: document.fileUrl,
-      issuing_country_code: issuingCountryCode,
-      ...evidence(document.type),
-    });
-  });
-
-  return documents;
 };
 
 const buildPersonDocuments = (
@@ -2334,8 +2252,7 @@ const buildPersonDocuments = (
     document_type: documentType,
   };
 
-  const documents: KycDocumentPayload[] = [
-    {
+  const documents: KycDocumentPayload[] = [{
       type: `${documentType}_front`,
       file_url: form.idFrontUrl.trim(),
       side: "front",
@@ -2345,15 +2262,17 @@ const buildPersonDocuments = (
       expires_at: normalizeDateValue(form.idExpiresAt) || null,
       metadata: baseMetadata,
       ...evidence("identity_front"),
-    },
-    {
+    }];
+
+  if (!corporate) {
+    documents.push({
       type: "proof_of_address",
       file_url: form.proofOfAddressUrl.trim(),
       issuing_country_code: "countryCode" in form ? normalizeCountryCode(form.countryCode) || null : null,
       metadata: { subject },
       ...evidence("proof_of_address"),
-    },
-  ];
+    });
+  }
 
   if (!corporate || documentType !== "passport") {
     documents.splice(1, 0, {
@@ -2498,6 +2417,7 @@ const SectionTitle = ({ title }: { title: string }) => (
 );
 
 const Field = ({
+  helperText,
   label,
   max,
   min,
@@ -2506,6 +2426,7 @@ const Field = ({
   type = "text",
   value,
 }: {
+  helperText?: string;
   label: string;
   max?: string;
   min?: string;
@@ -2525,31 +2446,67 @@ const Field = ({
       type={type}
       className="h-12 rounded-xl border-gray-200"
     />
+    {helperText ? <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{helperText}</p> : null}
+  </div>
+);
+
+const TextareaField = ({
+  helperText,
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  helperText?: string;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  value: string;
+}) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    <Textarea
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      className="min-h-28 resize-y rounded-xl border-gray-200"
+    />
+    {helperText ? <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{helperText}</p> : null}
   </div>
 );
 
 const FieldWithUpload = ({
+  acceptedTypes = "JPG, PNG or PDF",
+  helperText,
   label,
   onFile,
   uploadLabel,
   uploading,
   value,
+  required = false,
 }: {
+  acceptedTypes?: string;
+  helperText?: string;
   label: string;
   onChange: (value: string) => void;
   onFile: (file: File) => void;
   uploadLabel: string;
   uploading: boolean;
   value: string;
+  required?: boolean;
 }) => (
-  <div className="space-y-3">
+  <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
     <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <Label>{label}</Label>
+        {required ? <span className="text-xs font-semibold text-red-600">Required</span> : null}
+      </div>
+      {helperText ? <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{helperText}</p> : null}
+      <div className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${value ? "border-emerald-200 bg-emerald-50/70" : "border-gray-200 bg-white"}`}>
         <span className={value ? "font-medium text-emerald-700" : "text-gray-500"}>
-          {value ? "Uploaded and stored" : "No file uploaded yet"}
+          {value ? "Upload complete" : "Waiting for document"}
         </span>
-        {value ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">stored</span> : null}
+        {value ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
       </div>
     </div>
     <EvidenceUpload
@@ -2559,6 +2516,7 @@ const FieldWithUpload = ({
       onFile={onFile}
       uploading={uploading}
     />
+    <p className="text-xs text-gray-500 dark:text-gray-400">Accepted: {acceptedTypes}</p>
   </div>
 );
 
@@ -2664,6 +2622,83 @@ const MultiSelectField = ({
   );
 };
 
+const SearchableMultiSelectField = ({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: { label: string; value: string }[];
+  value: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selected = selectedValues(value);
+  const selectedOptions = selected
+    .map((selectedValue) => options.find((option) => option.value === selectedValue))
+    .filter((option): option is { label: string; value: string } => Boolean(option));
+
+  const toggleOption = (optionValue: string) => {
+    const next = selected.includes(optionValue)
+      ? selected.filter((item) => item !== optionValue)
+      : [...selected, optionValue];
+    onChange(next.join(","));
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {selectedOptions.length ? (
+        <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-white/10 dark:bg-white/5">
+          {selectedOptions.map((option) => (
+            <span key={option.value} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">
+              {option.label}
+              <button
+                type="button"
+                aria-label={`Remove ${option.label}`}
+                className="rounded-full p-0.5 hover:bg-emerald-100"
+                onClick={() => toggleOption(option.value)}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" className="h-12 w-full justify-between rounded-xl border-gray-200 bg-white px-3 font-normal text-gray-600">
+            {selected.length ? "Add or remove countries" : "Search and select countries"}
+            <ChevronsUpDown className="h-4 w-4 text-gray-400" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search countries..." />
+            <CommandList>
+              <CommandEmpty>No country found.</CommandEmpty>
+              <CommandGroup>
+                {options.map((option) => {
+                  const isSelected = selected.includes(option.value);
+                  return (
+                    <CommandItem key={option.value} value={`${option.label} ${option.value}`} onSelect={() => toggleOption(option.value)}>
+                      <span className={`mr-2 flex h-4 w-4 items-center justify-center rounded border ${isSelected ? "border-green-600 bg-green-600 text-white" : "border-gray-300"}`}>
+                        {isSelected ? <Check className="h-3 w-3" /> : null}
+                      </span>
+                      {option.label}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
+
 const PersonDetails = ({
   form,
   includeOwnership,
@@ -2746,25 +2781,46 @@ const PersonDocumentFields = ({
   uploadingCapture: string;
 }) => {
   const isPassport = corporate && form.idDocumentType === "passport";
+  const documentOptions = corporate
+    ? [
+        { label: "National ID", value: "national_id" as IdentityDocumentType },
+        { label: "Passport", value: "passport" as IdentityDocumentType },
+      ]
+    : [
+        { label: "National ID", value: "national_id" as IdentityDocumentType },
+        { label: "Passport", value: "passport" as IdentityDocumentType },
+        { label: "Driver license", value: "driver_license" as IdentityDocumentType },
+        { label: "Other identity document", value: "identity_document" as IdentityDocumentType },
+      ];
 
-  return <div className="rounded-2xl border border-gray-200 p-4">
-    <h3 className="font-semibold text-gray-900">{title}</h3>
-    <div className="mt-4 grid gap-4 md:grid-cols-2">
+  const changeDocumentType = (value: IdentityDocumentType) => {
+    onChange("idDocumentType", value);
+    if (!corporate) return;
+
+    onChange("idDocumentNumber", "");
+    onChange("idIssuingCountry", "");
+    onChange("idIssuedAt", "");
+    onChange("idExpiresAt", "");
+    onChange("idFrontUrl", "");
+    onChange("idBackUrl", "");
+  };
+
+  return <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
+    <div className="border-b border-gray-100 pb-4 dark:border-white/10">
+      <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+      {corporate ? <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose one identity document. All displayed fields and uploads are required.</p> : null}
+    </div>
+    <div className="mt-5 grid gap-x-5 gap-y-6 md:grid-cols-2">
       <SelectField
         label="Document type"
         value={form.idDocumentType}
-        onChange={(value) => onChange("idDocumentType", value)}
-        options={[
-          { label: "National ID", value: "national_id" },
-          { label: "Passport", value: "passport" },
-          { label: "Driver license", value: "driver_license" },
-          { label: "Other identity document", value: "identity_document" },
-        ]}
+        onChange={changeDocumentType}
+        options={documentOptions}
       />
       <Field label={isPassport ? "Passport number" : "ID number"} value={form.idDocumentNumber} onChange={(value) => onChange("idDocumentNumber", value)} />
-      {corporate ? <SelectField label="Issuing country" value={form.idIssuingCountry} onChange={(value) => onChange("idIssuingCountry", value)} options={countryOptions} placeholder="Select issuing country" /> : null}
-      <Field label={corporate ? "Issue date" : "Issued date"} value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} type="date" max={todayInputValue} />
-      <Field label="Expiry date" value={form.idExpiresAt} onChange={(value) => onChange("idExpiresAt", value)} type="date" min={tomorrowInputValue} />
+      {isPassport ? <SelectField label="Issuing country" value={form.idIssuingCountry} onChange={(value) => onChange("idIssuingCountry", value)} options={countryOptions} placeholder="Select issuing country" /> : null}
+      {!corporate || isPassport ? <Field label={corporate ? "Issue date" : "Issued date"} value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} type="date" max={todayInputValue} /> : null}
+      {!corporate || isPassport ? <Field label="Expiry date" value={form.idExpiresAt} onChange={(value) => onChange("idExpiresAt", value)} type="date" min={tomorrowInputValue} /> : null}
       <FieldWithUpload
         label={isPassport ? "Passport document" : "ID front image"}
         value={form.idFrontUrl}
@@ -2772,6 +2828,7 @@ const PersonDocumentFields = ({
         uploadLabel={isPassport ? "Upload passport document" : "Capture or upload ID front"}
         uploading={uploadingCapture === `${uploadSubject}:identity_front`}
         onFile={(file) => onUploadCapture("identity_front", "idFrontUrl", file)}
+        required={corporate}
       />
       {!isPassport ? (
         <FieldWithUpload
@@ -2781,10 +2838,11 @@ const PersonDocumentFields = ({
           uploadLabel="Capture or upload ID back"
           uploading={uploadingCapture === `${uploadSubject}:identity_back`}
           onFile={(file) => onUploadCapture("identity_back", "idBackUrl", file)}
+          required={corporate}
         />
       ) : null}
     </div>
-    <div className="mt-4">
+    {!corporate ? <div className="mt-4">
       <FieldWithUpload
         label="Proof of address"
         value={form.proofOfAddressUrl}
@@ -2793,7 +2851,7 @@ const PersonDocumentFields = ({
         uploading={uploadingCapture === `${uploadSubject}:proof_of_address`}
         onFile={(file) => onUploadCapture("proof_of_address", "proofOfAddressUrl", file)}
       />
-    </div>
+    </div> : null}
   </div>;
 };
 
