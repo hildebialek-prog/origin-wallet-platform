@@ -161,6 +161,7 @@ type ProfileForm = {
   postalCode: string;
   idDocumentType: IdentityDocumentType;
   idDocumentNumber: string;
+  idIssuingCountry: string;
   idIssuedAt: string;
   idExpiresAt: string;
   idFrontUrl: string;
@@ -185,6 +186,10 @@ type BusinessForm = {
   website: string;
   sourceOfFunds: string;
   expectedMonthlyVolume: string;
+  averageTransactionValue: string;
+  monthlyTransactionCount: string;
+  mainTransactionCountries: string;
+  accountPurpose: string;
   registrationDocumentUrl: string;
   certificateOfIncorporationUrl: string;
   businessAddressProofUrl: string;
@@ -204,6 +209,7 @@ type PersonForm = {
   nationality: string;
   residence: string;
   ownershipPercentage: string;
+  role: string;
   addressLine1: string;
   city: string;
   state: string;
@@ -211,6 +217,7 @@ type PersonForm = {
   countryCode: string;
   idDocumentType: IdentityDocumentType;
   idDocumentNumber: string;
+  idIssuingCountry: string;
   idIssuedAt: string;
   idExpiresAt: string;
   idFrontUrl: string;
@@ -223,6 +230,7 @@ type PersonForm = {
 type DocumentFieldKey =
   | "idDocumentType"
   | "idDocumentNumber"
+  | "idIssuingCountry"
   | "idIssuedAt"
   | "idExpiresAt"
   | "idFrontUrl"
@@ -248,7 +256,8 @@ type KycDraft = {
   savedAt: string;
 };
 
-const stepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
+const individualStepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
+const businessStepLabels = ["Profile type", "Applicant details", "Business / Address information", "Documents", "Review & Submit"];
 const kycDraftVersion = 1;
 const kycDraftKey = (userId: string | number) => `origin-wallet-kyc-draft:${userId}`;
 const todayInputValue = new Date().toISOString().slice(0, 10);
@@ -371,6 +380,7 @@ const defaultProfileForm = (name = ""): ProfileForm => ({
   postalCode: "",
   idDocumentType: "national_id",
   idDocumentNumber: "",
+  idIssuingCountry: "",
   idIssuedAt: "",
   idExpiresAt: "",
   idFrontUrl: "",
@@ -395,6 +405,10 @@ const defaultBusinessForm = (): BusinessForm => ({
   website: "",
   sourceOfFunds: "",
   expectedMonthlyVolume: "",
+  averageTransactionValue: "",
+  monthlyTransactionCount: "",
+  mainTransactionCountries: "",
+  accountPurpose: "",
   registrationDocumentUrl: "",
   certificateOfIncorporationUrl: "",
   businessAddressProofUrl: "",
@@ -414,6 +428,7 @@ const defaultPersonForm = (): PersonForm => ({
   nationality: "",
   residence: "",
   ownershipPercentage: "",
+  role: "",
   addressLine1: "",
   city: "",
   state: "",
@@ -421,6 +436,7 @@ const defaultPersonForm = (): PersonForm => ({
   countryCode: "",
   idDocumentType: "national_id",
   idDocumentNumber: "",
+  idIssuingCountry: "",
   idIssuedAt: "",
   idExpiresAt: "",
   idFrontUrl: "",
@@ -445,6 +461,7 @@ const normalizeProfileDraftForm = (form?: Partial<ProfileForm>, fallbackName = "
     dateOfBirth: toDateInputValue(next.dateOfBirth),
     expectedMonthlyVolume: optionValue(monthlyVolumeOptions, next.expectedMonthlyVolume),
     idExpiresAt: toDateInputValue(next.idExpiresAt),
+    idIssuingCountry: normalizeCountryCode(next.idIssuingCountry),
     idIssuedAt: toDateInputValue(next.idIssuedAt),
     nationality: normalizeCountryCode(next.nationality),
     occupation: optionValue(occupationOptions, next.occupation),
@@ -461,6 +478,7 @@ const normalizeBusinessDraftForm = (form?: Partial<BusinessForm>): BusinessForm 
     businessActivityType: optionValue(businessActivityOptions, next.businessActivityType) || "foreign_trade_export",
     expectedMonthlyVolume: optionValue(monthlyVolumeOptions, next.expectedMonthlyVolume),
     exportingRegions: selectedValues(next.exportingRegions).filter(isCountryCode).join(","),
+    mainTransactionCountries: selectedValues(next.mainTransactionCountries).filter(isCountryCode).join(","),
     industry: optionValue(industryOptions, next.industry),
     mainProduct: optionValue(mainProductOptions, next.mainProduct) || "Electrical Products and Accessories",
     niumBusinessType: normalizeNiumBusinessType(next.niumBusinessType),
@@ -478,6 +496,7 @@ const normalizePersonDraftForm = (form?: Partial<PersonForm>): PersonForm => {
     countryCode: normalizeCountryCode(next.countryCode),
     dateOfBirth: toDateInputValue(next.dateOfBirth),
     idExpiresAt: toDateInputValue(next.idExpiresAt),
+    idIssuingCountry: normalizeCountryCode(next.idIssuingCountry),
     idIssuedAt: toDateInputValue(next.idIssuedAt),
     nationality: normalizeCountryCode(next.nationality),
     residence: normalizeCountryCode(next.residence),
@@ -580,6 +599,7 @@ const AccountKyc = () => {
   const [editingRequestedInfo, setEditingRequestedInfo] = useState(false);
   const draftHydratedRef = useRef(false);
   const draftStorageKey = useMemo(() => (user?.id ? kycDraftKey(user.id) : ""), [user?.id]);
+  const stepLabels = applicantType === "business" ? businessStepLabels : individualStepLabels;
 
   const kycQuery = useQuery({
     queryKey: ["kyc-profile", user?.id, token],
@@ -590,8 +610,10 @@ const AccountKyc = () => {
   const profile = kycQuery.data?.kyc_profile ?? null;
 
   const applyDraft = useCallback((draft: KycDraft) => {
-    setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 0), stepLabels.length - 1) : 0);
-    setApplicantType(draft.applicantType === "business" ? "business" : "individual");
+    const draftApplicantType = draft.applicantType === "business" ? "business" : "individual";
+    const draftStepCount = draftApplicantType === "business" ? businessStepLabels.length : individualStepLabels.length;
+    setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 0), draftStepCount - 1) : 0);
+    setApplicantType(draftApplicantType);
     setProfileForm(normalizeProfileDraftForm(draft.profileForm, user?.name ?? ""));
     setBusinessForm(normalizeBusinessDraftForm(draft.businessForm));
     setRepresentativeForm(normalizePersonDraftForm(draft.representativeForm));
@@ -660,6 +682,12 @@ const AccountKyc = () => {
       website: stringifyMetadata(metadata.business_website),
       sourceOfFunds: optionValue(sourceOfFundsOptions, stringifyMetadata(metadata.source_of_funds)),
       expectedMonthlyVolume: optionValue(monthlyVolumeOptions, stringifyMetadata(metadata.expected_monthly_volume)),
+      averageTransactionValue: stringifyMetadata(metadata.average_transaction_value),
+      monthlyTransactionCount: stringifyMetadata(metadata.monthly_transaction_count),
+      mainTransactionCountries: Array.isArray(metadata.main_transaction_countries)
+        ? metadata.main_transaction_countries.map(String).join(",")
+        : stringifyMetadata(metadata.main_transaction_countries),
+      accountPurpose: stringifyMetadata(metadata.account_purpose),
       registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration"]),
       certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
       businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
@@ -683,6 +711,7 @@ const AccountKyc = () => {
       state: representative?.state ?? "",
       postalCode: representative?.postal_code ?? "",
       countryCode: normalizeCountryCode(representative?.country_code),
+      role: stringifyMetadata(representative?.metadata?.role) || "authorized_representative",
       ...representativeIdentity,
     });
     setBeneficialOwnerForm({
@@ -700,6 +729,7 @@ const AccountKyc = () => {
       state: beneficialOwner?.state ?? "",
       postalCode: beneficialOwner?.postal_code ?? "",
       countryCode: normalizeCountryCode(beneficialOwner?.country_code),
+      role: stringifyMetadata(beneficialOwner?.metadata?.role) || "beneficial_owner",
       ...beneficialOwnerIdentity,
     });
     setUploadedDocuments(hydratedDocuments);
@@ -1038,7 +1068,7 @@ const AccountKyc = () => {
         ? `${form.idDocumentType}_back`
         : "proof_of_address";
     const issuingCountryCode = isFront || isBack
-      ? normalizeCountryCode(form.nationality) || normalizeCountryCode(form.residence) || normalizeCountryCode(form.countryCode)
+      ? normalizeCountryCode(form.idIssuingCountry) || normalizeCountryCode(form.nationality) || normalizeCountryCode(form.residence) || normalizeCountryCode(form.countryCode)
       : normalizeCountryCode(form.countryCode) || normalizeCountryCode(form.residence) || normalizeCountryCode(form.nationality);
 
     if (!issuingCountryCode) {
@@ -1101,9 +1131,15 @@ const AccountKyc = () => {
     requiredFilled([form.legalName]) && isDateValue(form.dateOfBirth) && isCountryCode(form.nationality) && isCountryCode(form.residence);
   const validAddress = (form: Pick<PersonForm, "countryCode" | "addressLine1" | "city">) =>
     isCountryCode(form.countryCode) && requiredFilled([form.addressLine1, form.city]);
-  const validIdentityDocuments = (form: Pick<PersonForm, DocumentFieldKey>) =>
-    requiredFilled([form.idDocumentNumber, form.idFrontUrl, form.idBackUrl, form.proofOfAddressUrl]) &&
-    isDateValue(form.idExpiresAt);
+  const validIdentityDocuments = (form: Pick<PersonForm, DocumentFieldKey>, corporate = false) => {
+    const identityFiles = corporate && form.idDocumentType === "passport"
+      ? requiredFilled([form.idFrontUrl])
+      : requiredFilled([form.idFrontUrl, form.idBackUrl]);
+
+    return requiredFilled([form.idDocumentNumber, form.proofOfAddressUrl]) && identityFiles &&
+      (!corporate || (isCountryCode(form.idIssuingCountry) && isDateValue(form.idIssuedAt))) &&
+      isDateValue(form.idExpiresAt);
+  };
 
   const validateCurrentStep = () => {
     if (step === 1) {
@@ -1122,6 +1158,7 @@ const AccountKyc = () => {
           businessForm.registeredDate,
           businessForm.taxId,
           businessForm.businessActivity,
+          representativeForm.role,
           beneficialOwnerForm.ownershipPercentage,
         ]) &&
         requiredSelects([
@@ -1131,7 +1168,6 @@ const AccountKyc = () => {
           businessForm.mainProduct,
           businessForm.industry,
           businessForm.sourceOfFunds,
-          businessForm.expectedMonthlyVolume,
         ]) &&
         selectedValues(businessForm.exportingRegions).every(isCountryCode) &&
         selectedValues(businessForm.exportingRegions).length > 0 &&
@@ -1147,7 +1183,15 @@ const AccountKyc = () => {
       return (
         accountAddress &&
         validAddress(representativeForm) &&
-        validAddress(beneficialOwnerForm)
+        validAddress(beneficialOwnerForm) &&
+        requiredFilled([
+          businessForm.expectedMonthlyVolume,
+          businessForm.averageTransactionValue,
+          businessForm.monthlyTransactionCount,
+          businessForm.accountPurpose,
+        ]) &&
+        selectedValues(businessForm.mainTransactionCountries).every(isCountryCode) &&
+        selectedValues(businessForm.mainTransactionCountries).length > 0
       );
     }
 
@@ -1164,18 +1208,14 @@ const AccountKyc = () => {
           businessForm.accountOpeningFormUrl,
           businessForm.ownershipStructureUrl,
         ]) &&
-        validIdentityDocuments(representativeForm) &&
-        validIdentityDocuments(beneficialOwnerForm)
+        validIdentityDocuments(representativeForm, true) &&
+        validIdentityDocuments(beneficialOwnerForm, true)
       );
     }
 
     if (step === 4) {
-      const livenessReady =
-        applicantType === "business"
-          ? requiredFilled([representativeForm.selfieLivenessUrl, beneficialOwnerForm.selfieLivenessUrl])
-          : requiredFilled([profileForm.selfieLivenessUrl]);
-
-      return livenessReady && verificationConsent;
+      if (applicantType === "business") return verificationConsent;
+      return requiredFilled([profileForm.selfieLivenessUrl]) && verificationConsent;
     }
 
     return true;
@@ -1200,7 +1240,7 @@ const AccountKyc = () => {
     const documents =
       applicantType === "business"
         ? buildBusinessDocuments(businessForm, profileForm.countryCode, documentEvidence("business"))
-        : buildPersonDocuments(profileForm, "applicant", documentEvidence("applicant"));
+        : buildPersonDocuments(profileForm, "applicant", documentEvidence("applicant"), false);
     const ownership = Number(beneficialOwnerForm.ownershipPercentage);
 
     return {
@@ -1234,11 +1274,12 @@ const AccountKyc = () => {
                 state: representativeForm.state.trim() || null,
                 postal_code: representativeForm.postalCode.trim() || null,
                 country_code: normalizeCountryCode(representativeForm.countryCode),
-                metadata: { role: "authorized_representative" },
+                metadata: { role: representativeForm.role.trim() },
                 documents: buildPersonDocuments(
                   representativeForm,
                   "authorized_representative",
                   documentEvidence("authorized_representative"),
+                  true,
                 ),
               },
               {
@@ -1258,6 +1299,7 @@ const AccountKyc = () => {
                   beneficialOwnerForm,
                   "beneficial_owner",
                   documentEvidence("beneficial_owner"),
+                  true,
                 ),
               },
             ]
@@ -1272,6 +1314,13 @@ const AccountKyc = () => {
           applicantType === "business"
             ? businessForm.expectedMonthlyVolume.trim()
             : profileForm.expectedMonthlyVolume.trim(),
+        average_transaction_value:
+          applicantType === "business" ? businessForm.averageTransactionValue.trim() : null,
+        monthly_transaction_count:
+          applicantType === "business" ? businessForm.monthlyTransactionCount.trim() : null,
+        main_transaction_countries:
+          applicantType === "business" ? selectedValues(businessForm.mainTransactionCountries) : [],
+        account_purpose: applicantType === "business" ? businessForm.accountPurpose.trim() : null,
         occupation: applicantType === "individual" ? profileForm.occupation.trim() : null,
         business_industry: applicantType === "business" ? businessForm.industry.trim() : null,
         registered_date: applicantType === "business" ? normalizeDateValue(businessForm.registeredDate) : null,
@@ -1327,7 +1376,11 @@ const AccountKyc = () => {
       state: form.state.trim() || null,
       postal_code: form.postalCode.trim() || null,
       country_code: normalizeCountryCode(form.countryCode),
-      metadata: { role: relationshipType || (isBeneficialOwner ? "beneficial_owner" : "authorized_representative") },
+      metadata: {
+        role: isBeneficialOwner
+          ? relationshipType || "beneficial_owner"
+          : form.role.trim() || relationshipType || "authorized_representative",
+      },
     };
   };
 
@@ -1436,7 +1489,7 @@ const AccountKyc = () => {
 
   const handleSubmit = () => {
     if (!validateCurrentStep()) {
-      setFormError("Complete the face check and consent before submitting.");
+      setFormError("Review the information and confirm consent before submitting.");
       return;
     }
 
@@ -1463,7 +1516,7 @@ const AccountKyc = () => {
               KYC/KYB verification
             </CardTitle>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Complete identity, document, business ownership, and face verification before account approval.
+              Complete the required identity, document, and business ownership checks before account approval.
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -1536,7 +1589,7 @@ const AccountKyc = () => {
             {!isKycReadOnly && step === 1 ? (
               <section className="space-y-5">
                 <SectionTitle title={applicantType === "business" ? "Business and people details" : "Personal details"} />
-                <Field label="Legal name" value={profileForm.legalName} onChange={(value) => updateProfile("legalName", value)} />
+                <Field label={applicantType === "business" ? "Company legal name" : "Legal name"} value={profileForm.legalName} onChange={(value) => updateProfile("legalName", value)} />
                 {applicantType === "individual" ? (
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -1606,9 +1659,8 @@ const AccountKyc = () => {
                       <Field label="Business website" value={businessForm.website} onChange={(value) => updateBusiness("website", value)} />
                     </div>
                     <Field label="Business activity" value={businessForm.businessActivity} onChange={(value) => updateBusiness("businessActivity", value)} />
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4">
                       <SelectField label="Business source of funds" value={businessForm.sourceOfFunds} onChange={(value) => updateBusiness("sourceOfFunds", value)} options={sourceOfFundsOptions} placeholder="Select source" />
-                      <SelectField label="Expected monthly volume" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Agent name (optional)" value={businessForm.agentName} onChange={(value) => updateBusiness("agentName", value)} />
@@ -1636,6 +1688,18 @@ const AccountKyc = () => {
                 />
                 {applicantType === "business" ? (
                   <>
+                    <div className="rounded-2xl border border-gray-200 p-4">
+                      <h3 className="font-semibold text-gray-900">Expected account usage</h3>
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <SelectField label="Expected monthly volume" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
+                        <Field label="Average transaction value" value={businessForm.averageTransactionValue} onChange={(value) => updateBusiness("averageTransactionValue", value)} placeholder="For example, 5,000 USD" />
+                        <Field label="Monthly transaction count" value={businessForm.monthlyTransactionCount} onChange={(value) => updateBusiness("monthlyTransactionCount", value)} type="number" min="1" />
+                        <MultiSelectField label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={countryOptions} />
+                      </div>
+                      <div className="mt-4">
+                        <Field label="Account purpose" value={businessForm.accountPurpose} onChange={(value) => updateBusiness("accountPurpose", value)} placeholder="Describe how the company will use the account" />
+                      </div>
+                    </div>
                     <AddressFields
                       title="Authorized representative address"
                       countryCode={representativeForm.countryCode}
@@ -1670,6 +1734,7 @@ const AccountKyc = () => {
                     onChange={updateProfile}
                     uploadSubject="applicant"
                     uploadingCapture={uploadingDocument}
+                    corporate={false}
                     onUploadCapture={(captureType, field, file) =>
                       uploadPersonDocument("applicant", profileForm, updateProfile, captureType, field, file)
                     }
@@ -1766,6 +1831,7 @@ const AccountKyc = () => {
                       onChange={updateRepresentative}
                       uploadSubject="authorized_representative"
                       uploadingCapture={uploadingDocument}
+                      corporate
                       onUploadCapture={(captureType, field, file) =>
                         uploadPersonDocument(
                           "authorized_representative",
@@ -1783,6 +1849,7 @@ const AccountKyc = () => {
                       onChange={updateBeneficialOwner}
                       uploadSubject="beneficial_owner"
                       uploadingCapture={uploadingDocument}
+                      corporate
                       onUploadCapture={(captureType, field, file) =>
                         uploadPersonDocument(
                           "beneficial_owner",
@@ -1796,15 +1863,14 @@ const AccountKyc = () => {
                     />
                   </>
                 )}
-                <WizardActions onBack={previousStep} onNext={nextStep} nextLabel="Continue to face check" />
+                <WizardActions onBack={previousStep} onNext={nextStep} nextLabel={applicantType === "business" ? "Review & submit" : "Continue to face check"} />
               </section>
             ) : null}
 
-            {!isKycReadOnly && step === 4 ? (
+            {!isKycReadOnly && applicantType === "individual" && step === 4 ? (
               <section className="space-y-5">
                 <SectionTitle title="Face check and consent" />
-                {applicantType === "individual" ? (
-                  <FaceCheckFields
+                <FaceCheckFields
                     title="Applicant face check"
                     selfieLivenessUrl={profileForm.selfieLivenessUrl}
                     livenessSessionId={profileForm.livenessSessionId}
@@ -1816,34 +1882,6 @@ const AccountKyc = () => {
                       }, metadata, fallbackFile)
                     }
                   />
-                ) : (
-                  <>
-                    <FaceCheckFields
-                      title="Authorized representative face check"
-                      selfieLivenessUrl={representativeForm.selfieLivenessUrl}
-                      livenessSessionId={representativeForm.livenessSessionId}
-                      uploading={uploadingCapture === "authorized_representative:selfie_liveness"}
-                      onFile={(file, metadata, fallbackFile) =>
-                        uploadCapture("authorized_representative", "selfie_liveness", file, (artifact, session) => {
-                          updateRepresentative("selfieLivenessUrl", artifact.file_url);
-                          updateRepresentative("livenessSessionId", session.external_session_id);
-                        }, metadata, fallbackFile)
-                      }
-                    />
-                    <FaceCheckFields
-                      title="Beneficial owner face check"
-                      selfieLivenessUrl={beneficialOwnerForm.selfieLivenessUrl}
-                      livenessSessionId={beneficialOwnerForm.livenessSessionId}
-                      uploading={uploadingCapture === "beneficial_owner:selfie_liveness"}
-                      onFile={(file, metadata, fallbackFile) =>
-                        uploadCapture("beneficial_owner", "selfie_liveness", file, (artifact, session) => {
-                          updateBeneficialOwner("selfieLivenessUrl", artifact.file_url);
-                          updateBeneficialOwner("livenessSessionId", session.external_session_id);
-                        }, metadata, fallbackFile)
-                      }
-                    />
-                  </>
-                )}
                 <label className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-sm text-gray-700">
                   <Checkbox checked={verificationConsent} onCheckedChange={(checked) => setVerificationConsent(checked === true)} />
                   <span>
@@ -1855,7 +1893,7 @@ const AccountKyc = () => {
               </section>
             ) : null}
 
-            {!isKycReadOnly && step === 5 ? (
+            {!isKycReadOnly && ((applicantType === "business" && step === 4) || (applicantType === "individual" && step === 5)) ? (
               <section className="space-y-4">
                 <SectionTitle title="Review and submit" />
                 <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-white/10 dark:bg-white/5">
@@ -1869,6 +1907,11 @@ const AccountKyc = () => {
                       <SummaryRow label="Exporting regions" value={businessForm.exportingRegions || "-"} />
                       <SummaryRow label="Representative" value={representativeForm.legalName || "-"} />
                       <SummaryRow label="Beneficial owner" value={beneficialOwnerForm.legalName || "-"} />
+                      <SummaryRow label="Expected monthly volume" value={businessForm.expectedMonthlyVolume || "-"} />
+                      <SummaryRow label="Average transaction value" value={businessForm.averageTransactionValue || "-"} />
+                      <SummaryRow label="Monthly transaction count" value={businessForm.monthlyTransactionCount || "-"} />
+                      <SummaryRow label="Main transaction countries" value={businessForm.mainTransactionCountries || "-"} />
+                      <SummaryRow label="Account purpose" value={businessForm.accountPurpose || "-"} />
                       <SummaryRow
                         label="Company materials"
                         value={[
@@ -1883,8 +1926,14 @@ const AccountKyc = () => {
                   ) : null}
                   <SummaryRow label="Address" value={[profileForm.addressLine1, profileForm.city, profileForm.state, profileForm.postalCode, profileForm.countryCode].filter(Boolean).join(", ") || "-"} />
                   <SummaryRow label="Documents" value={applicantType === "business" ? "Company + representative + UBO" : "Identity + address"} />
-                  <SummaryRow label="Face check" value="Submitted" />
+                  {applicantType === "individual" ? <SummaryRow label="Face check" value="Submitted" /> : null}
                 </div>
+                {applicantType === "business" ? (
+                  <label className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-sm text-gray-700">
+                    <Checkbox checked={verificationConsent} onCheckedChange={(checked) => setVerificationConsent(checked === true)} />
+                    <span>I confirm the company information is accurate and consent to document, AML, and Origin Wallet onboarding checks.</span>
+                  </label>
+                ) : null}
                 <div className="flex flex-wrap gap-3">
                   <Button variant="outline" className="rounded-full" onClick={previousStep}>
                     Back
@@ -2276,15 +2325,16 @@ const buildPersonDocuments = (
   form: ProfileForm | PersonForm,
   subject: IdentityVerificationSubject,
   evidence: (captureType: string) => Partial<KycDocumentPayload>,
+  corporate = false,
 ): KycDocumentPayload[] => {
-  const issuingCountry = normalizeCountryCode("nationality" in form ? form.nationality : "");
+  const issuingCountry = normalizeCountryCode(form.idIssuingCountry) || normalizeCountryCode("nationality" in form ? form.nationality : "");
   const documentType = form.idDocumentType || "identity_document";
   const baseMetadata = {
     subject,
     document_type: documentType,
   };
 
-  return [
+  const documents: KycDocumentPayload[] = [
     {
       type: `${documentType}_front`,
       file_url: form.idFrontUrl.trim(),
@@ -2297,6 +2347,16 @@ const buildPersonDocuments = (
       ...evidence("identity_front"),
     },
     {
+      type: "proof_of_address",
+      file_url: form.proofOfAddressUrl.trim(),
+      issuing_country_code: "countryCode" in form ? normalizeCountryCode(form.countryCode) || null : null,
+      metadata: { subject },
+      ...evidence("proof_of_address"),
+    },
+  ];
+
+  if (!corporate || documentType !== "passport") {
+    documents.splice(1, 0, {
       type: `${documentType}_back`,
       file_url: form.idBackUrl.trim(),
       side: "back",
@@ -2306,15 +2366,11 @@ const buildPersonDocuments = (
       expires_at: normalizeDateValue(form.idExpiresAt) || null,
       metadata: baseMetadata,
       ...evidence("identity_back"),
-    },
-    {
-      type: "proof_of_address",
-      file_url: form.proofOfAddressUrl.trim(),
-      issuing_country_code: "countryCode" in form ? normalizeCountryCode(form.countryCode) || null : null,
-      metadata: { subject },
-      ...evidence("proof_of_address"),
-    },
-    {
+    });
+  }
+
+  if (form.selfieLivenessUrl.trim()) {
+    documents.push({
       type: "selfie_liveness",
       file_url: form.selfieLivenessUrl.trim(),
       metadata: {
@@ -2323,8 +2379,10 @@ const buildPersonDocuments = (
         captured_at: new Date().toISOString(),
       },
       ...evidence("selfie_liveness"),
-    },
-  ];
+    });
+  }
+
+  return documents;
 };
 
 const readPersonDocuments = (documents: KycDocumentPayload[]) => {
@@ -2337,6 +2395,7 @@ const readPersonDocuments = (documents: KycDocumentPayload[]) => {
   return {
     idDocumentType: documentType,
     idDocumentNumber: front?.document_number ?? back?.document_number ?? "",
+    idIssuingCountry: normalizeCountryCode(front?.issuing_country_code ?? back?.issuing_country_code),
     idIssuedAt: toDateInputValue(front?.issued_at ?? back?.issued_at),
     idExpiresAt: toDateInputValue(front?.expires_at ?? back?.expires_at),
     idFrontUrl: front?.file_url ?? "",
@@ -2629,7 +2688,9 @@ const PersonDetails = ({
       <SelectField label="Nationality" value={form.nationality} onChange={(value) => onChange("nationality", value)} options={countryOptions} placeholder="Select nationality" />
       {includeOwnership ? (
         <SelectField label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} options={countryOptions} placeholder="Select residence" />
-      ) : null}
+      ) : (
+        <Field label="Role" value={form.role} onChange={(value) => onChange("role", value)} placeholder="For example, Director" />
+      )}
     </div>
   </div>
 );
@@ -2668,6 +2729,7 @@ const AddressFields = ({
 );
 
 const PersonDocumentFields = ({
+  corporate,
   form,
   onChange,
   onUploadCapture,
@@ -2675,14 +2737,17 @@ const PersonDocumentFields = ({
   uploadSubject,
   uploadingCapture,
 }: {
+  corporate: boolean;
   form: Pick<PersonForm, DocumentFieldKey>;
   onChange: (field: DocumentFieldKey, value: string) => void;
   onUploadCapture: (captureType: IdentityCaptureType, field: DocumentFieldKey, file: File) => void;
   title: string;
   uploadSubject: IdentityVerificationSubject;
   uploadingCapture: string;
-}) => (
-  <div className="rounded-2xl border border-gray-200 p-4">
+}) => {
+  const isPassport = corporate && form.idDocumentType === "passport";
+
+  return <div className="rounded-2xl border border-gray-200 p-4">
     <h3 className="font-semibold text-gray-900">{title}</h3>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       <SelectField
@@ -2696,25 +2761,28 @@ const PersonDocumentFields = ({
           { label: "Other identity document", value: "identity_document" },
         ]}
       />
-      <Field label="Document number" value={form.idDocumentNumber} onChange={(value) => onChange("idDocumentNumber", value)} />
-      <Field label="Issued date" value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} type="date" max={todayInputValue} />
+      <Field label={isPassport ? "Passport number" : "ID number"} value={form.idDocumentNumber} onChange={(value) => onChange("idDocumentNumber", value)} />
+      {corporate ? <SelectField label="Issuing country" value={form.idIssuingCountry} onChange={(value) => onChange("idIssuingCountry", value)} options={countryOptions} placeholder="Select issuing country" /> : null}
+      <Field label={corporate ? "Issue date" : "Issued date"} value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} type="date" max={todayInputValue} />
       <Field label="Expiry date" value={form.idExpiresAt} onChange={(value) => onChange("idExpiresAt", value)} type="date" min={tomorrowInputValue} />
       <FieldWithUpload
-        label="ID front image"
+        label={isPassport ? "Passport document" : "ID front image"}
         value={form.idFrontUrl}
         onChange={(value) => onChange("idFrontUrl", value)}
-        uploadLabel="Capture or upload ID front"
+        uploadLabel={isPassport ? "Upload passport document" : "Capture or upload ID front"}
         uploading={uploadingCapture === `${uploadSubject}:identity_front`}
         onFile={(file) => onUploadCapture("identity_front", "idFrontUrl", file)}
       />
-      <FieldWithUpload
-        label="ID back image"
-        value={form.idBackUrl}
-        onChange={(value) => onChange("idBackUrl", value)}
-        uploadLabel="Capture or upload ID back"
-        uploading={uploadingCapture === `${uploadSubject}:identity_back`}
-        onFile={(file) => onUploadCapture("identity_back", "idBackUrl", file)}
-      />
+      {!isPassport ? (
+        <FieldWithUpload
+          label="ID back image"
+          value={form.idBackUrl}
+          onChange={(value) => onChange("idBackUrl", value)}
+          uploadLabel="Capture or upload ID back"
+          uploading={uploadingCapture === `${uploadSubject}:identity_back`}
+          onFile={(file) => onUploadCapture("identity_back", "idBackUrl", file)}
+        />
+      ) : null}
     </div>
     <div className="mt-4">
       <FieldWithUpload
@@ -2726,8 +2794,8 @@ const PersonDocumentFields = ({
         onFile={(file) => onUploadCapture("proof_of_address", "proofOfAddressUrl", file)}
       />
     </div>
-  </div>
-);
+  </div>;
+};
 
 const FaceCheckFields = ({
   livenessSessionId,
