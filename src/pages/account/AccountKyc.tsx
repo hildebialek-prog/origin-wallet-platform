@@ -173,6 +173,8 @@ type ProfileForm = {
 type BusinessForm = {
   businessName: string;
   businessRegistration: string;
+  registeredDate: string;
+  niumBusinessType: string;
   taxId: string;
   businessActivityType: string;
   exportingRegions: string;
@@ -321,6 +323,10 @@ const businessActivityOptions = [
   { label: "Import and export business", value: "foreign_trade_import_export" },
 ];
 
+const niumBusinessTypeOptions = [
+  { label: "Private company", value: "PRIVATE_COMPANY" },
+];
+
 const tradeTypeOptions = [
   { label: "Goods Trade", value: "goods_trade" },
   { label: "Service Trade", value: "service_trade" },
@@ -377,6 +383,8 @@ const defaultProfileForm = (name = ""): ProfileForm => ({
 const defaultBusinessForm = (): BusinessForm => ({
   businessName: "",
   businessRegistration: "",
+  registeredDate: "",
+  niumBusinessType: "",
   taxId: "",
   businessActivityType: "foreign_trade_export",
   exportingRegions: "",
@@ -425,6 +433,9 @@ const defaultPersonForm = (): PersonForm => ({
 const optionValue = <TValue extends string>(options: { value: TValue }[], value?: string | null) =>
   options.some((option) => option.value === value) ? (value as TValue) : "";
 
+const normalizeNiumBusinessType = (value?: string | null) =>
+  value?.trim().toUpperCase() === "PRIVATE_COMPANY" ? "PRIVATE_COMPANY" : "";
+
 const normalizeProfileDraftForm = (form?: Partial<ProfileForm>, fallbackName = ""): ProfileForm => {
   const next = { ...defaultProfileForm(fallbackName), ...(form ?? {}) };
 
@@ -452,6 +463,8 @@ const normalizeBusinessDraftForm = (form?: Partial<BusinessForm>): BusinessForm 
     exportingRegions: selectedValues(next.exportingRegions).filter(isCountryCode).join(","),
     industry: optionValue(industryOptions, next.industry),
     mainProduct: optionValue(mainProductOptions, next.mainProduct) || "Electrical Products and Accessories",
+    niumBusinessType: normalizeNiumBusinessType(next.niumBusinessType),
+    registeredDate: toDateInputValue(next.registeredDate),
     sourceOfFunds: optionValue(sourceOfFundsOptions, next.sourceOfFunds),
     tradeType: optionValue(tradeTypeOptions, next.tradeType) || "goods_trade",
   };
@@ -635,6 +648,8 @@ const AccountKyc = () => {
       ...defaultBusinessForm(),
       businessName: nextProfile.business_name ?? "",
       businessRegistration: nextProfile.business_registration_number ?? "",
+      registeredDate: toDateInputValue(stringifyMetadata(metadata.registered_date)),
+      niumBusinessType: normalizeNiumBusinessType(stringifyMetadata(metadata.nium_business_type)),
       taxId: nextProfile.tax_id ?? "",
       businessActivityType: optionValue(businessActivityOptions, stringifyMetadata(metadata.business_activity_type)) || "foreign_trade_export",
       exportingRegions: stringifyMetadata(metadata.exporting_regions),
@@ -1104,12 +1119,14 @@ const AccountKyc = () => {
           profileForm.legalName,
           businessForm.businessName,
           businessForm.businessRegistration,
+          businessForm.registeredDate,
           businessForm.taxId,
           businessForm.businessActivity,
           beneficialOwnerForm.ownershipPercentage,
         ]) &&
         requiredSelects([
           businessForm.businessActivityType,
+          businessForm.niumBusinessType,
           businessForm.tradeType,
           businessForm.mainProduct,
           businessForm.industry,
@@ -1257,6 +1274,8 @@ const AccountKyc = () => {
             : profileForm.expectedMonthlyVolume.trim(),
         occupation: applicantType === "individual" ? profileForm.occupation.trim() : null,
         business_industry: applicantType === "business" ? businessForm.industry.trim() : null,
+        registered_date: applicantType === "business" ? normalizeDateValue(businessForm.registeredDate) : null,
+        nium_business_type: applicantType === "business" ? businessForm.niumBusinessType.trim() : null,
         business_activity: applicantType === "business" ? businessForm.businessActivity.trim() : null,
         business_website: applicantType === "business" ? businessForm.website.trim() || null : null,
         business_activity_type: applicantType === "business" ? businessForm.businessActivityType.trim() : null,
@@ -1537,6 +1556,22 @@ const AccountKyc = () => {
                       <Field label="Business name" value={businessForm.businessName} onChange={(value) => updateBusiness("businessName", value)} />
                       <Field label="Registration number" value={businessForm.businessRegistration} onChange={(value) => updateBusiness("businessRegistration", value)} />
                       <Field label="Tax ID" value={businessForm.taxId} onChange={(value) => updateBusiness("taxId", value)} />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field
+                        label="Registered date"
+                        value={businessForm.registeredDate}
+                        onChange={(value) => updateBusiness("registeredDate", value)}
+                        type="date"
+                        max={todayInputValue}
+                      />
+                      <SelectField
+                        label="Nium business type"
+                        value={businessForm.niumBusinessType}
+                        onChange={(value) => updateBusiness("niumBusinessType", value)}
+                        options={niumBusinessTypeOptions}
+                        placeholder="Select business type"
+                      />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <SelectField
