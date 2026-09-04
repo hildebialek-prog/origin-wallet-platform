@@ -1,5 +1,62 @@
-import { describe, expect, it } from "vitest";
-import { assertFilingDocumentEvidence, buildFilingDocumentPayload } from "./AccountKyc";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload } from "./AccountKyc";
+
+describe("related-person address subdivisions", () => {
+  const renderAddress = (countryCode: string, state: string, onChange = vi.fn()) => {
+    render(createElement(AddressFields, {
+      title: "Authorized representative address",
+      countryCode,
+      addressLine1: "1 Test Street",
+      city: "Test City",
+      state,
+      postalCode: "100000",
+      onChange,
+    }));
+
+    return onChange;
+  };
+
+  it("renders configured Vietnam subdivisions as a selector and displays an existing code", () => {
+    renderAddress("VN", "VN-70");
+
+    const stateField = document.querySelector('[data-kyc-field="address-state"]');
+    expect(stateField).not.toBeNull();
+    const selector = within(stateField as HTMLElement).getByRole("combobox") as HTMLSelectElement;
+
+    expect(selector.value).toBe("VN-70");
+    expect(selector.selectedOptions[0]?.textContent).toBe("Phu Yen");
+    expect(within(stateField as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("stores the subdivision code selected by the user", () => {
+    const onChange = renderAddress("VN", "");
+    const stateField = document.querySelector('[data-kyc-field="address-state"]');
+
+    fireEvent.change(within(stateField as HTMLElement).getByRole("combobox"), { target: { value: "VN-HN" } });
+
+    expect(onChange).toHaveBeenCalledWith("state", "VN-HN");
+  });
+
+  it("renders Hong Kong subdivisions and stores the selected district code", () => {
+    const onChange = renderAddress("HK", "");
+    const stateField = document.querySelector('[data-kyc-field="address-state"]');
+    const selector = within(stateField as HTMLElement).getByRole("combobox");
+
+    expect(within(selector).getByRole("option", { name: "Central and Western" })).toHaveValue("HK-HCW");
+    fireEvent.change(selector, { target: { value: "HK-HCW" } });
+
+    expect(onChange).toHaveBeenCalledWith("state", "HK-HCW");
+  });
+
+  it("keeps a text input for countries without configured subdivisions", () => {
+    renderAddress("GB", "Greater London");
+
+    expect(screen.getByDisplayValue("Greater London")).toHaveAttribute("type", "text");
+    expect(document.querySelector('[data-kyc-field="address-state"]')).toBeNull();
+  });
+});
 
 describe("HK KYB filing document evidence", () => {
   it("preserves uploaded NNC1 evidence and metadata in the submission document", () => {

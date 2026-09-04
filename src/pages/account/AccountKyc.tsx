@@ -3075,7 +3075,7 @@ const PersonDetails = ({
   </div>
 );
 
-const AddressFields = ({
+export const AddressFields = ({
   addressLine1,
   city,
   countryCode,
@@ -3114,7 +3114,7 @@ const AddressFields = ({
     <div className="rounded-2xl border border-gray-200 p-4">
       <h3 className="font-semibold text-gray-900">{title}</h3>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <SelectField label="Country" value={countryCode} onChange={handleCountryChange} options={countryOptions} placeholder="Select country" />
+        <SelectField fieldId="address-country" label="Country" value={countryCode} onChange={handleCountryChange} options={countryOptions} placeholder="Select country" />
         <Field label="Postal code" value={postalCode} onChange={(value) => onChange("postalCode", value)} />
       </div>
       <div className="mt-4">
@@ -3123,7 +3123,7 @@ const AddressFields = ({
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <Field label="City" value={city} onChange={(value) => onChange("city", value)} />
         {subdivisionOptions.length > 0 ? (
-          <SelectField label="State/province" value={state} onChange={(value) => onChange("state", value)} options={subdivisionOptions} placeholder="Select state/province" />
+          <SelectField fieldId="address-state" label="State/province" value={state} onChange={(value) => onChange("state", value)} options={subdivisionOptions} placeholder="Select state/province" />
         ) : (
           <Field label="State/province" value={state} onChange={(value) => onChange("state", value)} />
         )}

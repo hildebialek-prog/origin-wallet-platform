@@ -14,6 +14,24 @@ describe("country subdivisions", () => {
     expect(getSubdivisionOptions(" vn ")).toEqual(getSubdivisionOptions("VN"));
   });
 
+  it("provides official Hong Kong district subdivision codes", () => {
+    expect(getSubdivisionOptions("HK")).toEqual(expect.arrayContaining([
+      { label: "Central and Western", value: "HK-HCW" },
+      { label: "Kowloon City", value: "HK-KKC" },
+      { label: "Sai Kung", value: "HK-NSK" },
+    ]));
+  });
+
+  it("provides official Singapore district subdivision codes", () => {
+    expect(getSubdivisionOptions("SG")).toEqual([
+      { label: "Central Singapore", value: "SG-01" },
+      { label: "North East", value: "SG-02" },
+      { label: "North West", value: "SG-03" },
+      { label: "South East", value: "SG-04" },
+      { label: "South West", value: "SG-05" },
+    ]);
+  });
+
   it("clears a state that is invalid for the newly selected country", () => {
     expect(stateAfterCountryChange("VN", "test address")).toBe("");
     expect(stateAfterCountryChange("VN", "VN-70")).toBe("VN-70");
