@@ -1,10 +1,18 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getCorporateSubdivisionOptions } from "@/services/kycService";
 import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload } from "./AccountKyc";
 
+vi.mock("@/services/kycService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/kycService")>()),
+  getCorporateSubdivisionOptions: vi.fn(),
+}));
+
 describe("related-person address subdivisions", () => {
-  const renderAddress = (countryCode: string, state: string, onChange = vi.fn()) => {
+  beforeEach(() => vi.mocked(getCorporateSubdivisionOptions).mockReset());
+
+  const renderAddress = (countryCode: string, state: string, onChange = vi.fn(), remote = false) => {
     render(createElement(AddressFields, {
       title: "Authorized representative address",
       countryCode,
@@ -13,6 +21,7 @@ describe("related-person address subdivisions", () => {
       state,
       postalCode: "100000",
       onChange,
+      ...(remote ? { token: "token", userId: 11 } : {}),
     }));
 
     return onChange;
@@ -30,13 +39,40 @@ describe("related-person address subdivisions", () => {
     expect(within(stateField as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
+  it("loads Vietnam constants and submits the Nium code", async () => {
+    vi.mocked(getCorporateSubdivisionOptions).mockResolvedValue({ values: [{ label: "Phu Yen", value: "VN-70" }] });
+    const onChange = renderAddress("VN", "", vi.fn(), true);
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Phu Yen" })).toBeInTheDocument());
+    const stateField = document.querySelector('[data-kyc-field="address-state"]');
+    fireEvent.change(within(stateField as HTMLElement).getByRole("combobox"), { target: { value: "VN-70" } });
+    expect(onChange).toHaveBeenCalledWith("state", "VN-70");
+  });
+
+  it("uses a Hong Kong code returned by Nium", async () => {
+    vi.mocked(getCorporateSubdivisionOptions).mockResolvedValue({ values: [{ label: "Kowloon City", value: "HK-KKC" }] });
+    const onChange = renderAddress("HK", "", vi.fn(), true);
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Kowloon City" })).toHaveValue("HK-KKC"));
+    const stateField = document.querySelector('[data-kyc-field="address-state"]');
+    fireEvent.change(within(stateField as HTMLElement).getByRole("combobox"), { target: { value: "HK-KKC" } });
+    expect(onChange).toHaveBeenCalledWith("state", "HK-KKC");
+  });
+
+  it("keeps free text when Nium returns no subdivisions", async () => {
+    vi.mocked(getCorporateSubdivisionOptions).mockResolvedValue({ values: [] });
+    renderAddress("ZZ", "Custom State", vi.fn(), true);
+
+    await waitFor(() => expect(screen.getByDisplayValue("Custom State")).toHaveAttribute("type", "text"));
+  });
+
   it("stores the subdivision code selected by the user", () => {
     const onChange = renderAddress("VN", "");
     const stateField = document.querySelector('[data-kyc-field="address-state"]');
 
-    fireEvent.change(within(stateField as HTMLElement).getByRole("combobox"), { target: { value: "VN-HN" } });
+    fireEvent.change(within(stateField as HTMLElement).getByRole("combobox"), { target: { value: "VN-70" } });
 
-    expect(onChange).toHaveBeenCalledWith("state", "VN-HN");
+    expect(onChange).toHaveBeenCalledWith("state", "VN-70");
   });
 
   it("renders Hong Kong subdivisions and stores the selected district code", () => {

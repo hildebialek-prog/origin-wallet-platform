@@ -14,6 +14,7 @@ import {
 import {
   completeIdentityVerificationSession,
   getKycProfile,
+  getCorporateSubdivisionOptions,
   resubmitKycRequirement,
   startIdentityVerificationSession,
   submitKycProfile,
@@ -1938,6 +1939,8 @@ const AccountKyc = () => {
                   city={profileForm.city}
                   state={profileForm.state}
                   postalCode={profileForm.postalCode}
+                  token={token ?? undefined}
+                  userId={user?.id}
                   onChange={(field, value) => updateProfile(field, value)}
                 />
                 {applicantType === "business" ? (
@@ -1966,13 +1969,20 @@ const AccountKyc = () => {
                         <Checkbox checked={businessForm.sameBusinessAddress} onCheckedChange={(checked) => updateBusiness("sameBusinessAddress", checked === true)} />
                         Business address is the same as the registered address
                       </label>
-                      {!businessForm.sameBusinessAddress ? <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <SelectField label="Business country" value={businessForm.businessCountryCode} onChange={(value) => updateBusiness("businessCountryCode", value)} options={countryOptions} />
-                        <Field label="Business postal code" value={businessForm.businessPostalCode} onChange={(value) => updateBusiness("businessPostalCode", value)} />
-                        <Field label="Business address line 1" value={businessForm.businessAddressLine1} onChange={(value) => updateBusiness("businessAddressLine1", value)} />
-                        <Field label="Business city" value={businessForm.businessCity} onChange={(value) => updateBusiness("businessCity", value)} />
-                        <Field label="Business state/province" value={businessForm.businessState} onChange={(value) => updateBusiness("businessState", value)} />
-                      </div> : null}
+                      {!businessForm.sameBusinessAddress ? <div className="mt-4"><AddressFields
+                        title="Business address"
+                        countryCode={businessForm.businessCountryCode}
+                        addressLine1={businessForm.businessAddressLine1}
+                        city={businessForm.businessCity}
+                        state={businessForm.businessState}
+                        postalCode={businessForm.businessPostalCode}
+                        token={token ?? undefined}
+                        userId={user?.id}
+                        onChange={(field, value) => {
+                          const keys = { countryCode: "businessCountryCode", addressLine1: "businessAddressLine1", city: "businessCity", state: "businessState", postalCode: "businessPostalCode" } as const;
+                          updateBusiness(keys[field], value);
+                        }}
+                      /></div> : null}
                     </div>
                     <AddressFields
                       title="Authorized representative address"
@@ -1981,6 +1991,8 @@ const AccountKyc = () => {
                       city={representativeForm.city}
                       state={representativeForm.state}
                       postalCode={representativeForm.postalCode}
+                      token={token ?? undefined}
+                      userId={user?.id}
                       onChange={(field, value) => updateRepresentative(field, value)}
                     />
                     <AddressFields
@@ -1990,6 +2002,8 @@ const AccountKyc = () => {
                       city={beneficialOwnerForm.city}
                       state={beneficialOwnerForm.state}
                       postalCode={beneficialOwnerForm.postalCode}
+                      token={token ?? undefined}
+                      userId={user?.id}
                       onChange={(field, value) => updateBeneficialOwner(field, value)}
                     />
                   </>
@@ -3083,6 +3097,9 @@ export const AddressFields = ({
   postalCode,
   state,
   title,
+  token,
+  userId,
+  region = "HK",
 }: {
   addressLine1: string;
   city: string;
@@ -3091,9 +3108,27 @@ export const AddressFields = ({
   postalCode: string;
   state: string;
   title: string;
+  token?: string;
+  userId?: string | number;
+  region?: string;
 }) => {
-  const subdivisionOptions = getSubdivisionOptions(countryCode);
+  const [subdivisionOptions, setSubdivisionOptions] = useState(() => getSubdivisionOptions(countryCode));
   const hasValidSubdivision = subdivisionOptions.some((option) => option.value === state);
+
+  useEffect(() => {
+    let active = true;
+    setSubdivisionOptions(getSubdivisionOptions(countryCode));
+
+    if (!token || !userId || !countryCode) return () => { active = false; };
+
+    getCorporateSubdivisionOptions({ token, userId, region, countryCode })
+      .then(({ values }) => {
+        if (active) setSubdivisionOptions(values);
+      })
+      .catch(() => undefined);
+
+    return () => { active = false; };
+  }, [countryCode, region, token, userId]);
 
   useEffect(() => {
     if (subdivisionOptions.length > 0 && state && !hasValidSubdivision) {

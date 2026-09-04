@@ -316,6 +316,27 @@ export const verifyBusinessRegistry = (params: {
     },
   });
 
+export interface CorporateConstantOption {
+  label: string;
+  value: string;
+}
+
+export const getCorporateSubdivisionOptions = (params: {
+  token: string;
+  userId: string | number;
+  region: string;
+  countryCode: string;
+}) =>
+  requestApi<{ values: CorporateConstantOption[] }>(
+    `/user/users/${params.userId}/kyc-profile/corporate-constants?${new URLSearchParams({
+      region: params.region.toUpperCase(),
+      customerType: "CORPORATE",
+      countryCode: params.countryCode.toUpperCase(),
+      type: "STATE",
+    })}`,
+    { token: params.token },
+  );
+
 export const startIdentityVerificationSession = (params: {
   token: string;
   userId: string | number;

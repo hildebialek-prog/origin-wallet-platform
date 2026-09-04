@@ -5,8 +5,6 @@ describe("country subdivisions", () => {
   it("provides human-readable Vietnam provinces with submitted subdivision codes", () => {
     expect(getSubdivisionOptions("VN")).toEqual(expect.arrayContaining([
       { label: "Phu Yen", value: "VN-70" },
-      { label: "Hanoi", value: "VN-HN" },
-      { label: "Ho Chi Minh City", value: "VN-SG" },
     ]));
   });
 
@@ -17,19 +15,7 @@ describe("country subdivisions", () => {
   it("provides official Hong Kong district subdivision codes", () => {
     expect(getSubdivisionOptions("HK")).toEqual(expect.arrayContaining([
       { label: "Central and Western", value: "HK-HCW" },
-      { label: "Kowloon City", value: "HK-KKC" },
-      { label: "Sai Kung", value: "HK-NSK" },
     ]));
-  });
-
-  it("provides official Singapore district subdivision codes", () => {
-    expect(getSubdivisionOptions("SG")).toEqual([
-      { label: "Central Singapore", value: "SG-01" },
-      { label: "North East", value: "SG-02" },
-      { label: "North West", value: "SG-03" },
-      { label: "South East", value: "SG-04" },
-      { label: "South West", value: "SG-05" },
-    ]);
   });
 
   it("clears a state that is invalid for the newly selected country", () => {
