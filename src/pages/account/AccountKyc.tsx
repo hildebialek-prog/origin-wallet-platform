@@ -29,6 +29,7 @@ import {
   type KycRequirement,
   type KycSubmissionPayload,
 } from "@/services/kycService";
+import { getSubdivisionOptions, stateAfterCountryChange } from "@/services/countrySubdivisions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -3090,22 +3091,46 @@ const AddressFields = ({
   postalCode: string;
   state: string;
   title: string;
-}) => (
-  <div className="rounded-2xl border border-gray-200 p-4">
-    <h3 className="font-semibold text-gray-900">{title}</h3>
-    <div className="mt-4 grid gap-4 md:grid-cols-2">
-      <SelectField label="Country" value={countryCode} onChange={(value) => onChange("countryCode", value)} options={countryOptions} placeholder="Select country" />
-      <Field label="Postal code" value={postalCode} onChange={(value) => onChange("postalCode", value)} />
+}) => {
+  const subdivisionOptions = getSubdivisionOptions(countryCode);
+  const hasValidSubdivision = subdivisionOptions.some((option) => option.value === state);
+
+  useEffect(() => {
+    if (subdivisionOptions.length > 0 && state && !hasValidSubdivision) {
+      onChange("state", "");
+    }
+  }, [hasValidSubdivision, onChange, state, subdivisionOptions.length]);
+
+  const handleCountryChange = (value: string) => {
+    const nextState = stateAfterCountryChange(value, state);
+
+    onChange("countryCode", value);
+    if (nextState !== state) {
+      onChange("state", nextState);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-gray-200 p-4">
+      <h3 className="font-semibold text-gray-900">{title}</h3>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <SelectField label="Country" value={countryCode} onChange={handleCountryChange} options={countryOptions} placeholder="Select country" />
+        <Field label="Postal code" value={postalCode} onChange={(value) => onChange("postalCode", value)} />
+      </div>
+      <div className="mt-4">
+        <Field label="Address line 1" value={addressLine1} onChange={(value) => onChange("addressLine1", value)} />
+      </div>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <Field label="City" value={city} onChange={(value) => onChange("city", value)} />
+        {subdivisionOptions.length > 0 ? (
+          <SelectField label="State/province" value={state} onChange={(value) => onChange("state", value)} options={subdivisionOptions} placeholder="Select state/province" />
+        ) : (
+          <Field label="State/province" value={state} onChange={(value) => onChange("state", value)} />
+        )}
+      </div>
     </div>
-    <div className="mt-4">
-      <Field label="Address line 1" value={addressLine1} onChange={(value) => onChange("addressLine1", value)} />
-    </div>
-    <div className="mt-4 grid gap-4 md:grid-cols-2">
-      <Field label="City" value={city} onChange={(value) => onChange("city", value)} />
-      <Field label="State/province" value={state} onChange={(value) => onChange("state", value)} />
-    </div>
-  </div>
-);
+  );
+};
 
 const PersonDocumentFields = ({
   corporate,
