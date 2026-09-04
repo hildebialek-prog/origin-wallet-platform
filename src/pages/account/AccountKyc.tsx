@@ -9,7 +9,6 @@ import {
 import {
   completeIdentityVerificationSession,
   getKycProfile,
-  getCorporateSubdivisionOptions,
   getCorporateConstantOptions,
   resubmitKycRequirement,
   startIdentityVerificationSession,
@@ -26,7 +25,6 @@ import {
   type KycRequirement,
   type KycSubmissionPayload,
 } from "@/services/kycService";
-import { getSubdivisionOptions, stateAfterCountryChange } from "@/services/countrySubdivisions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -743,9 +741,16 @@ const AccountKyc = () => {
     queryKey: ["nium-corporate-constants", user?.id, token, "HK"],
     enabled: !!user?.id && !!token && applicantType === "business",
     queryFn: async () => {
-      const categories = ["countryName", "countryOfOperation", "businessType", "industrySector", "monthlyTransactionVolume", "averageTransactionValue", "monthlyTransactions", "annualTurnover", "totalEmployees", "intendedUseOfAccount", "documentType"] as const;
-      const entries = await Promise.all(categories.map(async (category) => [category, (await getCorporateConstantOptions({ token: token as string, userId: user?.id as string, region: "HK", category })).values] as const));
-      return Object.fromEntries(entries);
+      const categories = ["annualTurnover", "averageTransactionValue", "businessType", "countryName", "countryOfOperation", "documentType", "intendedUseOfAccount", "industrySector", "monthlyTransactionVolume", "monthlyTransactions", "position", "totalEmployees"] as const;
+      const entries = await Promise.all(categories.map(async (category) => {
+        try {
+          const response = await getCorporateConstantOptions({ token: token as string, userId: user?.id as string, region: "HK", category });
+          return [category, response.values] as const;
+        } catch {
+          return null;
+        }
+      }));
+      return Object.fromEntries(entries.filter((entry) => entry !== null));
     },
   });
   const constants = constantsQuery.data ?? {};
@@ -3158,10 +3163,8 @@ export const AddressFields = ({
   onChange,
   postalCode,
   state,
+  subdivisionOptions = [],
   title,
-  token,
-  userId,
-  region = "HK",
 }: {
   addressLine1: string;
   city: string;
@@ -3170,28 +3173,10 @@ export const AddressFields = ({
   onChange: (field: "countryCode" | "addressLine1" | "city" | "state" | "postalCode", value: string) => void;
   postalCode: string;
   state: string;
+  subdivisionOptions?: { label: string; value: string }[];
   title: string;
-  token?: string;
-  userId?: string | number;
-  region?: string;
 }) => {
-  const [subdivisionOptions, setSubdivisionOptions] = useState(() => getSubdivisionOptions(countryCode));
   const hasValidSubdivision = subdivisionOptions.some((option) => option.value === state);
-
-  useEffect(() => {
-    let active = true;
-    setSubdivisionOptions(getSubdivisionOptions(countryCode));
-
-    if (!token || !userId || !countryCode) return () => { active = false; };
-
-    getCorporateSubdivisionOptions({ token, userId, region, countryCode })
-      .then(({ values }) => {
-        if (active) setSubdivisionOptions(values);
-      })
-      .catch(() => undefined);
-
-    return () => { active = false; };
-  }, [countryCode, region, token, userId]);
 
   useEffect(() => {
     if (subdivisionOptions.length > 0 && state && !hasValidSubdivision) {
@@ -3200,11 +3185,9 @@ export const AddressFields = ({
   }, [hasValidSubdivision, onChange, state, subdivisionOptions.length]);
 
   const handleCountryChange = (value: string) => {
-    const nextState = stateAfterCountryChange(value, state);
-
     onChange("countryCode", value);
-    if (nextState !== state) {
-      onChange("state", nextState);
+    if (value !== countryCode && state !== "") {
+      onChange("state", "");
     }
   };
 
