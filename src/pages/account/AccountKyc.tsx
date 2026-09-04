@@ -1471,6 +1471,10 @@ const AccountKyc = () => {
         : buildPersonDocuments(profileForm, "applicant", documentEvidence("applicant"), false);
     const ownership = Number(beneficialOwnerForm.ownershipPercentage);
 
+    if (applicantType === "business") {
+      assertFilingDocumentEvidence(documents, businessForm.filingDocumentType);
+    }
+
     return {
       applicant_type: applicantType,
       legal_name: profileForm.legalName.trim(),
@@ -1757,7 +1761,11 @@ const AccountKyc = () => {
       return;
     }
 
-    submitMutation.mutate(buildCurrentKycPayload());
+    try {
+      submitMutation.mutate(buildCurrentKycPayload());
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to build the KYC/KYB submission.");
+    }
   };
 
   const isKycReadOnly = isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo;
@@ -2468,6 +2476,7 @@ const artifactToDocumentPayload = (artifact?: IdentityVerificationArtifact): Par
     mime_type: artifact.mime_type ?? null,
     original_name: artifact.original_name ?? null,
     storage_disk: artifact.storage_disk ?? null,
+    metadata: artifact.metadata,
   };
 };
 
@@ -2481,6 +2490,7 @@ const uploadedDocumentToPayload = (document?: KycDocumentPayload): Partial<KycDo
     mime_type: document.mime_type ?? null,
     original_name: document.original_name ?? null,
     storage_disk: document.storage_disk ?? null,
+    metadata: document.metadata,
   };
 };
 
@@ -2498,6 +2508,15 @@ const buildBusinessDocuments = (
   evidence: (captureType: string) => Partial<KycDocumentPayload>,
 ): KycDocumentPayload[] => {
   const issuingCountryCode = normalizeCountryCode(countryCode) || null;
+  const filingEvidence = evidence(form.filingDocumentType);
+
+  if (import.meta.env.DEV) {
+    console.debug("HK KYB filing evidence", {
+      type: form.filingDocumentType,
+      evidence: filingEvidence,
+    });
+  }
+
   return [
     {
       type: "business_registration",
@@ -2506,14 +2525,7 @@ const buildBusinessDocuments = (
       issued_at: normalizeDateValue(form.registrationDocumentIssuedAt),
       ...evidence("business_registration"),
     },
-    {
-      type: form.filingDocumentType,
-      file_url: form.filingDocumentUrl.trim(),
-      issuing_country_code: issuingCountryCode,
-      issued_at: normalizeDateValue(form.filingDocumentIssuedAt),
-      metadata: { is_most_recent_filing: form.isMostRecentFiling },
-      ...evidence(form.filingDocumentType),
-    },
+    buildFilingDocumentPayload(form, issuingCountryCode, filingEvidence),
     {
       type: "proof_of_business_address",
       file_url: form.businessAddressProofUrl.trim(),
@@ -2529,6 +2541,39 @@ const buildBusinessDocuments = (
         }]
       : []),
   ];
+};
+
+export const buildFilingDocumentPayload = (
+  form: Pick<BusinessForm, "filingDocumentType" | "filingDocumentUrl" | "filingDocumentIssuedAt" | "isMostRecentFiling">,
+  issuingCountryCode: string | null,
+  filingEvidence: Partial<KycDocumentPayload>,
+): KycDocumentPayload => ({
+  type: form.filingDocumentType,
+  file_url: form.filingDocumentUrl.trim(),
+  issuing_country_code: issuingCountryCode,
+  issued_at: normalizeDateValue(form.filingDocumentIssuedAt),
+  ...filingEvidence,
+  metadata: {
+    ...(filingEvidence.metadata ?? {}),
+    is_most_recent_filing: form.isMostRecentFiling,
+  },
+});
+
+export const assertFilingDocumentEvidence = (
+  documents: KycDocumentPayload[],
+  filingDocumentType: "nar1" | "nnc1",
+) => {
+  const filingDocument = documents.find((document) => document.type === filingDocumentType);
+  const requiredEvidence = [
+    filingDocument?.file_url,
+    filingDocument?.file_hash,
+    filingDocument?.file_path,
+    filingDocument?.storage_disk,
+  ];
+
+  if (!filingDocument || requiredEvidence.some((value) => typeof value !== "string" || value.trim() === "")) {
+    throw new Error("Uploaded filing document metadata is missing. Please re-upload the NAR1/NNC1 document.");
+  }
 };
 
 const buildPersonDocuments = (
