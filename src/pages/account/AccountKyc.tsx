@@ -760,6 +760,7 @@ const AccountKyc = () => {
     const routingCode = Array.isArray(bankAccountDetails.routingCodes)
       ? asMetadataRecord(bankAccountDetails.routingCodes[0])
       : {};
+    const expectedAccountUsage = asMetadataRecord(niumFields.expectedAccountUsage);
     const sizeOfBusiness = asMetadataRecord(niumFields.sizeOfBusiness);
     const representativePositions = Array.isArray(representative?.metadata?.positions)
       ? representative.metadata.positions.filter((position): position is string => typeof position === "string")
