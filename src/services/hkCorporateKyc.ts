@@ -34,19 +34,19 @@ export const hkMonthlyTransactionOptions = [
 ];
 
 export const hkAnnualTurnoverOptions = [
-  { label: "Nium turnover band HK008", value: "HK008" },
-  { label: "Nium turnover band HK011", value: "HK011" },
+  { label: "Less than 1 million USD", value: "HK008" },
+  { label: "1 - 5 million USD", value: "HK011" },
 ] as const;
 
 export const hkEmployeeCountOptions = [
-  { label: "Nium employee band EM006", value: "EM006" },
-  { label: "Nium employee band EM008", value: "EM008" },
+  { label: "1 - 10 employees", value: "EM006" },
+  { label: "11 - 50 employees", value: "EM008" },
 ] as const;
 
 export const hkIntendedUseOptions = [
-  { label: "Nium intended use IU001", value: "IU001" },
-  { label: "Nium intended use IU002", value: "IU002" },
-  { label: "Nium intended use IU003", value: "IU003" },
+  { label: "Receive business payments", value: "IU001" },
+  { label: "International business payments", value: "IU002" },
+  { label: "Pay suppliers and business expenses", value: "IU003" },
 ] as const;
 
 export type HkCorporateSerializerInput = {

@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { buildHkCorporateFullFields } from "./hkCorporateKyc";
+import {
+  buildHkCorporateFullFields,
+  hkAnnualTurnoverOptions,
+  hkEmployeeCountOptions,
+  hkIntendedUseOptions,
+} from "./hkCorporateKyc";
+
+describe("HK Corporate enum labels", () => {
+  it("keeps Nium codes as values while displaying customer-friendly labels", () => {
+    expect(hkAnnualTurnoverOptions).toEqual([
+      { label: "Less than 1 million USD", value: "HK008" },
+      { label: "1 - 5 million USD", value: "HK011" },
+    ]);
+    expect(hkEmployeeCountOptions.map(({ value }) => value)).toEqual(["EM006", "EM008"]);
+    expect(hkIntendedUseOptions).toContainEqual({
+      label: "International business payments",
+      value: "IU002",
+    });
+  });
+});
 
 describe("HK Corporate Full serializer", () => {
   it("serializes factual answers into the required provider source contract", () => {

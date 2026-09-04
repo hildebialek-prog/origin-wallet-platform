@@ -1367,10 +1367,6 @@ const AccountKyc = () => {
           businessForm.accountPurpose,
           businessForm.annualTurnover,
           businessForm.totalEmployees,
-          businessForm.bankAccountName,
-          businessForm.bankAccountNumber,
-          businessForm.bankName,
-          businessForm.bankRoutingValue,
         ]) &&
         selectedValues(businessForm.mainTransactionCountries).every(isCountryCode) &&
         selectedValues(businessForm.mainTransactionCountries).length > 0 &&
@@ -1967,18 +1963,6 @@ const AccountKyc = () => {
                         <Field label="Business city" value={businessForm.businessCity} onChange={(value) => updateBusiness("businessCity", value)} />
                         <Field label="Business state/province" value={businessForm.businessState} onChange={(value) => updateBusiness("businessState", value)} />
                       </div> : null}
-                    </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">Company bank account</h3>
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <Field label="Account name" value={businessForm.bankAccountName} onChange={(value) => updateBusiness("bankAccountName", value)} />
-                        <Field label="Account number" value={businessForm.bankAccountNumber} onChange={(value) => updateBusiness("bankAccountNumber", value)} />
-                        <Field label="Bank name" value={businessForm.bankName} onChange={(value) => updateBusiness("bankName", value)} />
-                        <SelectField label="Bank country" value={businessForm.bankCountry} onChange={(value) => updateBusiness("bankCountry", value)} options={countryOptions} />
-                        <Field label="Currency" value={businessForm.bankCurrency} onChange={(value) => updateBusiness("bankCurrency", value)} />
-                        <Field label="Routing code type" value={businessForm.bankRoutingType} onChange={(value) => updateBusiness("bankRoutingType", value)} />
-                        <Field label="Routing code" value={businessForm.bankRoutingValue} onChange={(value) => updateBusiness("bankRoutingValue", value)} />
-                      </div>
                     </div>
                     <AddressFields
                       title="Authorized representative address"
