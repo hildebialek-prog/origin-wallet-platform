@@ -5,16 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/services/apiClient";
 import {
   buildHkCorporateFullFields,
-  hkAnnualTurnoverOptions,
-  hkAverageTransactionValueOptions,
-  hkEmployeeCountOptions,
-  hkIntendedUseOptions,
-  hkMonthlyTransactionOptions,
 } from "@/services/hkCorporateKyc";
 import {
   completeIdentityVerificationSession,
   getKycProfile,
   getCorporateSubdivisionOptions,
+  getCorporateConstantOptions,
   resubmitKycRequirement,
   startIdentityVerificationSession,
   submitKycProfile,
@@ -173,6 +169,7 @@ type ProfileForm = {
   state: string;
   postalCode: string;
   idDocumentType: IdentityDocumentType;
+  idNiumDocumentType: string;
   idDocumentNumber: string;
   idIssuingCountry: string;
   idIssuedAt: string;
@@ -223,14 +220,18 @@ type BusinessForm = {
   accountPurpose: string;
   registrationDocumentUrl: string;
   registrationDocumentIssuedAt: string;
+  registrationNiumDocumentType: string;
   filingDocumentType: "nar1" | "nnc1";
   filingDocumentUrl: string;
   filingDocumentIssuedAt: string;
+  filingNiumDocumentType: string;
   isMostRecentFiling: boolean;
   certificateOfIncorporationUrl: string;
   businessAddressProofUrl: string;
+  businessAddressProofNiumDocumentType: string;
   accountOpeningFormUrl: string;
   ownershipStructureUrl: string;
+  ownershipNiumDocumentType: string;
   tradeAttachmentUrl: string;
   agentName: string;
   agentAddress: string;
@@ -254,6 +255,7 @@ type PersonForm = {
   postalCode: string;
   countryCode: string;
   idDocumentType: IdentityDocumentType;
+  idNiumDocumentType: string;
   idDocumentNumber: string;
   idIssuingCountry: string;
   idIssuedAt: string;
@@ -267,6 +269,7 @@ type PersonForm = {
 
 type DocumentFieldKey =
   | "idDocumentType"
+  | "idNiumDocumentType"
   | "idDocumentNumber"
   | "idIssuingCountry"
   | "idIssuedAt"
@@ -422,6 +425,7 @@ const defaultProfileForm = (name = ""): ProfileForm => ({
   state: "",
   postalCode: "",
   idDocumentType: "national_id",
+  idNiumDocumentType: "",
   idDocumentNumber: "",
   idIssuingCountry: "",
   idIssuedAt: "",
@@ -472,14 +476,18 @@ const defaultBusinessForm = (): BusinessForm => ({
   accountPurpose: "",
   registrationDocumentUrl: "",
   registrationDocumentIssuedAt: "",
+  registrationNiumDocumentType: "",
   filingDocumentType: "nar1",
   filingDocumentUrl: "",
   filingDocumentIssuedAt: "",
+  filingNiumDocumentType: "",
   isMostRecentFiling: true,
   certificateOfIncorporationUrl: "",
   businessAddressProofUrl: "",
+  businessAddressProofNiumDocumentType: "",
   accountOpeningFormUrl: "",
   ownershipStructureUrl: "",
+  ownershipNiumDocumentType: "",
   tradeAttachmentUrl: "",
   agentName: "",
   agentAddress: "",
@@ -503,6 +511,7 @@ const defaultPersonForm = (): PersonForm => ({
   postalCode: "",
   countryCode: "",
   idDocumentType: "national_id",
+  idNiumDocumentType: "",
   idDocumentNumber: "",
   idIssuingCountry: "",
   idIssuedAt: "",
@@ -730,6 +739,28 @@ const AccountKyc = () => {
     enabled: !!user?.id && !!token,
     queryFn: async () => getKycProfile({ userId: user?.id as string, token: token as string }),
   });
+  const constantsQuery = useQuery({
+    queryKey: ["nium-corporate-constants", user?.id, token, "HK"],
+    enabled: !!user?.id && !!token && applicantType === "business",
+    queryFn: async () => {
+      const categories = ["countryName", "countryOfOperation", "businessType", "industrySector", "monthlyTransactionVolume", "averageTransactionValue", "monthlyTransactions", "annualTurnover", "totalEmployees", "intendedUseOfAccount", "documentType"] as const;
+      const entries = await Promise.all(categories.map(async (category) => [category, (await getCorporateConstantOptions({ token: token as string, userId: user?.id as string, region: "HK", category })).values] as const));
+      return Object.fromEntries(entries);
+    },
+  });
+  const constants = constantsQuery.data ?? {};
+  const niumCountryOptions = constants.countryName ?? [];
+  const operationCountryOptions = constants.countryOfOperation ?? [];
+  const niumBusinessTypeOptions = constants.businessType ?? [];
+  const industryOptions = constants.industrySector ?? [];
+  const monthlyVolumeOptions = constants.monthlyTransactionVolume ?? [];
+  const hkAverageTransactionValueOptions = constants.averageTransactionValue ?? [];
+  const hkMonthlyTransactionOptions = constants.monthlyTransactions ?? [];
+  const hkAnnualTurnoverOptions = constants.annualTurnover ?? [];
+  const hkEmployeeCountOptions = constants.totalEmployees ?? [];
+  const hkIntendedUseOptions = constants.intendedUseOfAccount ?? [];
+  const niumDocumentTypeOptions = constants.documentType ?? [];
+  const addressCountryOptions = applicantType === "business" ? niumCountryOptions : countryOptions;
 
   const profile = kycQuery.data?.kyc_profile ?? null;
 
@@ -841,14 +872,18 @@ const AccountKyc = () => {
       accountPurpose: stringifyMetadata(metadata.account_purpose),
       registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration", "certificate_of_incorporation"]),
       registrationDocumentIssuedAt: toDateInputValue(profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.issued_at),
+      registrationNiumDocumentType: stringifyMetadata(profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.metadata?.nium_document_type),
       filingDocumentType: profileDocs.some((document) => document.type.toLowerCase() === "nnc1") ? "nnc1" : "nar1",
       filingDocumentUrl: findDocumentUrl(profileDocs, ["nar1", "nnc1"]),
       filingDocumentIssuedAt: toDateInputValue(profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.issued_at),
+      filingNiumDocumentType: stringifyMetadata(profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.metadata?.nium_document_type),
       isMostRecentFiling: profileDocs.some((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()) && document.metadata?.is_most_recent_filing === true),
       certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
       businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
+      businessAddressProofNiumDocumentType: stringifyMetadata(profileDocs.find((document) => document.type === "proof_of_business_address")?.metadata?.nium_document_type),
       accountOpeningFormUrl: findDocumentUrl(profileDocs, ["account_opening_application_form"]),
       ownershipStructureUrl: findDocumentUrl(profileDocs, ["ownership_structure"]),
+      ownershipNiumDocumentType: stringifyMetadata(profileDocs.find((document) => ["ownership_structure", "ownership_chart"].includes(document.type))?.metadata?.nium_document_type),
       tradeAttachmentUrl: findDocumentUrl(profileDocs, ["foreign_trade_attachment"]),
       agentName: stringifyMetadata(asMetadataRecord(metadata.agent).name),
       agentAddress: stringifyMetadata(asMetadataRecord(metadata.agent).address),
@@ -1246,6 +1281,7 @@ const AccountKyc = () => {
       metadata: {
         capture_type: captureType,
         document_type: form.idDocumentType,
+        nium_document_type: form.idNiumDocumentType,
         subject: subjectType,
       },
       onUploaded: (document) => update(field, document.file_url),
@@ -1300,7 +1336,7 @@ const AccountKyc = () => {
         isDateValue(form.idExpiresAt);
     }
 
-    return requiredFilled([form.idDocumentNumber]) && identityFiles &&
+    return requiredFilled([form.idDocumentNumber, form.idNiumDocumentType]) && identityFiles &&
       (form.idDocumentType !== "passport" || (
         isCountryCode(form.idIssuingCountry) &&
         isDateValue(form.idIssuedAt) &&
@@ -1389,12 +1425,15 @@ const AccountKyc = () => {
           businessForm.filingDocumentUrl,
           businessForm.filingDocumentIssuedAt,
           businessForm.businessAddressProofUrl,
+          businessForm.registrationNiumDocumentType,
+          businessForm.filingNiumDocumentType,
+          businessForm.businessAddressProofNiumDocumentType,
         ]) &&
         validIdentityDocuments(representativeForm, true) &&
         validIdentityDocuments(beneficialOwnerForm, true) &&
         isRecentDocumentDate(businessForm.registrationDocumentIssuedAt) &&
         businessForm.isMostRecentFiling &&
-        (!businessForm.isMultiLayeredCompany || businessForm.ownershipStructureUrl.trim() !== "")
+        (!businessForm.isMultiLayeredCompany || requiredFilled([businessForm.ownershipStructureUrl, businessForm.ownershipNiumDocumentType]))
       );
     }
 
@@ -1845,8 +1884,8 @@ const AccountKyc = () => {
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Date of birth" value={profileForm.dateOfBirth} onChange={(value) => updateProfile("dateOfBirth", value)} type="date" max={todayInputValue} />
-                      <SelectField label="Nationality" value={profileForm.nationality} onChange={(value) => updateProfile("nationality", value)} options={countryOptions} placeholder="Select nationality" />
-                      <SelectField label="Residence" value={profileForm.residence} onChange={(value) => updateProfile("residence", value)} options={countryOptions} placeholder="Select residence" />
+                      <SelectField label="Nationality" value={profileForm.nationality} onChange={(value) => updateProfile("nationality", value)} options={niumCountryOptions} placeholder="Select nationality" />
+                      <SelectField label="Residence" value={profileForm.residence} onChange={(value) => updateProfile("residence", value)} options={niumCountryOptions} placeholder="Select residence" />
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       <SelectField label="Occupation" value={profileForm.occupation} onChange={(value) => updateProfile("occupation", value)} options={occupationOptions} placeholder="Select occupation" />
@@ -1896,7 +1935,7 @@ const AccountKyc = () => {
                         label="Operating countries"
                         value={businessForm.exportingRegions}
                         onChange={(value) => updateBusiness("exportingRegions", value)}
-                        options={countryOptions}
+                        options={operationCountryOptions}
                       />
                       <SelectField
                         label="Main product"
@@ -1921,8 +1960,8 @@ const AccountKyc = () => {
                       <Field label="Agent name (optional)" value={businessForm.agentName} onChange={(value) => updateBusiness("agentName", value)} />
                       <Field label="Agent address (optional)" value={businessForm.agentAddress} onChange={(value) => updateBusiness("agentAddress", value)} />
                     </div>
-                    <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone />
-                    <PersonDetails title="Beneficial owner / UBO" form={beneficialOwnerForm} onChange={updateBeneficialOwner} includeOwnership includePhone={false} />
+                    <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone countryOptions={niumCountryOptions} />
+                    <PersonDetails title="Beneficial owner / UBO" form={beneficialOwnerForm} onChange={updateBeneficialOwner} includeOwnership includePhone={false} countryOptions={niumCountryOptions} />
                   </>
                 )}
                 <WizardActions onBack={previousStep} onNext={nextStep} />
@@ -1941,6 +1980,7 @@ const AccountKyc = () => {
                   postalCode={profileForm.postalCode}
                   token={token ?? undefined}
                   userId={user?.id}
+                  countryOptions={addressCountryOptions}
                   onChange={(field, value) => updateProfile(field, value)}
                 />
                 {applicantType === "business" ? (
@@ -1954,7 +1994,7 @@ const AccountKyc = () => {
                         <SelectField fieldId="expected-monthly-volume" label="Expected monthly transaction volume (USD)" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
                         <SelectField fieldId="average-transaction-value" label="Average transaction value (USD)" value={businessForm.averageTransactionValue} onChange={(value) => updateBusiness("averageTransactionValue", value)} options={hkAverageTransactionValueOptions} placeholder="Select average value" />
                         <SelectField fieldId="monthly-transaction-count" label="Monthly transaction count" value={businessForm.monthlyTransactionCount} onChange={(value) => updateBusiness("monthlyTransactionCount", value)} options={hkMonthlyTransactionOptions} placeholder="Select count" />
-                        <SearchableMultiSelectField fieldId="main-transaction-countries" label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={countryOptions} />
+                        <SearchableMultiSelectField fieldId="main-transaction-countries" label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={operationCountryOptions} />
                         <SelectField fieldId="annual-turnover" label="Annual turnover band" value={businessForm.annualTurnover} onChange={(value) => updateBusiness("annualTurnover", value)} options={[...hkAnnualTurnoverOptions]} />
                         <SelectField fieldId="total-employees" label="Employee count band" value={businessForm.totalEmployees} onChange={(value) => updateBusiness("totalEmployees", value)} options={[...hkEmployeeCountOptions]} />
                         <MultiSelectField fieldId="intended-uses" label="Intended account uses" value={businessForm.intendedUses} onChange={(value) => updateBusiness("intendedUses", value)} options={[...hkIntendedUseOptions]} />
@@ -1978,6 +2018,7 @@ const AccountKyc = () => {
                         postalCode={businessForm.businessPostalCode}
                         token={token ?? undefined}
                         userId={user?.id}
+                        countryOptions={addressCountryOptions}
                         onChange={(field, value) => {
                           const keys = { countryCode: "businessCountryCode", addressLine1: "businessAddressLine1", city: "businessCity", state: "businessState", postalCode: "businessPostalCode" } as const;
                           updateBusiness(keys[field], value);
@@ -1993,6 +2034,7 @@ const AccountKyc = () => {
                       postalCode={representativeForm.postalCode}
                       token={token ?? undefined}
                       userId={user?.id}
+                      countryOptions={addressCountryOptions}
                       onChange={(field, value) => updateRepresentative(field, value)}
                     />
                     <AddressFields
@@ -2004,6 +2046,7 @@ const AccountKyc = () => {
                       postalCode={beneficialOwnerForm.postalCode}
                       token={token ?? undefined}
                       userId={user?.id}
+                      countryOptions={addressCountryOptions}
                       onChange={(field, value) => updateBeneficialOwner(field, value)}
                     />
                   </>
@@ -2023,6 +2066,8 @@ const AccountKyc = () => {
                     uploadSubject="applicant"
                     uploadingCapture={uploadingDocument}
                     corporate={false}
+                    countryOptions={addressCountryOptions}
+                    niumDocumentTypeOptions={niumDocumentTypeOptions}
                     onUploadCapture={(captureType, field, file) =>
                       uploadPersonDocument("applicant", profileForm, updateProfile, captureType, field, file)
                     }
@@ -2044,10 +2089,11 @@ const AccountKyc = () => {
                           onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
                           uploadLabel="Upload incorporation or registration document"
                           uploading={uploadingDocument === captureKey("business", "business_registration")}
-                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, undefined, businessForm.registrationDocumentIssuedAt)}
+                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt)}
                           required
                         />
                         <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                        <SelectField label="Nium registration document type" value={businessForm.registrationNiumDocumentType} onChange={(value) => updateBusiness("registrationNiumDocumentType", value)} options={niumDocumentTypeOptions} />
                         <SelectField label="Latest company filing type" value={businessForm.filingDocumentType} onChange={(value) => updateBusiness("filingDocumentType", value)} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
                         <FieldWithUpload
                           label="Latest NAR1 or NNC1 filing"
@@ -2055,29 +2101,32 @@ const AccountKyc = () => {
                           onChange={(value) => updateBusiness("filingDocumentUrl", value)}
                           uploadLabel="Upload latest filing"
                           uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
-                          onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true }, businessForm.filingDocumentIssuedAt)}
+                          onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt)}
                           required
                         />
                         <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                        <SelectField label="Nium filing document type" value={businessForm.filingNiumDocumentType} onChange={(value) => updateBusiness("filingNiumDocumentType", value)} options={niumDocumentTypeOptions} />
                         <FieldWithUpload
                           label="Business address proof"
                           value={businessForm.businessAddressProofUrl}
                           onChange={(value) => updateBusiness("businessAddressProofUrl", value)}
                           uploadLabel="Upload business address proof"
                           uploading={uploadingDocument === captureKey("business", "proof_of_business_address")}
-                          onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file)}
+                          onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file, { nium_document_type: businessForm.businessAddressProofNiumDocumentType })}
                           required
                           helperText="For example, a recent utility bill, bank statement, or government-issued address record."
                         />
+                        <SelectField label="Nium address proof document type" value={businessForm.businessAddressProofNiumDocumentType} onChange={(value) => updateBusiness("businessAddressProofNiumDocumentType", value)} options={niumDocumentTypeOptions} />
                         {businessForm.isMultiLayeredCompany ? <FieldWithUpload
                           label="Corporate ownership structure"
                           value={businessForm.ownershipStructureUrl}
                           onChange={(value) => updateBusiness("ownershipStructureUrl", value)}
                           uploadLabel="Upload ownership chart"
                           uploading={uploadingDocument === captureKey("business", "ownership_chart")}
-                          onFile={(file) => uploadBusinessDocument("ownership_chart", "ownershipStructureUrl", file)}
+                          onFile={(file) => uploadBusinessDocument("ownership_chart", "ownershipStructureUrl", file, { nium_document_type: businessForm.ownershipNiumDocumentType })}
                           required
                         /> : null}
+                        {businessForm.isMultiLayeredCompany ? <SelectField label="Nium ownership document type" value={businessForm.ownershipNiumDocumentType} onChange={(value) => updateBusiness("ownershipNiumDocumentType", value)} options={niumDocumentTypeOptions} /> : null}
                       </div>
                     </div>
                     <PersonDocumentFields
@@ -2087,6 +2136,8 @@ const AccountKyc = () => {
                       uploadSubject="authorized_representative"
                       uploadingCapture={uploadingDocument}
                       corporate
+                      countryOptions={niumCountryOptions}
+                      niumDocumentTypeOptions={niumDocumentTypeOptions}
                       onUploadCapture={(captureType, field, file) =>
                         uploadPersonDocument(
                           "authorized_representative",
@@ -2105,6 +2156,8 @@ const AccountKyc = () => {
                       uploadSubject="beneficial_owner"
                       uploadingCapture={uploadingDocument}
                       corporate
+                      countryOptions={niumCountryOptions}
+                      niumDocumentTypeOptions={niumDocumentTypeOptions}
                       onUploadCapture={(captureType, field, file) =>
                         uploadPersonDocument(
                           "beneficial_owner",
@@ -2539,6 +2592,7 @@ const buildBusinessDocuments = (
       issuing_country_code: issuingCountryCode,
       issued_at: normalizeDateValue(form.registrationDocumentIssuedAt),
       ...evidence("business_registration"),
+      metadata: { ...(evidence("business_registration").metadata ?? {}), nium_document_type: form.registrationNiumDocumentType },
     },
     buildFilingDocumentPayload(form, issuingCountryCode, filingEvidence),
     {
@@ -2546,6 +2600,7 @@ const buildBusinessDocuments = (
       file_url: form.businessAddressProofUrl.trim(),
       issuing_country_code: issuingCountryCode,
       ...evidence("proof_of_business_address"),
+      metadata: { ...(evidence("proof_of_business_address").metadata ?? {}), nium_document_type: form.businessAddressProofNiumDocumentType },
     },
     ...(form.isMultiLayeredCompany
       ? [{
@@ -2553,6 +2608,7 @@ const buildBusinessDocuments = (
           file_url: form.ownershipStructureUrl.trim(),
           issuing_country_code: issuingCountryCode,
           ...evidence("ownership_chart"),
+          metadata: { ...(evidence("ownership_chart").metadata ?? {}), nium_document_type: form.ownershipNiumDocumentType },
         }]
       : []),
   ];
@@ -2571,6 +2627,7 @@ export const buildFilingDocumentPayload = (
   metadata: {
     ...(filingEvidence.metadata ?? {}),
     is_most_recent_filing: form.isMostRecentFiling,
+    nium_document_type: form.filingNiumDocumentType,
   },
 });
 
@@ -2602,6 +2659,7 @@ const buildPersonDocuments = (
   const baseMetadata = {
     subject,
     document_type: documentType,
+    nium_document_type: form.idNiumDocumentType,
   };
 
   const documents: KycDocumentPayload[] = [{
@@ -2665,6 +2723,7 @@ const readPersonDocuments = (documents: KycDocumentPayload[]) => {
 
   return {
     idDocumentType: documentType,
+    idNiumDocumentType: stringifyMetadata(front?.metadata?.nium_document_type ?? back?.metadata?.nium_document_type),
     idDocumentNumber: front?.document_number ?? back?.document_number ?? "",
     idIssuingCountry: normalizeCountryCode(front?.issuing_country_code ?? back?.issuing_country_code),
     idIssuedAt: toDateInputValue(front?.issued_at ?? back?.issued_at),
@@ -3033,12 +3092,14 @@ const SearchableMultiSelectField = ({
 };
 
 const PersonDetails = ({
+  countryOptions,
   form,
   includePhone,
   includeOwnership,
   onChange,
   title,
 }: {
+  countryOptions: { label: string; value: string }[];
   form: PersonForm;
   includePhone: boolean;
   includeOwnership: boolean;
@@ -3093,6 +3154,7 @@ export const AddressFields = ({
   addressLine1,
   city,
   countryCode,
+  countryOptions = [],
   onChange,
   postalCode,
   state,
@@ -3104,6 +3166,7 @@ export const AddressFields = ({
   addressLine1: string;
   city: string;
   countryCode: string;
+  countryOptions?: { label: string; value: string }[];
   onChange: (field: "countryCode" | "addressLine1" | "city" | "state" | "postalCode", value: string) => void;
   postalCode: string;
   state: string;
@@ -3169,17 +3232,21 @@ export const AddressFields = ({
 
 const PersonDocumentFields = ({
   corporate,
+  countryOptions,
   form,
   onChange,
   onUploadCapture,
+  niumDocumentTypeOptions,
   title,
   uploadSubject,
   uploadingCapture,
 }: {
   corporate: boolean;
+  countryOptions: { label: string; value: string }[];
   form: Pick<PersonForm, DocumentFieldKey>;
   onChange: (field: DocumentFieldKey, value: string) => void;
   onUploadCapture: (captureType: IdentityCaptureType, field: DocumentFieldKey, file: File) => void;
+  niumDocumentTypeOptions: { label: string; value: string }[];
   title: string;
   uploadSubject: IdentityVerificationSubject;
   uploadingCapture: string;
@@ -3221,6 +3288,13 @@ const PersonDocumentFields = ({
         onChange={changeDocumentType}
         options={documentOptions}
       />
+      {corporate ? <SelectField
+        label="Nium document type"
+        value={form.idNiumDocumentType}
+        onChange={(value) => onChange("idNiumDocumentType", value)}
+        options={niumDocumentTypeOptions}
+        placeholder="Select Nium document type"
+      /> : null}
       <Field label={isPassport ? "Passport number" : "ID number"} value={form.idDocumentNumber} onChange={(value) => onChange("idDocumentNumber", value)} />
       {isPassport ? <SelectField label="Issuing country" value={form.idIssuingCountry} onChange={(value) => onChange("idIssuingCountry", value)} options={countryOptions} placeholder="Select issuing country" /> : null}
       {!corporate || isPassport ? <Field label={corporate ? "Issue date" : "Issued date"} value={form.idIssuedAt} onChange={(value) => onChange("idIssuedAt", value)} type="date" max={todayInputValue} /> : null}

@@ -321,21 +321,29 @@ export interface CorporateConstantOption {
   value: string;
 }
 
+export type CorporateConstantCategory = "annualTurnover" | "averageTransactionValue" | "businessType" | "countryName" | "countryOfOperation" | "documentType" | "intendedUseOfAccount" | "industrySector" | "isoState" | "monthlyTransactionVolume" | "monthlyTransactions" | "position" | "totalEmployees";
+
+export const getCorporateConstantOptions = (params: {
+  token: string;
+  userId: string | number;
+  region: string;
+  category: CorporateConstantCategory;
+  countryCode?: string;
+}) => requestApi<{ values: CorporateConstantOption[] }>(
+  `/user/users/${params.userId}/kyc-profile/corporate-constants?${new URLSearchParams({
+    region: params.region.toUpperCase(), customerType: "CORPORATE", category: params.category,
+    ...(params.countryCode ? { countryCode: params.countryCode.toUpperCase() } : {}),
+  })}`,
+  { token: params.token },
+);
+
 export const getCorporateSubdivisionOptions = (params: {
   token: string;
   userId: string | number;
   region: string;
   countryCode: string;
 }) =>
-  requestApi<{ values: CorporateConstantOption[] }>(
-    `/user/users/${params.userId}/kyc-profile/corporate-constants?${new URLSearchParams({
-      region: params.region.toUpperCase(),
-      customerType: "CORPORATE",
-      countryCode: params.countryCode.toUpperCase(),
-      type: "STATE",
-    })}`,
-    { token: params.token },
-  );
+  getCorporateConstantOptions({ ...params, category: "isoState" });
 
 export const startIdentityVerificationSession = (params: {
   token: string;
