@@ -578,6 +578,33 @@ const normalizePersonDraftForm = (form?: Partial<PersonForm>): PersonForm => {
   };
 };
 
+type PersistedAddress = {
+  addressLine1: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode: string;
+};
+
+export const readPersistedAddress = (value: unknown, fallback: Record<string, unknown> = {}): PersistedAddress => {
+  const address = asMetadataRecord(value);
+  const read = (...keys: string[]) => {
+    for (const key of keys) {
+      const candidate = address[key] ?? fallback[key];
+      if (typeof candidate === "string") return candidate;
+    }
+    return "";
+  };
+
+  return {
+    addressLine1: read("address_line1", "addressLine1"),
+    city: read("city"),
+    state: read("state"),
+    postalCode: read("postal_code", "postalCode", "postcode"),
+    countryCode: normalizeCountryCode(read("country_code", "countryCode", "country")),
+  };
+};
+
 const statusTone = (status?: string | null) => {
   switch (getSemanticStatus(status)) {
     case "success":
@@ -791,9 +818,16 @@ const AccountKyc = () => {
     const representativeIdentity = readPersonDocuments(representative?.documents ?? []);
     const beneficialOwnerIdentity = readPersonDocuments(beneficialOwner?.documents ?? []);
     const metadata = nextProfile.metadata ?? {};
+    const profileRecord = asMetadataRecord(nextProfile);
+    const representativeRecord = asMetadataRecord(representative);
+    const beneficialOwnerRecord = asMetadataRecord(beneficialOwner);
     const niumFields = asMetadataRecord(metadata.nium_v5_fields);
     const niumAddresses = asMetadataRecord(niumFields.addresses);
     const businessAddress = asMetadataRecord(niumAddresses.businessAddress);
+    const registeredAddress = readPersistedAddress(profileRecord.address, profileRecord);
+    const hydratedBusinessAddress = readPersistedAddress(businessAddress);
+    const representativeAddress = readPersistedAddress(representativeRecord.address, representativeRecord);
+    const beneficialOwnerAddress = readPersistedAddress(beneficialOwnerRecord.address, beneficialOwnerRecord);
     const bankAccountDetails = asMetadataRecord(niumFields.bankAccountDetails);
     const routingCode = Array.isArray(bankAccountDetails.routingCodes)
       ? asMetadataRecord(bankAccountDetails.routingCodes[0])
@@ -828,11 +862,11 @@ const AccountKyc = () => {
       occupation: optionValue(occupationOptions, stringifyMetadata(metadata.occupation)),
       sourceOfFunds: optionValue(sourceOfFundsOptions, stringifyMetadata(metadata.source_of_funds)),
       expectedMonthlyVolume: optionValue(monthlyVolumeOptions, stringifyMetadata(metadata.expected_monthly_volume)),
-      countryCode: normalizeCountryCode(nextProfile.country_code),
-      addressLine1: nextProfile.address_line1 ?? "",
-      city: nextProfile.city ?? "",
-      state: nextProfile.state ?? "",
-      postalCode: nextProfile.postal_code ?? "",
+      countryCode: registeredAddress.countryCode,
+      addressLine1: registeredAddress.addressLine1,
+      city: registeredAddress.city,
+      state: registeredAddress.state,
+      postalCode: registeredAddress.postalCode,
       ...profileIdentity,
     });
     setBusinessForm({
@@ -851,11 +885,11 @@ const AccountKyc = () => {
       website: stringifyMetadata(metadata.business_website),
       tradeName: stringifyMetadata(niumFields.tradeName) || nextProfile.business_name || "",
       sameBusinessAddress: niumAddresses.isBusinessAddressSameAsRegisteredAddress !== false,
-      businessAddressLine1: stringifyMetadata(businessAddress.address_line1),
-      businessCity: stringifyMetadata(businessAddress.city),
-      businessState: stringifyMetadata(businessAddress.state),
-      businessPostalCode: stringifyMetadata(businessAddress.postal_code),
-      businessCountryCode: normalizeCountryCode(stringifyMetadata(businessAddress.country_code)) || "HK",
+      businessAddressLine1: hydratedBusinessAddress.addressLine1,
+      businessCity: hydratedBusinessAddress.city,
+      businessState: hydratedBusinessAddress.state,
+      businessPostalCode: hydratedBusinessAddress.postalCode,
+      businessCountryCode: hydratedBusinessAddress.countryCode || "HK",
       isMultiLayeredCompany: niumFields.isMultiLayeredCompany === true,
       bankAccountName: stringifyMetadata(bankAccountDetails.accountName),
       bankAccountNumber: stringifyMetadata(bankAccountDetails.accountNumber),
@@ -902,11 +936,11 @@ const AccountKyc = () => {
       dateOfBirth: toDateInputValue(representative?.date_of_birth),
       nationality: normalizeCountryCode(representative?.nationality_country_code),
       residence: normalizeCountryCode(representative?.residence_country_code),
-      addressLine1: representative?.address_line1 ?? "",
-      city: representative?.city ?? "",
-      state: representative?.state ?? "",
-      postalCode: representative?.postal_code ?? "",
-      countryCode: normalizeCountryCode(representative?.country_code),
+      addressLine1: representativeAddress.addressLine1,
+      city: representativeAddress.city,
+      state: representativeAddress.state,
+      postalCode: representativeAddress.postalCode,
+      countryCode: representativeAddress.countryCode,
       role: representativePositions[0] || stringifyMetadata(representative?.metadata?.role) || "director",
       ...representativePhone,
       ...representativeIdentity,
@@ -921,11 +955,11 @@ const AccountKyc = () => {
         beneficialOwner?.ownership_percentage !== undefined && beneficialOwner?.ownership_percentage !== null
           ? String(beneficialOwner.ownership_percentage)
           : "",
-      addressLine1: beneficialOwner?.address_line1 ?? "",
-      city: beneficialOwner?.city ?? "",
-      state: beneficialOwner?.state ?? "",
-      postalCode: beneficialOwner?.postal_code ?? "",
-      countryCode: normalizeCountryCode(beneficialOwner?.country_code),
+      addressLine1: beneficialOwnerAddress.addressLine1,
+      city: beneficialOwnerAddress.city,
+      state: beneficialOwnerAddress.state,
+      postalCode: beneficialOwnerAddress.postalCode,
+      countryCode: beneficialOwnerAddress.countryCode,
       role: stringifyMetadata(beneficialOwner?.metadata?.role) || "beneficial_owner",
       ...beneficialOwnerPhone,
       ...beneficialOwnerIdentity,

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload } from "./AccountKyc";
+import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload, readPersistedAddress } from "./AccountKyc";
 
 describe("related-person address subdivisions", () => {
   const renderAddress = (countryCode: string, state: string, onChange = vi.fn(), subdivisionOptions: { label: string; value: string }[] = []) => {
@@ -48,6 +48,34 @@ describe("related-person address subdivisions", () => {
 
     expect(screen.getByDisplayValue("Phu Yen")).toHaveAttribute("type", "text");
     expect(document.querySelector('[data-kyc-field="address-state"]')).toBeNull();
+  });
+
+  it.each([
+    ["registered business", { country: "VN", state: "Phu Yen", city: "Phu Yen" }],
+    ["business", { countryCode: "VN", state: "Phu Yen", city: "Phu Yen" }],
+    ["authorized representative", { country_code: "VN", state: "Phu Yen", city: "Phu Yen" }],
+    ["beneficial owner", { country: "VN", state: "Phu Yen", city: "Phu Yen" }],
+  ])("hydrates an existing %s address state", (_label, address) => {
+    const persisted = readPersistedAddress(address);
+    renderAddress(persisted.countryCode, persisted.state);
+
+    expect(screen.getByDisplayValue("Phu Yen")).toHaveAttribute("type", "text");
+  });
+
+  it("editing a persisted state updates the address payload value", () => {
+    const onChange = renderAddress("VN", "Phu Yen");
+
+    fireEvent.change(screen.getByDisplayValue("Phu Yen"), { target: { value: "Ho Chi Minh City" } });
+
+    expect(onChange).toHaveBeenCalledWith("state", "Ho Chi Minh City");
+  });
+
+  it("keeps an empty persisted state empty", () => {
+    const persisted = readPersistedAddress({ country: "VN", state: "", city: "Phu Yen" });
+    renderAddress(persisted.countryCode, persisted.state);
+
+    const stateField = screen.getAllByRole("textbox").find((input) => (input as HTMLInputElement).value === "");
+    expect(stateField).toBeDefined();
   });
 });
 
