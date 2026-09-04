@@ -213,6 +213,8 @@ type PersonForm = {
   residence: string;
   ownershipPercentage: string;
   role: string;
+  phoneCallingCode: string;
+  phoneNumber: string;
   addressLine1: string;
   city: string;
   state: string;
@@ -247,21 +249,17 @@ type UploadedDocumentMap = Record<string, KycDocumentPayload>;
 type KycDraft = {
   version: number;
   step: number;
-  applicantType: ApplicantType;
   profileForm: ProfileForm;
   businessForm: BusinessForm;
   representativeForm: PersonForm;
   beneficialOwnerForm: PersonForm;
-  captureSessions: CaptureSessionMap;
-  captureArtifacts: CaptureArtifactMap;
-  uploadedDocuments: UploadedDocumentMap;
   verificationConsent: boolean;
   savedAt: string;
 };
 
 const individualStepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
-const businessStepLabels = ["Profile type", "Applicant details", "Business / Address information", "Documents", "Review & Submit"];
-const kycDraftVersion = 1;
+const businessStepLabels = ["Applicant details", "Business / Address information", "Documents", "Review & Submit"];
+const kycDraftVersion = 2;
 const kycDraftKey = (userId: string | number) => `origin-wallet-kyc-draft:${userId}`;
 const todayInputValue = new Date().toISOString().slice(0, 10);
 const tomorrowInputValue = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
@@ -286,6 +284,15 @@ const countryOptions = [
   { label: "Germany (DE)", value: "DE" },
   { label: "France (FR)", value: "FR" },
   { label: "Netherlands (NL)", value: "NL" },
+];
+
+const phoneCountryOptions = [
+  { label: "Vietnam (+84)", value: "+84" },
+  { label: "Hong Kong (+852)", value: "+852" },
+  { label: "Singapore (+65)", value: "+65" },
+  { label: "China (+86)", value: "+86" },
+  { label: "United States / Canada (+1)", value: "+1" },
+  { label: "United Kingdom (+44)", value: "+44" },
 ];
 
 const occupationOptions = [
@@ -338,6 +345,23 @@ const businessActivityOptions = [
 const niumBusinessTypeOptions = [
   { label: "Private company", value: "PRIVATE_COMPANY" },
 ];
+
+const niumVpsPassCorporateConstants = {
+  credit: {
+    averageTransactionValue: "ATVHK06",
+    monthlyTransactionVolume: "MVHK10",
+    monthlyTransactions: "ATC03",
+  },
+  debit: {
+    averageTransactionValue: "ATVHK06",
+    monthlyTransactionVolume: "MVHK10",
+    monthlyTransactions: "ATC03",
+  },
+  intendedUses: ["IU001", "IU002"],
+  industryCodes: ["IS140", "IS138", "IS164"],
+  annualTurnover: "HK011",
+  totalEmployees: "EM008",
+} as const;
 
 const tradeTypeOptions = [
   { label: "Goods Trade", value: "goods_trade" },
@@ -432,6 +456,8 @@ const defaultPersonForm = (): PersonForm => ({
   residence: "",
   ownershipPercentage: "",
   role: "",
+  phoneCallingCode: "+84",
+  phoneNumber: "",
   addressLine1: "",
   city: "",
   state: "",
@@ -578,11 +604,59 @@ const selectedValues = (value: string) =>
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 
+const e164Phone = (callingCode: string, phoneNumber: string) => {
+  const code = callingCode.replace(/\D/g, "");
+  const localNumber = phoneNumber.replace(/\D/g, "").replace(/^0+/, "");
+  return code && localNumber ? `+${code}${localNumber}` : "";
+};
+
+const splitE164Phone = (value?: string | null) => {
+  const normalized = String(value ?? "").replace(/[^\d+]/g, "");
+  const option = [...phoneCountryOptions]
+    .sort((left, right) => right.value.length - left.value.length)
+    .find((candidate) => normalized.startsWith(candidate.value));
+
+  return {
+    phoneCallingCode: option?.value ?? "+84",
+    phoneNumber: option ? normalized.slice(option.value.length) : normalized.replace(/^\+/, ""),
+  };
+};
+
+const withoutProfileUploads = (form: ProfileForm): ProfileForm => ({
+  ...form,
+  idFrontUrl: "",
+  idBackUrl: "",
+  proofOfAddressUrl: "",
+  selfieLivenessUrl: "",
+  livenessSessionId: "",
+});
+
+const withoutPersonUploads = (form: PersonForm): PersonForm => ({
+  ...form,
+  idFrontUrl: "",
+  idBackUrl: "",
+  proofOfAddressUrl: "",
+  selfieLivenessUrl: "",
+  livenessSessionId: "",
+});
+
+const withoutBusinessUploads = (form: BusinessForm): BusinessForm => ({
+  ...form,
+  registrationDocumentUrl: "",
+  certificateOfIncorporationUrl: "",
+  businessAddressProofUrl: "",
+  accountOpeningFormUrl: "",
+  ownershipStructureUrl: "",
+  tradeAttachmentUrl: "",
+  agentIdentityUrl: "",
+  historicalTradeMaterialsUrl: "",
+});
+
 const AccountKyc = () => {
   const { user, token, refreshSession } = useAuth();
   const queryClient = useQueryClient();
-  const [step, setStep] = useState(0);
-  const [applicantType, setApplicantType] = useState<ApplicantType>("individual");
+  const [step, setStep] = useState(1);
+  const [applicantType, setApplicantType] = useState<ApplicantType>("business");
   const [profileForm, setProfileForm] = useState<ProfileForm>(() => defaultProfileForm(user?.name ?? ""));
   const [businessForm, setBusinessForm] = useState<BusinessForm>(() => defaultBusinessForm());
   const [representativeForm, setRepresentativeForm] = useState<PersonForm>(() => defaultPersonForm());
@@ -613,17 +687,12 @@ const AccountKyc = () => {
   const profile = kycQuery.data?.kyc_profile ?? null;
 
   const applyDraft = useCallback((draft: KycDraft) => {
-    const draftApplicantType = draft.applicantType === "business" ? "business" : "individual";
-    const draftStepCount = draftApplicantType === "business" ? businessStepLabels.length : individualStepLabels.length;
-    setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 0), draftStepCount - 1) : 0);
-    setApplicantType(draftApplicantType);
+    setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 1), 4) : 1);
+    setApplicantType("business");
     setProfileForm(normalizeProfileDraftForm(draft.profileForm, user?.name ?? ""));
     setBusinessForm(normalizeBusinessDraftForm(draft.businessForm));
     setRepresentativeForm(normalizePersonDraftForm(draft.representativeForm));
     setBeneficialOwnerForm(normalizePersonDraftForm(draft.beneficialOwnerForm));
-    setCaptureSessions(draft.captureSessions ?? {});
-    setCaptureArtifacts(draft.captureArtifacts ?? {});
-    setUploadedDocuments(draft.uploadedDocuments ?? {});
     setVerificationConsent(Boolean(draft.verificationConsent));
   }, [user?.name]);
 
@@ -640,6 +709,8 @@ const AccountKyc = () => {
     const beneficialOwnerIdentity = readPersonDocuments(beneficialOwner?.documents ?? []);
     const metadata = nextProfile.metadata ?? {};
     const hydratedDocuments: UploadedDocumentMap = {};
+    const representativePhone = splitE164Phone(stringifyMetadata(representative?.metadata?.phone));
+    const beneficialOwnerPhone = splitE164Phone(stringifyMetadata(beneficialOwner?.metadata?.phone));
 
     if (nextProfile.applicant_type === "business") {
       profileDocs.forEach((document) => {
@@ -652,7 +723,7 @@ const AccountKyc = () => {
     hydratePersonDocumentMap(hydratedDocuments, "authorized_representative", representative?.documents ?? []);
     hydratePersonDocumentMap(hydratedDocuments, "beneficial_owner", beneficialOwner?.documents ?? []);
 
-    setApplicantType(nextProfile.applicant_type === "business" ? "business" : "individual");
+    setApplicantType("business");
     setProfileForm({
       ...defaultProfileForm(user?.name ?? ""),
       legalName: nextProfile.legal_name ?? "",
@@ -715,6 +786,7 @@ const AccountKyc = () => {
       postalCode: representative?.postal_code ?? "",
       countryCode: normalizeCountryCode(representative?.country_code),
       role: stringifyMetadata(representative?.metadata?.role) || "authorized_representative",
+      ...representativePhone,
       ...representativeIdentity,
     });
     setBeneficialOwnerForm({
@@ -733,6 +805,7 @@ const AccountKyc = () => {
       postalCode: beneficialOwner?.postal_code ?? "",
       countryCode: normalizeCountryCode(beneficialOwner?.country_code),
       role: stringifyMetadata(beneficialOwner?.metadata?.role) || "beneficial_owner",
+      ...beneficialOwnerPhone,
       ...beneficialOwnerIdentity,
     });
     setUploadedDocuments(hydratedDocuments);
@@ -804,25 +877,18 @@ const AccountKyc = () => {
     const draft: KycDraft = {
       version: kycDraftVersion,
       step,
-      applicantType,
-      profileForm,
-      businessForm,
-      representativeForm,
-      beneficialOwnerForm,
-      captureSessions,
-      captureArtifacts,
-      uploadedDocuments,
+      profileForm: withoutProfileUploads(profileForm),
+      businessForm: withoutBusinessUploads(businessForm),
+      representativeForm: withoutPersonUploads(representativeForm),
+      beneficialOwnerForm: withoutPersonUploads(beneficialOwnerForm),
       verificationConsent,
       savedAt: new Date().toISOString(),
     };
 
     localStorage.setItem(draftStorageKey, JSON.stringify(draft));
   }, [
-    applicantType,
     beneficialOwnerForm,
     businessForm,
-    captureArtifacts,
-    captureSessions,
     draftReady,
     draftStorageKey,
     editingRequestedInfo,
@@ -831,7 +897,6 @@ const AccountKyc = () => {
     profileForm,
     representativeForm,
     step,
-    uploadedDocuments,
     user?.kycStatus,
     verificationConsent,
   ]);
@@ -1183,6 +1248,7 @@ const AccountKyc = () => {
         selectedValues(businessForm.exportingRegions).every(isCountryCode) &&
         selectedValues(businessForm.exportingRegions).length > 0 &&
         validPersonDetails(representativeForm) &&
+        requiredFilled([e164Phone(representativeForm.phoneCallingCode, representativeForm.phoneNumber)]) &&
         validPersonDetails(beneficialOwnerForm)
       );
     }
@@ -1236,12 +1302,12 @@ const AccountKyc = () => {
     }
 
     setFormError("");
-    setStep((currentStep) => Math.min(currentStep + 1, stepLabels.length - 1));
+    setStep((currentStep) => Math.min(currentStep + 1, 4));
   };
 
   const previousStep = () => {
     setFormError("");
-    setStep((currentStep) => Math.max(currentStep - 1, 0));
+    setStep((currentStep) => Math.max(currentStep - 1, 1));
   };
 
   const buildCurrentKycPayload = (): KycSubmissionPayload => {
@@ -1282,7 +1348,10 @@ const AccountKyc = () => {
                 state: representativeForm.state.trim() || null,
                 postal_code: representativeForm.postalCode.trim() || null,
                 country_code: normalizeCountryCode(representativeForm.countryCode),
-                metadata: { role: representativeForm.role.trim() },
+                metadata: {
+                  role: representativeForm.role.trim(),
+                  phone: e164Phone(representativeForm.phoneCallingCode, representativeForm.phoneNumber),
+                },
                 documents: buildPersonDocuments(
                   representativeForm,
                   "authorized_representative",
@@ -1318,30 +1387,41 @@ const AccountKyc = () => {
         verification_consent_at: new Date().toISOString(),
         source_of_funds:
           applicantType === "business" ? businessForm.sourceOfFunds.trim() : profileForm.sourceOfFunds.trim(),
-        expected_monthly_volume:
-          applicantType === "business"
-            ? businessForm.expectedMonthlyVolume.trim()
-            : profileForm.expectedMonthlyVolume.trim(),
-        average_transaction_value:
-          applicantType === "business" ? businessForm.averageTransactionValue.trim() : null,
-        monthly_transaction_count:
-          applicantType === "business" ? businessForm.monthlyTransactionCount.trim() : null,
-        main_transaction_countries:
-          applicantType === "business" ? selectedValues(businessForm.mainTransactionCountries) : [],
-        account_purpose: applicantType === "business" ? businessForm.accountPurpose.trim() : null,
+        ...(applicantType === "individual"
+          ? { expected_monthly_volume: profileForm.expectedMonthlyVolume.trim() }
+          : {}),
         occupation: applicantType === "individual" ? profileForm.occupation.trim() : null,
-        business_industry: applicantType === "business" ? businessForm.industry.trim() : null,
         registered_date: applicantType === "business" ? normalizeDateValue(businessForm.registeredDate) : null,
         nium_business_type: applicantType === "business" ? businessForm.niumBusinessType.trim() : null,
         business_activity: applicantType === "business" ? businessForm.businessActivity.trim() : null,
         business_website: applicantType === "business" ? businessForm.website.trim() || null : null,
         business_activity_type: applicantType === "business" ? businessForm.businessActivityType.trim() : null,
-        exporting_regions:
-          applicantType === "business"
-            ? selectedValues(businessForm.exportingRegions)
-            : [],
         trade_type: applicantType === "business" ? businessForm.tradeType.trim() : null,
         main_product: applicantType === "business" ? businessForm.mainProduct.trim() : null,
+        nium_v5_fields:
+          applicantType === "business"
+            ? {
+                expectedAccountUsage: {
+                  debit: {
+                    ...niumVpsPassCorporateConstants.debit,
+                    topTransactionCountries: selectedValues(businessForm.exportingRegions),
+                  },
+                  credit: {
+                    ...niumVpsPassCorporateConstants.credit,
+                    topTransactionCountries: selectedValues(businessForm.exportingRegions),
+                  },
+                  intendedUses: [...niumVpsPassCorporateConstants.intendedUses],
+                },
+                natureOfBusiness: {
+                  industryCodes: [...niumVpsPassCorporateConstants.industryCodes],
+                  operatingCountries: selectedValues(businessForm.exportingRegions),
+                },
+                sizeOfBusiness: {
+                  annualTurnover: niumVpsPassCorporateConstants.annualTurnover,
+                  totalEmployees: niumVpsPassCorporateConstants.totalEmployees,
+                },
+              }
+            : null,
         historical_trade_comment:
           applicantType === "business" ? businessForm.historicalTradeComment.trim() || null : null,
         agent:
@@ -1388,6 +1468,9 @@ const AccountKyc = () => {
         role: isBeneficialOwner
           ? relationshipType || "beneficial_owner"
           : form.role.trim() || relationshipType || "authorized_representative",
+        ...(!isBeneficialOwner
+          ? { phone: e164Phone(form.phoneCallingCode, form.phoneNumber) }
+          : {}),
       },
     };
   };
@@ -1528,7 +1611,7 @@ const AccountKyc = () => {
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
-            {!isKycReadOnly ? <StepIndicator currentStep={step} labels={stepLabels} /> : null}
+            {!isKycReadOnly ? <StepIndicator currentStep={Math.max(step - 1, 0)} labels={stepLabels} /> : null}
 
             {kycQuery.isLoading ? (
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
@@ -1570,29 +1653,6 @@ const AccountKyc = () => {
             ) : null}
 
             {lockedStatusOnly ? <LockedKycStatusOnlySummary status={profile?.status ?? user?.kycStatus} /> : null}
-
-            {!isKycReadOnly && step === 0 ? (
-              <section className="space-y-4">
-                <SectionTitle title="Choose profile type" />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <TypeButton
-                    active={applicantType === "individual"}
-                    label="Individual KYC"
-                    description="Personal account verification with ID, address, and face check."
-                    onClick={() => setApplicantType("individual")}
-                  />
-                  <TypeButton
-                    active={applicantType === "business"}
-                    label="Business KYB"
-                    description="Company verification with representative and UBO checks."
-                    onClick={() => setApplicantType("business")}
-                  />
-                </div>
-                <Button className="rounded-full bg-green-600 px-6 text-white hover:bg-green-700" onClick={nextStep}>
-                  Continue
-                </Button>
-              </section>
-            ) : null}
 
             {!isKycReadOnly && step === 1 ? (
               <section className="space-y-5">
@@ -1674,8 +1734,8 @@ const AccountKyc = () => {
                       <Field label="Agent name (optional)" value={businessForm.agentName} onChange={(value) => updateBusiness("agentName", value)} />
                       <Field label="Agent address (optional)" value={businessForm.agentAddress} onChange={(value) => updateBusiness("agentAddress", value)} />
                     </div>
-                    <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} />
-                    <PersonDetails title="Beneficial owner / UBO" form={beneficialOwnerForm} onChange={updateBeneficialOwner} includeOwnership />
+                    <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone />
+                    <PersonDetails title="Beneficial owner / UBO" form={beneficialOwnerForm} onChange={updateBeneficialOwner} includeOwnership includePhone={false} />
                   </>
                 )}
                 <WizardActions onBack={previousStep} onNext={nextStep} />
@@ -2387,31 +2447,6 @@ const StepIndicator = ({ currentStep, labels }: { currentStep: number; labels: s
   </div>
 );
 
-const TypeButton = ({
-  active,
-  description,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  description: string;
-  label: string;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`rounded-2xl border p-5 text-left transition-colors ${
-      active
-        ? "border-green-500 bg-green-50 text-green-800"
-        : "border-gray-200 bg-white text-gray-700 hover:border-green-200"
-    }`}
-  >
-    <div className="font-semibold">{label}</div>
-    <div className="mt-1 text-sm opacity-80">{description}</div>
-  </button>
-);
-
 const SectionTitle = ({ title }: { title: string }) => (
   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
 );
@@ -2701,11 +2736,13 @@ const SearchableMultiSelectField = ({
 
 const PersonDetails = ({
   form,
+  includePhone,
   includeOwnership,
   onChange,
   title,
 }: {
   form: PersonForm;
+  includePhone: boolean;
   includeOwnership: boolean;
   onChange: (field: keyof PersonForm, value: string) => void;
   title: string;
@@ -2727,6 +2764,30 @@ const PersonDetails = ({
         <Field label="Role" value={form.role} onChange={(value) => onChange("role", value)} placeholder="For example, Director" />
       )}
     </div>
+    {includePhone ? (
+      <div className="mt-4 space-y-2">
+        <Label>Registration phone</Label>
+        <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
+          <select
+            className="h-12 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm"
+            value={form.phoneCallingCode}
+            onChange={(event) => onChange("phoneCallingCode", event.target.value)}
+          >
+            {phoneCountryOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <Input
+            className="h-12 rounded-xl border-gray-200"
+            inputMode="tel"
+            value={form.phoneNumber}
+            placeholder="901234567"
+            onChange={(event) => onChange("phoneNumber", event.target.value)}
+          />
+        </div>
+        <p className="text-xs text-gray-500">Submitted as {e164Phone(form.phoneCallingCode, form.phoneNumber) || "an E.164 phone number"}.</p>
+      </div>
+    ) : null}
   </div>
 );
 
