@@ -321,7 +321,7 @@ export interface CorporateConstantOption {
   value: string;
 }
 
-export type CorporateConstantCategory = "annualTurnover" | "averageTransactionValue" | "businessType" | "countryName" | "countryOfOperation" | "documentType" | "intendedUseOfAccount" | "industrySector" | "monthlyTransactionVolume" | "monthlyTransactions" | "position" | "totalEmployees";
+export type CorporateConstantCategory = "annualTurnover" | "averageTransactionValue" | "businessType" | "countryName" | "countryOfOperation" | "documentType" | "intendedUseOfAccount" | "industrySector" | "isoState" | "monthlyTransactionVolume" | "monthlyTransactions" | "position" | "totalEmployees";
 
 export const getCorporateConstantOptions = (params: {
   token: string;
@@ -336,6 +336,13 @@ export const getCorporateConstantOptions = (params: {
   })}`,
   { token: params.token },
 );
+
+export const getCorporateSubdivisionOptions = (params: {
+  token: string;
+  userId: string | number;
+  region: string;
+  countryCode: string;
+}) => getCorporateConstantOptions({ ...params, category: "isoState" });
 
 export const startIdentityVerificationSession = (params: {
   token: string;

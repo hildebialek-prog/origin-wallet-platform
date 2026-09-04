@@ -9,6 +9,7 @@ import {
 import {
   completeIdentityVerificationSession,
   getKycProfile,
+  getCorporateSubdivisionOptions,
   getCorporateConstantOptions,
   resubmitKycRequirement,
   startIdentityVerificationSession,
@@ -3189,6 +3190,8 @@ const PersonDetails = ({
   </div>
 );
 
+const emptySubdivisionOptions: { label: string; value: string }[] = [];
+
 export const AddressFields = ({
   addressLine1,
   city,
@@ -3197,8 +3200,11 @@ export const AddressFields = ({
   onChange,
   postalCode,
   state,
-  subdivisionOptions = [],
+  subdivisionOptions = emptySubdivisionOptions,
   title,
+  token,
+  userId,
+  region = "HK",
 }: {
   addressLine1: string;
   city: string;
@@ -3209,14 +3215,33 @@ export const AddressFields = ({
   state: string;
   subdivisionOptions?: { label: string; value: string }[];
   title: string;
+  token?: string;
+  userId?: string | number;
+  region?: string;
 }) => {
-  const hasValidSubdivision = subdivisionOptions.some((option) => option.value === state);
+  const [remoteSubdivisionOptions, setRemoteSubdivisionOptions] = useState(subdivisionOptions);
 
   useEffect(() => {
-    if (subdivisionOptions.length > 0 && state && !hasValidSubdivision) {
-      onChange("state", "");
-    }
-  }, [hasValidSubdivision, onChange, state, subdivisionOptions.length]);
+    let active = true;
+    setRemoteSubdivisionOptions(subdivisionOptions);
+
+    if (!token || !userId || !countryCode) return () => { active = false; };
+
+    getCorporateSubdivisionOptions({ token, userId, region, countryCode })
+      .then(({ values }) => {
+        if (active) setRemoteSubdivisionOptions(values);
+      })
+      .catch(() => {
+        if (active) setRemoteSubdivisionOptions([]);
+      });
+
+    return () => { active = false; };
+  }, [countryCode, region, subdivisionOptions, token, userId]);
+
+  const displayedSubdivisionOptions = remoteSubdivisionOptions.length > 0 && state
+    && !remoteSubdivisionOptions.some((option) => option.value === state)
+    ? [{ label: state, value: state }, ...remoteSubdivisionOptions]
+    : remoteSubdivisionOptions;
 
   const handleCountryChange = (value: string) => {
     onChange("countryCode", value);
@@ -3237,8 +3262,8 @@ export const AddressFields = ({
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <Field label="City" value={city} onChange={(value) => onChange("city", value)} />
-        {subdivisionOptions.length > 0 ? (
-          <SelectField fieldId="address-state" label="State/province" value={state} onChange={(value) => onChange("state", value)} options={subdivisionOptions} placeholder="Select state/province" />
+        {displayedSubdivisionOptions.length > 0 ? (
+          <SelectField fieldId="address-state" label="State/province" value={state} onChange={(value) => onChange("state", value)} options={displayedSubdivisionOptions} placeholder="Select state/province" />
         ) : (
           <Field label="State/province" value={state} onChange={(value) => onChange("state", value)} />
         )}

@@ -1,10 +1,18 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getCorporateSubdivisionOptions } from "@/services/kycService";
 import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload, readPersistedAddress } from "./AccountKyc";
 
+vi.mock("@/services/kycService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/kycService")>()),
+  getCorporateSubdivisionOptions: vi.fn(),
+}));
+
 describe("related-person address subdivisions", () => {
-  const renderAddress = (countryCode: string, state: string, onChange = vi.fn(), subdivisionOptions: { label: string; value: string }[] = []) => {
+  beforeEach(() => vi.mocked(getCorporateSubdivisionOptions).mockReset());
+
+  const renderAddress = (countryCode: string, state: string, onChange = vi.fn(), subdivisionOptions: { label: string; value: string }[] = [], remote = false) => {
     render(createElement(AddressFields, {
       title: "Authorized representative address",
       countryCode,
@@ -14,10 +22,26 @@ describe("related-person address subdivisions", () => {
       postalCode: "100000",
       onChange,
       subdivisionOptions,
+      ...(remote ? { token: "token", userId: 11, region: "HK" } : {}),
     }));
 
     return onChange;
   };
+
+  it("renders a dropdown when US isoState options are returned", async () => {
+    vi.mocked(getCorporateSubdivisionOptions).mockResolvedValue({ values: [{ label: "Alaska", value: "US-AK" }] });
+    renderAddress("US", "", vi.fn(), [], true);
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Alaska" })).toHaveValue("US-AK"));
+    expect(getCorporateSubdivisionOptions).toHaveBeenCalledWith({ token: "token", userId: 11, region: "HK", countryCode: "US" });
+  });
+
+  it("renders free text when HK isoState is unsupported", async () => {
+    vi.mocked(getCorporateSubdivisionOptions).mockResolvedValue({ values: [] });
+    renderAddress("HK", "Kowloon City", vi.fn(), [], true);
+
+    await waitFor(() => expect(screen.getByDisplayValue("Kowloon City")).toHaveAttribute("type", "text"));
+  });
 
   it("renders a selector only for a backend-confirmed subdivision category", () => {
     renderAddress("VN", "VN-70", vi.fn(), [{ label: "Phu Yen", value: "VN-70" }]);
