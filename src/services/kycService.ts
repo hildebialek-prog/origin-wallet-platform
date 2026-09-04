@@ -33,6 +33,55 @@ export interface KycRelatedPersonPayload {
   documents?: KycDocumentPayload[];
 }
 
+export interface HkCorporateAddressPayload {
+  address_line1: string;
+  address_line2?: string | null;
+  city: string;
+  state?: string | null;
+  postal_code: string;
+  country_code: string;
+}
+
+export interface HkCorporateFullFields {
+  tradeName: string;
+  addresses: {
+    isBusinessAddressSameAsRegisteredAddress: boolean;
+    businessAddress?: HkCorporateAddressPayload;
+  };
+  applicantDeclaration: true;
+  applicantDeclarationTimeStamp: string;
+  isMultiLayeredCompany: boolean;
+  bankAccountDetails: {
+    accountName: string;
+    accountNumber: string;
+    bankCountry: string;
+    bankName: string;
+    currency: string;
+    routingCodes: Array<{ type: string; value: string }>;
+  };
+  deviceDescriptor: string;
+  natureOfBusiness: {
+    industryCodes: string[];
+    operatingCountries: string[];
+  };
+  expectedAccountUsage: {
+    intendedUses: string[];
+    credit: HkCorporateUsagePayload;
+    debit: HkCorporateUsagePayload;
+  };
+  sizeOfBusiness: {
+    annualTurnover: string;
+    totalEmployees: string;
+  };
+}
+
+export interface HkCorporateUsagePayload {
+  averageTransactionValue: string;
+  monthlyTransactionVolume: string;
+  monthlyTransactions: string;
+  topTransactionCountries: string[];
+}
+
 export interface KycSubmissionPayload {
   applicant_type: "individual" | "business";
   legal_name: string;
@@ -50,7 +99,11 @@ export interface KycSubmissionPayload {
   country_code: string;
   documents?: KycDocumentPayload[];
   related_persons?: KycRelatedPersonPayload[];
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> & {
+    nium_region?: "HK";
+    nium_kyc_type?: "full";
+    nium_v5_fields?: HkCorporateFullFields;
+  };
 }
 
 export interface KycRequirement {

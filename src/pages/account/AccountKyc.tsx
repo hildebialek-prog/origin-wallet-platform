@@ -4,6 +4,14 @@ import { AlertCircle, Check, CheckCircle2, ChevronsUpDown, Circle, Loader2, Shie
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/services/apiClient";
 import {
+  buildHkCorporateFullFields,
+  hkAnnualTurnoverOptions,
+  hkAverageTransactionValueOptions,
+  hkEmployeeCountOptions,
+  hkIntendedUseOptions,
+  hkMonthlyTransactionOptions,
+} from "@/services/hkCorporateKyc";
+import {
   completeIdentityVerificationSession,
   getKycProfile,
   resubmitKycRequirement,
@@ -187,6 +195,24 @@ type BusinessForm = {
   industry: string;
   businessActivity: string;
   website: string;
+  tradeName: string;
+  sameBusinessAddress: boolean;
+  businessAddressLine1: string;
+  businessCity: string;
+  businessState: string;
+  businessPostalCode: string;
+  businessCountryCode: string;
+  isMultiLayeredCompany: boolean;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankCountry: string;
+  bankName: string;
+  bankCurrency: string;
+  bankRoutingType: string;
+  bankRoutingValue: string;
+  annualTurnover: string;
+  totalEmployees: string;
+  intendedUses: string;
   sourceOfFunds: string;
   expectedMonthlyVolume: string;
   averageTransactionValue: string;
@@ -194,6 +220,11 @@ type BusinessForm = {
   mainTransactionCountries: string;
   accountPurpose: string;
   registrationDocumentUrl: string;
+  registrationDocumentIssuedAt: string;
+  filingDocumentType: "nar1" | "nnc1";
+  filingDocumentUrl: string;
+  filingDocumentIssuedAt: string;
+  isMostRecentFiling: boolean;
   certificateOfIncorporationUrl: string;
   businessAddressProofUrl: string;
   accountOpeningFormUrl: string;
@@ -346,23 +377,6 @@ const niumBusinessTypeOptions = [
   { label: "Private company", value: "PRIVATE_COMPANY" },
 ];
 
-const niumVpsPassCorporateConstants = {
-  credit: {
-    averageTransactionValue: "ATVHK06",
-    monthlyTransactionVolume: "MVHK10",
-    monthlyTransactions: "ATC03",
-  },
-  debit: {
-    averageTransactionValue: "ATVHK06",
-    monthlyTransactionVolume: "MVHK10",
-    monthlyTransactions: "ATC03",
-  },
-  intendedUses: ["IU001", "IU002"],
-  industryCodes: ["IS140", "IS138", "IS164"],
-  annualTurnover: "HK011",
-  totalEmployees: "EM008",
-} as const;
-
 const tradeTypeOptions = [
   { label: "Goods Trade", value: "goods_trade" },
   { label: "Service Trade", value: "service_trade" },
@@ -430,6 +444,24 @@ const defaultBusinessForm = (): BusinessForm => ({
   industry: "",
   businessActivity: "",
   website: "",
+  tradeName: "",
+  sameBusinessAddress: true,
+  businessAddressLine1: "",
+  businessCity: "",
+  businessState: "",
+  businessPostalCode: "",
+  businessCountryCode: "HK",
+  isMultiLayeredCompany: false,
+  bankAccountName: "",
+  bankAccountNumber: "",
+  bankCountry: "HK",
+  bankName: "",
+  bankCurrency: "HKD",
+  bankRoutingType: "SWIFT",
+  bankRoutingValue: "",
+  annualTurnover: "",
+  totalEmployees: "",
+  intendedUses: "",
   sourceOfFunds: "",
   expectedMonthlyVolume: "",
   averageTransactionValue: "",
@@ -437,6 +469,11 @@ const defaultBusinessForm = (): BusinessForm => ({
   mainTransactionCountries: "",
   accountPurpose: "",
   registrationDocumentUrl: "",
+  registrationDocumentIssuedAt: "",
+  filingDocumentType: "nar1",
+  filingDocumentUrl: "",
+  filingDocumentIssuedAt: "",
+  isMostRecentFiling: true,
   certificateOfIncorporationUrl: "",
   businessAddressProofUrl: "",
   accountOpeningFormUrl: "",
@@ -455,7 +492,7 @@ const defaultPersonForm = (): PersonForm => ({
   nationality: "",
   residence: "",
   ownershipPercentage: "",
-  role: "",
+  role: "director",
   phoneCallingCode: "+84",
   phoneNumber: "",
   addressLine1: "",
@@ -597,6 +634,14 @@ const toDateInputValue = (value?: string | null) => {
 };
 
 const isDateValue = (value?: string | null) => normalizeDateValue(value) !== "";
+const isRecentDocumentDate = (value?: string | null) => {
+  const normalized = normalizeDateValue(value);
+  if (!normalized) return false;
+  const issuedAt = new Date(`${normalized}T00:00:00Z`).getTime();
+  const oneYearAgo = new Date();
+  oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1);
+  return issuedAt <= Date.now() && issuedAt >= oneYearAgo.getTime();
+};
 
 const selectedValues = (value: string) =>
   value
@@ -708,6 +753,17 @@ const AccountKyc = () => {
     const representativeIdentity = readPersonDocuments(representative?.documents ?? []);
     const beneficialOwnerIdentity = readPersonDocuments(beneficialOwner?.documents ?? []);
     const metadata = nextProfile.metadata ?? {};
+    const niumFields = asMetadataRecord(metadata.nium_v5_fields);
+    const niumAddresses = asMetadataRecord(niumFields.addresses);
+    const businessAddress = asMetadataRecord(niumAddresses.businessAddress);
+    const bankAccountDetails = asMetadataRecord(niumFields.bankAccountDetails);
+    const routingCode = Array.isArray(bankAccountDetails.routingCodes)
+      ? asMetadataRecord(bankAccountDetails.routingCodes[0])
+      : {};
+    const sizeOfBusiness = asMetadataRecord(niumFields.sizeOfBusiness);
+    const representativePositions = Array.isArray(representative?.metadata?.positions)
+      ? representative.metadata.positions.filter((position): position is string => typeof position === "string")
+      : [];
     const hydratedDocuments: UploadedDocumentMap = {};
     const representativePhone = splitE164Phone(stringifyMetadata(representative?.metadata?.phone));
     const beneficialOwnerPhone = splitE164Phone(stringifyMetadata(beneficialOwner?.metadata?.phone));
@@ -754,6 +810,24 @@ const AccountKyc = () => {
       industry: optionValue(industryOptions, stringifyMetadata(metadata.business_industry)),
       businessActivity: stringifyMetadata(metadata.business_activity),
       website: stringifyMetadata(metadata.business_website),
+      tradeName: stringifyMetadata(niumFields.tradeName) || nextProfile.business_name || "",
+      sameBusinessAddress: niumAddresses.isBusinessAddressSameAsRegisteredAddress !== false,
+      businessAddressLine1: stringifyMetadata(businessAddress.address_line1),
+      businessCity: stringifyMetadata(businessAddress.city),
+      businessState: stringifyMetadata(businessAddress.state),
+      businessPostalCode: stringifyMetadata(businessAddress.postal_code),
+      businessCountryCode: normalizeCountryCode(stringifyMetadata(businessAddress.country_code)) || "HK",
+      isMultiLayeredCompany: niumFields.isMultiLayeredCompany === true,
+      bankAccountName: stringifyMetadata(bankAccountDetails.accountName),
+      bankAccountNumber: stringifyMetadata(bankAccountDetails.accountNumber),
+      bankCountry: normalizeCountryCode(stringifyMetadata(bankAccountDetails.bankCountry)) || "HK",
+      bankName: stringifyMetadata(bankAccountDetails.bankName),
+      bankCurrency: stringifyMetadata(bankAccountDetails.currency) || "HKD",
+      bankRoutingType: stringifyMetadata(routingCode.type) || "SWIFT",
+      bankRoutingValue: stringifyMetadata(routingCode.value),
+      annualTurnover: stringifyMetadata(sizeOfBusiness.annualTurnover),
+      totalEmployees: stringifyMetadata(sizeOfBusiness.totalEmployees),
+      intendedUses: Array.isArray(expectedAccountUsage.intendedUses) ? expectedAccountUsage.intendedUses.filter((value): value is string => typeof value === "string").join(",") : "",
       sourceOfFunds: optionValue(sourceOfFundsOptions, stringifyMetadata(metadata.source_of_funds)),
       expectedMonthlyVolume: optionValue(monthlyVolumeOptions, stringifyMetadata(metadata.expected_monthly_volume)),
       averageTransactionValue: stringifyMetadata(metadata.average_transaction_value),
@@ -763,6 +837,11 @@ const AccountKyc = () => {
         : stringifyMetadata(metadata.main_transaction_countries),
       accountPurpose: stringifyMetadata(metadata.account_purpose),
       registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration", "certificate_of_incorporation"]),
+      registrationDocumentIssuedAt: toDateInputValue(profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.issued_at),
+      filingDocumentType: profileDocs.some((document) => document.type.toLowerCase() === "nnc1") ? "nnc1" : "nar1",
+      filingDocumentUrl: findDocumentUrl(profileDocs, ["nar1", "nnc1"]),
+      filingDocumentIssuedAt: toDateInputValue(profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.issued_at),
+      isMostRecentFiling: profileDocs.some((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()) && document.metadata?.is_most_recent_filing === true),
       certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
       businessAddressProofUrl: findDocumentUrl(profileDocs, ["proof_of_business_address"]),
       accountOpeningFormUrl: findDocumentUrl(profileDocs, ["account_opening_application_form"]),
@@ -785,7 +864,7 @@ const AccountKyc = () => {
       state: representative?.state ?? "",
       postalCode: representative?.postal_code ?? "",
       countryCode: normalizeCountryCode(representative?.country_code),
-      role: stringifyMetadata(representative?.metadata?.role) || "authorized_representative",
+      role: representativePositions[0] || stringifyMetadata(representative?.metadata?.role) || "director",
       ...representativePhone,
       ...representativeIdentity,
     });
@@ -924,7 +1003,7 @@ const AccountKyc = () => {
       : { ...current, businessName: value });
   };
 
-  const updateBusiness = (field: keyof BusinessForm, value: string) => {
+  const updateBusiness = (field: keyof BusinessForm, value: string | boolean) => {
     setBusinessForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -1179,6 +1258,7 @@ const AccountKyc = () => {
     field: keyof BusinessForm,
     file: File,
     metadata?: Record<string, unknown>,
+    issuedAt?: string | null,
   ) => {
     void uploadKycDocumentFile({
       file,
@@ -1187,6 +1267,7 @@ const AccountKyc = () => {
         subject: "business",
         ...metadata,
       },
+      issuedAt,
       onUploaded: (document) => updateBusiness(field, document.file_url),
       subjectType: "business",
       type,
@@ -1241,6 +1322,8 @@ const AccountKyc = () => {
           businessForm.registeredDate,
           businessForm.taxId,
           businessForm.businessActivity,
+          businessForm.tradeName,
+          businessForm.website,
           representativeForm.role,
           beneficialOwnerForm.ownershipPercentage,
         ]) &&
@@ -1255,6 +1338,7 @@ const AccountKyc = () => {
         selectedValues(businessForm.exportingRegions).every(isCountryCode) &&
         selectedValues(businessForm.exportingRegions).length > 0 &&
         validPersonDetails(representativeForm) &&
+        representativeForm.role.trim() !== "" &&
         requiredFilled([e164Phone(representativeForm.phoneCallingCode, representativeForm.phoneNumber)]) &&
         validPersonDetails(beneficialOwnerForm)
       );
@@ -1266,6 +1350,14 @@ const AccountKyc = () => {
 
       return (
         accountAddress &&
+        (businessForm.sameBusinessAddress || (
+          isCountryCode(businessForm.businessCountryCode) &&
+          requiredFilled([
+            businessForm.businessAddressLine1,
+            businessForm.businessCity,
+            businessForm.businessPostalCode,
+          ])
+        )) &&
         validAddress(representativeForm) &&
         validAddress(beneficialOwnerForm) &&
         requiredFilled([
@@ -1273,9 +1365,16 @@ const AccountKyc = () => {
           businessForm.averageTransactionValue,
           businessForm.monthlyTransactionCount,
           businessForm.accountPurpose,
+          businessForm.annualTurnover,
+          businessForm.totalEmployees,
+          businessForm.bankAccountName,
+          businessForm.bankAccountNumber,
+          businessForm.bankName,
+          businessForm.bankRoutingValue,
         ]) &&
         selectedValues(businessForm.mainTransactionCountries).every(isCountryCode) &&
-        selectedValues(businessForm.mainTransactionCountries).length > 0
+        selectedValues(businessForm.mainTransactionCountries).length > 0 &&
+        selectedValues(businessForm.intendedUses).length > 0
       );
     }
 
@@ -1287,10 +1386,16 @@ const AccountKyc = () => {
       return (
         requiredFilled([
           businessForm.registrationDocumentUrl,
+          businessForm.registrationDocumentIssuedAt,
+          businessForm.filingDocumentUrl,
+          businessForm.filingDocumentIssuedAt,
           businessForm.businessAddressProofUrl,
         ]) &&
         validIdentityDocuments(representativeForm, true) &&
-        validIdentityDocuments(beneficialOwnerForm, true)
+        validIdentityDocuments(beneficialOwnerForm, true) &&
+        isRecentDocumentDate(businessForm.registrationDocumentIssuedAt) &&
+        businessForm.isMostRecentFiling &&
+        (!businessForm.isMultiLayeredCompany || businessForm.ownershipStructureUrl.trim() !== "")
       );
     }
 
@@ -1302,9 +1407,53 @@ const AccountKyc = () => {
     return true;
   };
 
+  const firstCurrentStepError = (): { field: string; message: string } => {
+    if (applicantType === "business" && step === 2) {
+      const checks: Array<[boolean, string, string]> = [
+        [businessForm.expectedMonthlyVolume.trim() !== "", "expected-monthly-volume", "Select the expected monthly transaction volume."],
+        [businessForm.averageTransactionValue.trim() !== "", "average-transaction-value", "Select the average transaction value."],
+        [businessForm.monthlyTransactionCount.trim() !== "", "monthly-transaction-count", "Select the monthly transaction count."],
+        [selectedValues(businessForm.mainTransactionCountries).length > 0, "main-transaction-countries", "Select at least one main transaction country."],
+        [businessForm.annualTurnover.trim() !== "", "annual-turnover", "Select the annual turnover band."],
+        [businessForm.totalEmployees.trim() !== "", "total-employees", "Select the employee count band."],
+        [selectedValues(businessForm.intendedUses).length > 0, "intended-uses", "Select at least one intended account use."],
+        [businessForm.sameBusinessAddress || businessForm.businessAddressLine1.trim() !== "", "business-address-line1", "Enter the business address line 1."],
+        [businessForm.sameBusinessAddress || businessForm.businessCity.trim() !== "", "business-city", "Enter the business city."],
+        [businessForm.sameBusinessAddress || businessForm.businessPostalCode.trim() !== "", "business-postal-code", "Enter the business postal code."],
+      ];
+      const failed = checks.find(([valid]) => !valid);
+      if (failed) return { field: failed[1], message: failed[2] };
+    }
+
+    if (applicantType === "business" && step === 3) {
+      const checks: Array<[boolean, string, string]> = [
+        [businessForm.registrationDocumentUrl.trim() !== "", "business-registration-document", "Upload the business registration document."],
+        [isRecentDocumentDate(businessForm.registrationDocumentIssuedAt), "business-registration-issued-at", "Enter a valid recent business registration issue date."],
+        [businessForm.filingDocumentUrl.trim() !== "", "filing-document", "Upload the latest NAR1 or NNC1 filing."],
+        [isDateValue(businessForm.filingDocumentIssuedAt), "filing-issued-at", "Enter a valid filing issue date."],
+        [businessForm.isMostRecentFiling, "most-recent-filing", "Confirm that this is the most recent company filing."],
+        [!businessForm.isMultiLayeredCompany || businessForm.ownershipStructureUrl.trim() !== "", "ownership-structure", "Upload corporate structure evidence for a multilayered company."],
+      ];
+      const failed = checks.find(([valid]) => !valid);
+      if (failed) return { field: failed[1], message: failed[2] };
+    }
+
+    return { field: `kyc-step-${step}`, message: "Complete the first missing or invalid field in this step." };
+  };
+
+  const showFirstCurrentStepError = () => {
+    const error = firstCurrentStepError();
+    setFormError(error.message);
+    requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(`[data-kyc-field="${error.field}"]`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.querySelector<HTMLElement>("input, select, textarea, button")?.focus();
+    });
+  };
+
   const nextStep = () => {
     if (!validateCurrentStep()) {
-      setFormError("Complete all required fields in this step before continuing.");
+      showFirstCurrentStepError();
       return;
     }
 
@@ -1318,6 +1467,7 @@ const AccountKyc = () => {
   };
 
   const buildCurrentKycPayload = (): KycSubmissionPayload => {
+    const consentAt = new Date().toISOString();
     const documents =
       applicantType === "business"
         ? buildBusinessDocuments(businessForm, profileForm.countryCode, documentEvidence("business"))
@@ -1357,6 +1507,7 @@ const AccountKyc = () => {
                 country_code: normalizeCountryCode(representativeForm.countryCode),
                 metadata: {
                   role: representativeForm.role.trim(),
+                  positions: [representativeForm.role.trim().toLowerCase().replace(/[ -]+/g, "_")],
                   phone: e164Phone(representativeForm.phoneCallingCode, representativeForm.phoneNumber),
                 },
                 documents: buildPersonDocuments(
@@ -1391,7 +1542,9 @@ const AccountKyc = () => {
       metadata: {
         source: "origin_wallet_platform",
         verification_consent: verificationConsent,
-        verification_consent_at: new Date().toISOString(),
+        verification_consent_at: consentAt,
+        nium_region: applicantType === "business" ? "HK" : undefined,
+        nium_kyc_type: applicantType === "business" ? "full" : undefined,
         source_of_funds:
           applicantType === "business" ? businessForm.sourceOfFunds.trim() : profileForm.sourceOfFunds.trim(),
         ...(applicantType === "individual"
@@ -1405,29 +1558,45 @@ const AccountKyc = () => {
         business_activity_type: applicantType === "business" ? businessForm.businessActivityType.trim() : null,
         trade_type: applicantType === "business" ? businessForm.tradeType.trim() : null,
         main_product: applicantType === "business" ? businessForm.mainProduct.trim() : null,
+        business_industry: applicantType === "business" ? businessForm.industry : null,
+        expected_monthly_volume: applicantType === "business" ? businessForm.expectedMonthlyVolume : profileForm.expectedMonthlyVolume,
+        average_transaction_value: applicantType === "business" ? businessForm.averageTransactionValue : null,
+        monthly_transaction_count: applicantType === "business" ? businessForm.monthlyTransactionCount : null,
+        main_transaction_countries: applicantType === "business" ? selectedValues(businessForm.mainTransactionCountries) : null,
         nium_v5_fields:
           applicantType === "business"
-            ? {
-                expectedAccountUsage: {
-                  debit: {
-                    ...niumVpsPassCorporateConstants.debit,
-                    topTransactionCountries: selectedValues(businessForm.exportingRegions),
-                  },
-                  credit: {
-                    ...niumVpsPassCorporateConstants.credit,
-                    topTransactionCountries: selectedValues(businessForm.exportingRegions),
-                  },
-                  intendedUses: [...niumVpsPassCorporateConstants.intendedUses],
+            ? buildHkCorporateFullFields({
+                tradeName: businessForm.tradeName,
+                sameBusinessAddress: businessForm.sameBusinessAddress,
+                businessAddress: {
+                  addressLine1: businessForm.businessAddressLine1,
+                  city: businessForm.businessCity,
+                  state: businessForm.businessState,
+                  postalCode: businessForm.businessPostalCode,
+                  countryCode: businessForm.businessCountryCode,
                 },
-                natureOfBusiness: {
-                  industryCodes: [...niumVpsPassCorporateConstants.industryCodes],
-                  operatingCountries: selectedValues(businessForm.exportingRegions),
+                consentAt,
+                isMultiLayeredCompany: businessForm.isMultiLayeredCompany,
+                bank: {
+                  accountName: businessForm.bankAccountName,
+                  accountNumber: businessForm.bankAccountNumber,
+                  bankCountry: businessForm.bankCountry,
+                  bankName: businessForm.bankName,
+                  currency: businessForm.bankCurrency,
+                  routingType: businessForm.bankRoutingType,
+                  routingValue: businessForm.bankRoutingValue,
                 },
-                sizeOfBusiness: {
-                  annualTurnover: niumVpsPassCorporateConstants.annualTurnover,
-                  totalEmployees: niumVpsPassCorporateConstants.totalEmployees,
-                },
-              }
+                deviceDescriptor: navigator.platform || "Origin Wallet web",
+                industry: businessForm.industry,
+                operatingCountries: selectedValues(businessForm.exportingRegions),
+                monthlyVolume: businessForm.expectedMonthlyVolume,
+                averageTransactionValue: businessForm.averageTransactionValue,
+                monthlyTransactions: businessForm.monthlyTransactionCount,
+                transactionCountries: selectedValues(businessForm.mainTransactionCountries),
+                annualTurnover: businessForm.annualTurnover,
+                totalEmployees: businessForm.totalEmployees,
+                intendedUses: selectedValues(businessForm.intendedUses),
+              })
             : null,
         historical_trade_comment:
           applicantType === "business" ? businessForm.historicalTradeComment.trim() || null : null,
@@ -1587,7 +1756,7 @@ const AccountKyc = () => {
 
   const handleSubmit = () => {
     if (!validateCurrentStep()) {
-      setFormError("Review the information and confirm consent before submitting.");
+      showFirstCurrentStepError();
       return;
     }
 
@@ -1682,6 +1851,7 @@ const AccountKyc = () => {
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Business name" value={businessForm.businessName} onChange={(value) => updateBusiness("businessName", value)} />
+                      <Field label="Trade name" value={businessForm.tradeName} onChange={(value) => updateBusiness("tradeName", value)} />
                       <Field label="Registration number" value={businessForm.businessRegistration} onChange={(value) => updateBusiness("businessRegistration", value)} />
                       <Field label="Tax ID" value={businessForm.taxId} onChange={(value) => updateBusiness("taxId", value)} />
                     </div>
@@ -1733,6 +1903,10 @@ const AccountKyc = () => {
                       <Field label="Business website" value={businessForm.website} onChange={(value) => updateBusiness("website", value)} />
                     </div>
                     <Field label="Business activity" value={businessForm.businessActivity} onChange={(value) => updateBusiness("businessActivity", value)} />
+                    <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 text-sm">
+                      <Checkbox checked={businessForm.isMultiLayeredCompany} onCheckedChange={(checked) => updateBusiness("isMultiLayeredCompany", checked === true)} />
+                      The company has multiple ownership layers
+                    </label>
                     <div className="grid gap-4">
                       <SelectField label="Business source of funds" value={businessForm.sourceOfFunds} onChange={(value) => updateBusiness("sourceOfFunds", value)} options={sourceOfFundsOptions} placeholder="Select source" />
                     </div>
@@ -1768,13 +1942,42 @@ const AccountKyc = () => {
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Help us understand the company&apos;s expected payment activity.</p>
                       </div>
                       <div className="mt-5 grid gap-x-5 gap-y-6 md:grid-cols-2">
-                        <SelectField label="Expected monthly transaction volume (USD)" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
-                        <Field label="Average transaction value (USD)" value={businessForm.averageTransactionValue} onChange={(value) => updateBusiness("averageTransactionValue", value)} placeholder="For example, 5,000" />
-                        <Field label="Monthly transaction count" value={businessForm.monthlyTransactionCount} onChange={(value) => updateBusiness("monthlyTransactionCount", value)} type="number" min="1" helperText="Number of transactions expected per month" />
-                        <SearchableMultiSelectField label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={countryOptions} />
+                        <SelectField fieldId="expected-monthly-volume" label="Expected monthly transaction volume (USD)" value={businessForm.expectedMonthlyVolume} onChange={(value) => updateBusiness("expectedMonthlyVolume", value)} options={monthlyVolumeOptions} placeholder="Select volume" />
+                        <SelectField fieldId="average-transaction-value" label="Average transaction value (USD)" value={businessForm.averageTransactionValue} onChange={(value) => updateBusiness("averageTransactionValue", value)} options={hkAverageTransactionValueOptions} placeholder="Select average value" />
+                        <SelectField fieldId="monthly-transaction-count" label="Monthly transaction count" value={businessForm.monthlyTransactionCount} onChange={(value) => updateBusiness("monthlyTransactionCount", value)} options={hkMonthlyTransactionOptions} placeholder="Select count" />
+                        <SearchableMultiSelectField fieldId="main-transaction-countries" label="Main transaction countries" value={businessForm.mainTransactionCountries} onChange={(value) => updateBusiness("mainTransactionCountries", value)} options={countryOptions} />
+                        <SelectField fieldId="annual-turnover" label="Annual turnover band" value={businessForm.annualTurnover} onChange={(value) => updateBusiness("annualTurnover", value)} options={[...hkAnnualTurnoverOptions]} />
+                        <SelectField fieldId="total-employees" label="Employee count band" value={businessForm.totalEmployees} onChange={(value) => updateBusiness("totalEmployees", value)} options={[...hkEmployeeCountOptions]} />
+                        <MultiSelectField fieldId="intended-uses" label="Intended account uses" value={businessForm.intendedUses} onChange={(value) => updateBusiness("intendedUses", value)} options={[...hkIntendedUseOptions]} />
                       </div>
                       <div className="mt-6">
                         <TextareaField label="Account purpose" value={businessForm.accountPurpose} onChange={(value) => updateBusiness("accountPurpose", value)} placeholder="For example, collecting customer payments and paying overseas suppliers" helperText="Describe how the company will use the Origin Wallet account" />
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Business address relationship</h3>
+                      <label className="mt-4 flex items-center gap-3 text-sm">
+                        <Checkbox checked={businessForm.sameBusinessAddress} onCheckedChange={(checked) => updateBusiness("sameBusinessAddress", checked === true)} />
+                        Business address is the same as the registered address
+                      </label>
+                      {!businessForm.sameBusinessAddress ? <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <SelectField label="Business country" value={businessForm.businessCountryCode} onChange={(value) => updateBusiness("businessCountryCode", value)} options={countryOptions} />
+                        <Field label="Business postal code" value={businessForm.businessPostalCode} onChange={(value) => updateBusiness("businessPostalCode", value)} />
+                        <Field label="Business address line 1" value={businessForm.businessAddressLine1} onChange={(value) => updateBusiness("businessAddressLine1", value)} />
+                        <Field label="Business city" value={businessForm.businessCity} onChange={(value) => updateBusiness("businessCity", value)} />
+                        <Field label="Business state/province" value={businessForm.businessState} onChange={(value) => updateBusiness("businessState", value)} />
+                      </div> : null}
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Company bank account</h3>
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <Field label="Account name" value={businessForm.bankAccountName} onChange={(value) => updateBusiness("bankAccountName", value)} />
+                        <Field label="Account number" value={businessForm.bankAccountNumber} onChange={(value) => updateBusiness("bankAccountNumber", value)} />
+                        <Field label="Bank name" value={businessForm.bankName} onChange={(value) => updateBusiness("bankName", value)} />
+                        <SelectField label="Bank country" value={businessForm.bankCountry} onChange={(value) => updateBusiness("bankCountry", value)} options={countryOptions} />
+                        <Field label="Currency" value={businessForm.bankCurrency} onChange={(value) => updateBusiness("bankCurrency", value)} />
+                        <Field label="Routing code type" value={businessForm.bankRoutingType} onChange={(value) => updateBusiness("bankRoutingType", value)} />
+                        <Field label="Routing code" value={businessForm.bankRoutingValue} onChange={(value) => updateBusiness("bankRoutingValue", value)} />
                       </div>
                     </div>
                     <AddressFields
@@ -1833,9 +2036,21 @@ const AccountKyc = () => {
                           onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
                           uploadLabel="Upload incorporation or registration document"
                           uploading={uploadingDocument === captureKey("business", "business_registration")}
-                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file)}
+                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, undefined, businessForm.registrationDocumentIssuedAt)}
                           required
                         />
+                        <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                        <SelectField label="Latest company filing type" value={businessForm.filingDocumentType} onChange={(value) => updateBusiness("filingDocumentType", value)} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
+                        <FieldWithUpload
+                          label="Latest NAR1 or NNC1 filing"
+                          value={businessForm.filingDocumentUrl}
+                          onChange={(value) => updateBusiness("filingDocumentUrl", value)}
+                          uploadLabel="Upload latest filing"
+                          uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
+                          onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true }, businessForm.filingDocumentIssuedAt)}
+                          required
+                        />
+                        <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
                         <FieldWithUpload
                           label="Business address proof"
                           value={businessForm.businessAddressProofUrl}
@@ -1846,6 +2061,15 @@ const AccountKyc = () => {
                           required
                           helperText="For example, a recent utility bill, bank statement, or government-issued address record."
                         />
+                        {businessForm.isMultiLayeredCompany ? <FieldWithUpload
+                          label="Corporate ownership structure"
+                          value={businessForm.ownershipStructureUrl}
+                          onChange={(value) => updateBusiness("ownershipStructureUrl", value)}
+                          uploadLabel="Upload ownership chart"
+                          uploading={uploadingDocument === captureKey("business", "ownership_chart")}
+                          onFile={(file) => uploadBusinessDocument("ownership_chart", "ownershipStructureUrl", file)}
+                          required
+                        /> : null}
                       </div>
                     </div>
                     <PersonDocumentFields
@@ -2294,7 +2518,16 @@ const buildBusinessDocuments = (
       type: "business_registration",
       file_url: form.registrationDocumentUrl.trim(),
       issuing_country_code: issuingCountryCode,
+      issued_at: normalizeDateValue(form.registrationDocumentIssuedAt),
       ...evidence("business_registration"),
+    },
+    {
+      type: form.filingDocumentType,
+      file_url: form.filingDocumentUrl.trim(),
+      issuing_country_code: issuingCountryCode,
+      issued_at: normalizeDateValue(form.filingDocumentIssuedAt),
+      metadata: { is_most_recent_filing: form.isMostRecentFiling },
+      ...evidence(form.filingDocumentType),
     },
     {
       type: "proof_of_business_address",
@@ -2302,6 +2535,14 @@ const buildBusinessDocuments = (
       issuing_country_code: issuingCountryCode,
       ...evidence("proof_of_business_address"),
     },
+    ...(form.isMultiLayeredCompany
+      ? [{
+          type: "ownership_chart",
+          file_url: form.ownershipStructureUrl.trim(),
+          issuing_country_code: issuingCountryCode,
+          ...evidence("ownership_chart"),
+        }]
+      : []),
   ];
 };
 
@@ -2595,19 +2836,21 @@ const EvidenceUpload = ({
 );
 
 const SelectField = <TValue extends string>({
+  fieldId,
   label,
   onChange,
   options,
   placeholder = "Select an option",
   value,
 }: {
+  fieldId?: string;
   label: string;
   onChange: (value: TValue) => void;
   options: { label: string; value: TValue }[];
   placeholder?: string;
   value: TValue;
 }) => (
-  <div className="space-y-2">
+  <div className="space-y-2" data-kyc-field={fieldId}>
     <Label>{label}</Label>
     <select
       className="h-12 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm"
@@ -2628,11 +2871,13 @@ const SelectField = <TValue extends string>({
 );
 
 const MultiSelectField = ({
+  fieldId,
   label,
   onChange,
   options,
   value,
 }: {
+  fieldId?: string;
   label: string;
   onChange: (value: string) => void;
   options: { label: string; value: string }[];
@@ -2641,7 +2886,7 @@ const MultiSelectField = ({
   const selected = selectedValues(value);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-kyc-field={fieldId}>
       <Label>{label}</Label>
       <select
         multiple
@@ -2664,11 +2909,13 @@ const MultiSelectField = ({
 };
 
 const SearchableMultiSelectField = ({
+  fieldId,
   label,
   onChange,
   options,
   value,
 }: {
+  fieldId?: string;
   label: string;
   onChange: (value: string) => void;
   options: { label: string; value: string }[];
@@ -2688,7 +2935,7 @@ const SearchableMultiSelectField = ({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-kyc-field={fieldId}>
       <Label>{label}</Label>
       {selectedOptions.length ? (
         <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2.5 dark:border-white/10 dark:bg-white/5">
@@ -2767,7 +3014,7 @@ const PersonDetails = ({
       {includeOwnership ? (
         <SelectField label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} options={countryOptions} placeholder="Select residence" />
       ) : (
-        <Field label="Role" value={form.role} onChange={(value) => onChange("role", value)} placeholder="For example, Director" />
+        <SelectField label="Role" value={form.role} onChange={(value) => onChange("role", value)} options={[{ label: "Director", value: "director" }]} />
       )}
     </div>
     {includePhone ? (
