@@ -14,13 +14,28 @@ const getAuthErrorMessage = (error: unknown, fallback: string) => {
   return message || fallback;
 };
 
+const phoneCountryOptions = [
+  { label: "Vietnam (+84)", value: "+84" },
+  { label: "Hong Kong (+852)", value: "+852" },
+  { label: "Singapore (+65)", value: "+65" },
+  { label: "United States (+1)", value: "+1" },
+  { label: "United Kingdom (+44)", value: "+44" },
+];
+
+const toE164Phone = (callingCode: string, localPhone: string) => {
+  const code = callingCode.replace(/\D/g, "");
+  const number = localPhone.replace(/\D/g, "").replace(/^0+/, "");
+  return code && number ? `+${code}${number}` : "";
+};
+
 const Register = () => {
   const navigate = useNavigate();
   const { register, verifyRegister, authError, clearAuthError } = useAuth();
 
   const [step, setStep] = useState<"form" | "verify">("form");
   const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phoneCallingCode, setPhoneCallingCode] = useState("+84");
+  const [localPhone, setLocalPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,12 +61,18 @@ const Register = () => {
       return;
     }
 
+    const phone = toE164Phone(phoneCallingCode, localPhone);
+    if (!phone) {
+      setError("Enter a valid phone number.");
+      return;
+    }
+
     setIsEmailLoading(true);
 
     try {
       const challenge = await register({
         fullName: fullName.trim(),
-        phone: phone.trim(),
+        phone,
         email: email.trim(),
         password,
         passwordConfirmation: confirmPassword,
@@ -142,19 +163,32 @@ const Register = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <div className="grid grid-cols-[160px_minmax(0,1fr)] gap-2">
+                      <select
+                        aria-label="Country calling code"
+                        value={phoneCallingCode}
+                        onChange={(event) => setPhoneCallingCode(event.target.value)}
+                        className="h-12 rounded-md border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        {phoneCountryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <Input
                         id="phone"
                         type="tel"
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                        placeholder="+84901234567"
+                        value={localPhone}
+                        onChange={(event) => setLocalPhone(event.target.value)}
+                        placeholder="901234567"
                         className="h-12 pl-10"
                         autoComplete="tel"
                         required
                       />
+                      </div>
                     </div>
+                    <p className="text-xs text-slate-500">Stored as {toE164Phone(phoneCallingCode, localPhone) || "an E.164 phone number"}.</p>
                   </div>
 
                   <div className="space-y-2">

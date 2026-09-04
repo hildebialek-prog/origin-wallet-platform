@@ -421,7 +421,7 @@ const defaultBusinessForm = (): BusinessForm => ({
   businessName: "",
   businessRegistration: "",
   registeredDate: "",
-  niumBusinessType: "",
+  niumBusinessType: "PRIVATE_COMPANY",
   taxId: "",
   businessActivityType: "foreign_trade_export",
   exportingRegions: "",
@@ -510,7 +510,7 @@ const normalizeBusinessDraftForm = (form?: Partial<BusinessForm>): BusinessForm 
     mainTransactionCountries: selectedValues(next.mainTransactionCountries).filter(isCountryCode).join(","),
     industry: optionValue(industryOptions, next.industry),
     mainProduct: optionValue(mainProductOptions, next.mainProduct) || "Electrical Products and Accessories",
-    niumBusinessType: normalizeNiumBusinessType(next.niumBusinessType),
+    niumBusinessType: normalizeNiumBusinessType(next.niumBusinessType) || "PRIVATE_COMPANY",
     registeredDate: toDateInputValue(next.registeredDate),
     sourceOfFunds: optionValue(sourceOfFundsOptions, next.sourceOfFunds),
     tradeType: optionValue(tradeTypeOptions, next.tradeType) || "goods_trade",
@@ -745,7 +745,7 @@ const AccountKyc = () => {
       businessName: nextProfile.business_name ?? "",
       businessRegistration: nextProfile.business_registration_number ?? "",
       registeredDate: toDateInputValue(stringifyMetadata(metadata.registered_date)),
-      niumBusinessType: normalizeNiumBusinessType(stringifyMetadata(metadata.nium_business_type)),
+      niumBusinessType: normalizeNiumBusinessType(stringifyMetadata(metadata.nium_business_type)) || "PRIVATE_COMPANY",
       taxId: nextProfile.tax_id ?? "",
       businessActivityType: optionValue(businessActivityOptions, stringifyMetadata(metadata.business_activity_type)) || "foreign_trade_export",
       exportingRegions: stringifyMetadata(metadata.exporting_regions),
@@ -915,6 +915,13 @@ const AccountKyc = () => {
 
   const updateProfile = (field: keyof ProfileForm, value: string) => {
     setProfileForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateCompanyLegalName = (value: string) => {
+    setProfileForm((current) => ({ ...current, legalName: value }));
+    setBusinessForm((current) => current.businessName.trim()
+      ? current
+      : { ...current, businessName: value });
   };
 
   const updateBusiness = (field: keyof BusinessForm, value: string) => {
@@ -1657,7 +1664,7 @@ const AccountKyc = () => {
             {!isKycReadOnly && step === 1 ? (
               <section className="space-y-5">
                 <SectionTitle title={applicantType === "business" ? "Business and people details" : "Personal details"} />
-                <Field label={applicantType === "business" ? "Company legal name" : "Legal name"} value={profileForm.legalName} onChange={(value) => updateProfile("legalName", value)} />
+                <Field label={applicantType === "business" ? "Company legal name" : "Legal name"} value={profileForm.legalName} onChange={applicantType === "business" ? updateCompanyLegalName : (value) => updateProfile("legalName", value)} />
                 {applicantType === "individual" ? (
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -1683,8 +1690,7 @@ const AccountKyc = () => {
                         label="Registered date"
                         value={businessForm.registeredDate}
                         onChange={(value) => updateBusiness("registeredDate", value)}
-                        type="date"
-                        max={todayInputValue}
+                        placeholder="YYYY-MM-DD"
                       />
                       <SelectField
                         label="Nium business type"
@@ -1709,8 +1715,8 @@ const AccountKyc = () => {
                       />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <MultiSelectField
-                        label="Exporting countries/regions"
+                      <SearchableMultiSelectField
+                        label="Operating countries"
                         value={businessForm.exportingRegions}
                         onChange={(value) => updateBusiness("exportingRegions", value)}
                         options={countryOptions}
