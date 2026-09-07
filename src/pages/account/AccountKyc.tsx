@@ -2144,54 +2144,64 @@ const AccountKyc = () => {
                         </div>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Upload clear, complete documents so we can verify your company and its ownership.</p>
                       </div>
-                      <div className="mt-5 grid gap-5 md:grid-cols-2">
-                        <FieldWithUpload
-                          label="Business Registration Document"
-                          value={businessForm.registrationDocumentUrl}
-                          onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
-                          uploadLabel="Upload incorporation or registration document"
-                          uploading={uploadingDocument === captureKey("business", "business_registration")}
-                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt, businessForm.registrationDocumentNumber, businessForm.registrationDocumentExpiresAt)}
-                          required
-                          helperText="Upload your certificate of incorporation or business registration document."
-                        />
-                        <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
-                        <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
-                        <SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
-                          updateBusiness("filingDocumentType", value);
-                          updateBusiness("filingNiumDocumentType", value);
-                        }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
-                        <FieldWithUpload
-                          label="Latest Company Filing Document (NNC1/NAR1)"
-                          value={businessForm.filingDocumentUrl}
-                          onChange={(value) => updateBusiness("filingDocumentUrl", value)}
-                          uploadLabel="Upload latest filing"
-                          uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
-                          onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt, businessForm.filingDocumentNumber, businessForm.filingDocumentExpiresAt)}
-                          required
-                          helperText="Upload your latest company filing document showing directors and shareholders."
-                        />
-                        <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
-                        <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
-                        <FieldWithUpload
-                          label="Business Address Proof"
-                          value={businessForm.businessAddressProofUrl}
-                          onChange={(value) => updateBusiness("businessAddressProofUrl", value)}
-                          uploadLabel="Upload business address proof"
-                          uploading={uploadingDocument === captureKey("business", "proof_of_business_address")}
-                          onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file, { nium_document_type: businessForm.businessAddressProofNiumDocumentType })}
-                          required
-                          helperText="Upload a recent utility bill, bank statement, or official document showing your business address."
-                        />
-                        {businessForm.isMultiLayeredCompany ? <FieldWithUpload
-                          label="Corporate ownership structure"
-                          value={businessForm.ownershipStructureUrl}
-                          onChange={(value) => updateBusiness("ownershipStructureUrl", value)}
-                          uploadLabel="Upload ownership chart"
-                          uploading={uploadingDocument === captureKey("business", "ownership_chart")}
-                          onFile={(file) => uploadBusinessDocument("ownership_chart", "ownershipStructureUrl", file, { nium_document_type: businessForm.ownershipNiumDocumentType })}
-                          required
-                        /> : null}
+                      <div className="mt-5 space-y-6">
+                        <div className="grid gap-5 md:grid-cols-2">
+                          <FieldWithUpload
+                            label="Business Registration Document"
+                            value={businessForm.registrationDocumentUrl}
+                            onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
+                            uploadLabel="Upload incorporation or registration document"
+                            uploading={uploadingDocument === captureKey("business", "business_registration")}
+                            onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt, businessForm.registrationDocumentNumber, businessForm.registrationDocumentExpiresAt)}
+                            required
+                            helperText="Upload your certificate of incorporation or business registration document."
+                          />
+                          <div className="space-y-5">
+                            <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                            <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
+                          </div>
+                        </div>
+                        <div className="grid gap-5 md:grid-cols-2">
+                          <FieldWithUpload
+                            label="Latest Company Filing Document (NNC1/NAR1)"
+                            value={businessForm.filingDocumentUrl}
+                            onChange={(value) => updateBusiness("filingDocumentUrl", value)}
+                            uploadLabel="Upload latest filing"
+                            uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
+                            onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt, businessForm.filingDocumentNumber, businessForm.filingDocumentExpiresAt)}
+                            required
+                            helperText="Upload your latest company filing document showing directors and shareholders."
+                          />
+                          <div className="space-y-5">
+                            <SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
+                              updateBusiness("filingDocumentType", value);
+                              updateBusiness("filingNiumDocumentType", value);
+                            }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
+                            <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                            <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
+                          </div>
+                        </div>
+                        <div className="grid gap-5 md:grid-cols-2">
+                          <FieldWithUpload
+                            label="Business Address Proof"
+                            value={businessForm.businessAddressProofUrl}
+                            onChange={(value) => updateBusiness("businessAddressProofUrl", value)}
+                            uploadLabel="Upload business address proof"
+                            uploading={uploadingDocument === captureKey("business", "proof_of_business_address")}
+                            onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file, { nium_document_type: businessForm.businessAddressProofNiumDocumentType })}
+                            required
+                            helperText="Upload a recent utility bill, bank statement, or official document showing your business address."
+                          />
+                          {businessForm.isMultiLayeredCompany ? <FieldWithUpload
+                            label="Corporate ownership structure"
+                            value={businessForm.ownershipStructureUrl}
+                            onChange={(value) => updateBusiness("ownershipStructureUrl", value)}
+                            uploadLabel="Upload ownership chart"
+                            uploading={uploadingDocument === captureKey("business", "ownership_chart")}
+                            onFile={(file) => uploadBusinessDocument("ownership_chart", "ownershipStructureUrl", file, { nium_document_type: businessForm.ownershipNiumDocumentType })}
+                            required
+                          /> : null}
+                        </div>
                       </div>
                     </div>
                     <PersonDocumentFields
