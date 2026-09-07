@@ -2156,7 +2156,6 @@ const AccountKyc = () => {
                           helperText="Upload your certificate of incorporation or business registration document."
                         />
                         <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
-                        <Field label="Business registration document number" value={businessForm.registrationDocumentNumber} onChange={(value) => updateBusiness("registrationDocumentNumber", value)} />
                         <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
                         <SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
                           updateBusiness("filingDocumentType", value);
@@ -2173,7 +2172,6 @@ const AccountKyc = () => {
                           helperText="Upload your latest company filing document showing directors and shareholders."
                         />
                         <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
-                        <Field label="Filing document number" value={businessForm.filingDocumentNumber} onChange={(value) => updateBusiness("filingDocumentNumber", value)} />
                         <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
                         <FieldWithUpload
                           label="Business Address Proof"
