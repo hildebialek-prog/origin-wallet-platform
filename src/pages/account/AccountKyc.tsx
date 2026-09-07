@@ -219,10 +219,14 @@ type BusinessForm = {
   accountPurpose: string;
   registrationDocumentUrl: string;
   registrationDocumentIssuedAt: string;
+  registrationDocumentNumber: string;
+  registrationDocumentExpiresAt: string;
   registrationNiumDocumentType: string;
   filingDocumentType: "nar1" | "nnc1";
   filingDocumentUrl: string;
   filingDocumentIssuedAt: string;
+  filingDocumentNumber: string;
+  filingDocumentExpiresAt: string;
   filingNiumDocumentType: string;
   isMostRecentFiling: boolean;
   certificateOfIncorporationUrl: string;
@@ -477,10 +481,14 @@ const defaultBusinessForm = (): BusinessForm => ({
   accountPurpose: "",
   registrationDocumentUrl: "",
   registrationDocumentIssuedAt: "",
+  registrationDocumentNumber: "",
+  registrationDocumentExpiresAt: "",
   registrationNiumDocumentType: "business_registration_doc",
   filingDocumentType: "nar1",
   filingDocumentUrl: "",
   filingDocumentIssuedAt: "",
+  filingDocumentNumber: "",
+  filingDocumentExpiresAt: "",
   filingNiumDocumentType: "nar1",
   isMostRecentFiling: true,
   certificateOfIncorporationUrl: "",
@@ -919,10 +927,14 @@ const AccountKyc = () => {
       accountPurpose: stringifyMetadata(metadata.account_purpose),
       registrationDocumentUrl: findDocumentUrl(profileDocs, ["business_registration", "certificate_of_incorporation"]),
       registrationDocumentIssuedAt: toDateInputValue(profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.issued_at),
+      registrationDocumentNumber: profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.document_number ?? "",
+      registrationDocumentExpiresAt: toDateInputValue(profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.expires_at),
       registrationNiumDocumentType: stringifyMetadata(profileDocs.find((document) => ["business_registration", "certificate_of_incorporation"].includes(document.type))?.metadata?.nium_document_type) || "business_registration_doc",
       filingDocumentType: profileDocs.some((document) => document.type.toLowerCase() === "nnc1") ? "nnc1" : "nar1",
       filingDocumentUrl: findDocumentUrl(profileDocs, ["nar1", "nnc1"]),
       filingDocumentIssuedAt: toDateInputValue(profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.issued_at),
+      filingDocumentNumber: profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.document_number ?? "",
+      filingDocumentExpiresAt: toDateInputValue(profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.expires_at),
       filingNiumDocumentType: stringifyMetadata(profileDocs.find((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()))?.metadata?.nium_document_type) || (profileDocs.some((document) => document.type.toLowerCase() === "nnc1") ? "nnc1" : "nar1"),
       isMostRecentFiling: profileDocs.some((document) => ["nar1", "nnc1"].includes(document.type.toLowerCase()) && document.metadata?.is_most_recent_filing === true),
       certificateOfIncorporationUrl: findDocumentUrl(profileDocs, ["certificate_of_incorporation"]),
@@ -1345,9 +1357,13 @@ const AccountKyc = () => {
     file: File,
     metadata?: Record<string, unknown>,
     issuedAt?: string | null,
+    documentNumber?: string | null,
+    expiresAt?: string | null,
   ) => {
     void uploadKycDocumentFile({
       file,
+      documentNumber: documentNumber?.trim() || null,
+      expiresAt: expiresAt || null,
       issuingCountryCode: normalizeCountryCode(profileForm.countryCode) || null,
       metadata: {
         subject: "business",
@@ -2135,11 +2151,13 @@ const AccountKyc = () => {
                           onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
                           uploadLabel="Upload incorporation or registration document"
                           uploading={uploadingDocument === captureKey("business", "business_registration")}
-                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt)}
+                          onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt, businessForm.registrationDocumentNumber, businessForm.registrationDocumentExpiresAt)}
                           required
                           helperText="Upload your certificate of incorporation or business registration document."
                         />
                         <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                        <Field label="Business registration document number" value={businessForm.registrationDocumentNumber} onChange={(value) => updateBusiness("registrationDocumentNumber", value)} />
+                        <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
                         <SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
                           updateBusiness("filingDocumentType", value);
                           updateBusiness("filingNiumDocumentType", value);
@@ -2150,11 +2168,13 @@ const AccountKyc = () => {
                           onChange={(value) => updateBusiness("filingDocumentUrl", value)}
                           uploadLabel="Upload latest filing"
                           uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
-                          onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt)}
+                          onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt, businessForm.filingDocumentNumber, businessForm.filingDocumentExpiresAt)}
                           required
                           helperText="Upload your latest company filing document showing directors and shareholders."
                         />
                         <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                        <Field label="Filing document number" value={businessForm.filingDocumentNumber} onChange={(value) => updateBusiness("filingDocumentNumber", value)} />
+                        <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
                         <FieldWithUpload
                           label="Business Address Proof"
                           value={businessForm.businessAddressProofUrl}
@@ -2634,6 +2654,8 @@ const buildBusinessDocuments = (
     {
       type: "business_registration",
       file_url: form.registrationDocumentUrl.trim(),
+      document_number: form.registrationDocumentNumber.trim() || null,
+      expires_at: normalizeDateValue(form.registrationDocumentExpiresAt) || null,
       issuing_country_code: issuingCountryCode,
       issued_at: normalizeDateValue(form.registrationDocumentIssuedAt),
       ...evidence("business_registration"),
@@ -2660,12 +2682,15 @@ const buildBusinessDocuments = (
 };
 
 export const buildFilingDocumentPayload = (
-  form: Pick<BusinessForm, "filingDocumentType" | "filingDocumentUrl" | "filingDocumentIssuedAt" | "isMostRecentFiling">,
+  form: Pick<BusinessForm, "filingDocumentType" | "filingDocumentUrl" | "filingDocumentIssuedAt" | "isMostRecentFiling">
+    & Partial<Pick<BusinessForm, "filingDocumentNumber" | "filingDocumentExpiresAt" | "filingNiumDocumentType">>,
   issuingCountryCode: string | null,
   filingEvidence: Partial<KycDocumentPayload>,
 ): KycDocumentPayload => ({
   type: form.filingDocumentType,
   file_url: form.filingDocumentUrl.trim(),
+  document_number: form.filingDocumentNumber?.trim() || null,
+  expires_at: normalizeDateValue(form.filingDocumentExpiresAt) || null,
   issuing_country_code: issuingCountryCode,
   issued_at: normalizeDateValue(form.filingDocumentIssuedAt),
   ...filingEvidence,
