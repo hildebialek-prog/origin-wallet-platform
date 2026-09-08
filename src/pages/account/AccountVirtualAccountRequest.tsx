@@ -15,31 +15,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { countryOptions } from "@/lib/money";
 import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
-import { getProviderReference, requestVirtualAccount } from "@/services/providerAccountService";
+import {
+  getProviderReference,
+  requestVirtualAccount,
+  type VirtualAccountCategory,
+  type VirtualAccountType,
+} from "@/services/providerAccountService";
 
-const countryCurrencyMap: Record<string, string> = {
-  AU: "AUD",
-  CA: "CAD",
-  CN: "CNY",
-  DE: "EUR",
-  FR: "EUR",
-  GB: "GBP",
-  HK: "HKD",
-  ID: "IDR",
-  IE: "EUR",
-  JP: "JPY",
-  KR: "KRW",
-  MY: "MYR",
-  PH: "PHP",
-  SG: "SGD",
-  TH: "THB",
-  US: "USD",
-  VN: "VND",
-};
-
-const multiCurrencyVirtualAccountCurrencies = [
+const virtualAccountCurrencies = [
   "AED",
   "AUD",
   "CAD",
@@ -66,50 +50,13 @@ const multiCurrencyVirtualAccountCurrencies = [
   "ZAR",
 ];
 
-type VirtualAccountCountryOption = {
-  code: string;
-  name: string;
-  defaultCurrency: string;
-  currencies: string[];
-  isMultiCurrency?: boolean;
-};
-
-const virtualAccountCountryOptions: VirtualAccountCountryOption[] = [
-  ...countryOptions.map((country) => {
-    const defaultCurrency = countryCurrencyMap[country.code] ?? "USD";
-
-    return {
-      ...country,
-      defaultCurrency,
-      currencies: [defaultCurrency],
-      isMultiCurrency: false,
-    };
-  }),
-  {
-    code: "IE",
-    name: "Ireland",
-    defaultCurrency: "EUR",
-    currencies: ["EUR"],
-    isMultiCurrency: false,
-  },
-].map((country) =>
-  country.code === "GB"
-    ? {
-        ...country,
-        name: "United Kingdom (Multi-currency)",
-        currencies: multiCurrencyVirtualAccountCurrencies,
-        isMultiCurrency: true,
-      }
-    : country,
-);
-
 const AccountVirtualAccountRequest = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [providerCode, setProviderCode] = useState("");
-  const [countryCode, setCountryCode] = useState("US");
   const [currency, setCurrency] = useState("USD");
-  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(["USD"]);
+  const [accountCategory, setAccountCategory] = useState<VirtualAccountCategory>("SELF_FUNDING_ACCOUNT");
+  const [accountType, setAccountType] = useState<VirtualAccountType>("LOCAL");
   const [alias, setAlias] = useState("");
   const [storeLink, setStoreLink] = useState("");
   const [note, setNote] = useState("");
@@ -123,17 +70,6 @@ const AccountVirtualAccountRequest = () => {
 
   const providers = useMemo(() => (providersQuery.data ?? []).filter((provider) => provider.status === "active"), [providersQuery.data]);
   const selectedProvider = providers.find((provider) => provider.code === providerCode);
-  const selectedCountry = virtualAccountCountryOptions.find((country) => country.code === countryCode);
-  const accountType = selectedCountry?.isMultiCurrency ? "Multi-currency virtual account" : "Local virtual account";
-  const requestCurrencies = selectedCountry?.isMultiCurrency ? selectedCurrencies : [currency];
-
-  const countrySelectOptions = useMemo(
-    () =>
-      virtualAccountCountryOptions
-        .filter((country, index, list) => list.findIndex((item) => item.code === country.code) === index)
-        .sort((left, right) => left.name.localeCompare(right.name)),
-    [],
-  );
 
   useEffect(() => {
     if (!providerCode && providers.length > 0) {
@@ -141,35 +77,10 @@ const AccountVirtualAccountRequest = () => {
     }
   }, [providerCode, providers]);
 
-  useEffect(() => {
-    if (!selectedCountry) return;
-
-    setCurrency(selectedCountry.defaultCurrency);
-    setSelectedCurrencies(
-      selectedCountry.isMultiCurrency ? [selectedCountry.defaultCurrency] : [selectedCountry.defaultCurrency],
-    );
-  }, [countryCode, selectedCountry]);
-
-  const toggleCurrency = (nextCurrency: string) => {
-    if (!selectedCountry?.isMultiCurrency) return;
-
-    setSelectedCurrencies((current) => {
-      if (current.includes(nextCurrency)) {
-        return current.length === 1 ? current : current.filter((item) => item !== nextCurrency);
-      }
-
-      return [...current, nextCurrency].sort();
-    });
-  };
-
   const requestMutation = useMutation({
     mutationFn: async () => {
       if (!providerCode || !alias.trim()) {
         throw new Error("Account setup and account alias are required.");
-      }
-
-      if (requestCurrencies.length === 0) {
-        throw new Error("Select at least one currency for the virtual account.");
       }
 
       return requestVirtualAccount({
@@ -177,8 +88,8 @@ const AccountVirtualAccountRequest = () => {
         token: token as string,
         providerCode,
         currency,
-        accountCategory: "SELF_FUNDING_ACCOUNT",
-        accountType: "LOCAL",
+        accountCategory,
+        accountType,
       });
     },
     onSuccess: (payload) => {
@@ -222,7 +133,7 @@ const AccountVirtualAccountRequest = () => {
               <div className="space-y-1">
                 <p className="font-semibold">Choose the receiving account type carefully</p>
                 <p className="leading-6 text-[#53627a] dark:text-amber-50/80">
-                  Local countries use their domestic currency automatically. United Kingdom multi-currency accounts can collect several supported currencies under one request.
+                  Currency, account category, and account type determine how the receiving account can be funded and used.
                 </p>
               </div>
             </div>
@@ -237,66 +148,56 @@ const AccountVirtualAccountRequest = () => {
             </p>
           </div>
 
+          <div className="space-y-2">
+            <Label>Currency</Label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#151b24] dark:text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {virtualAccountCurrencies.map((item) => (
+                  <SelectItem key={item} value={item} translate="no">
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Country/territory</Label>
-              <Select value={countryCode} onValueChange={setCountryCode}>
+              <Label>Account category</Label>
+              <Select
+                value={accountCategory}
+                onValueChange={(value) => setAccountCategory(value as VirtualAccountCategory)}
+              >
                 <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#151b24] dark:text-white">
-                  <SelectValue>
-                    {selectedCountry ? `${selectedCountry.code} - ${selectedCountry.name}` : countryCode}
-                  </SelectValue>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {countrySelectOptions.map((country) => (
-                    <SelectItem key={country.code} value={country.code}>
-                      {country.code} - {country.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="SELF_FUNDING_ACCOUNT">Self-funding account</SelectItem>
+                  <SelectItem value="COLLECTION_ACCOUNT">Collection account</SelectItem>
+                  <SelectItem value="SELF_FUNDING_AND_COLLECTION_ACCOUNT">
+                    Self-funding and collection
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Currency</Label>
-              <div className="flex h-12 items-center rounded-xl border border-[#d7d7d2] bg-white px-4 text-[1rem] font-semibold text-[#0f2442] dark:border-white/10 dark:bg-[#151b24] dark:text-white">
-                <span translate="no">{currency}</span>
-              </div>
+              <Label>Account type</Label>
+              <Select value={accountType} onValueChange={(value) => setAccountType(value as VirtualAccountType)}>
+                <SelectTrigger className="h-12 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#151b24] dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOCAL">Local</SelectItem>
+                  <SelectItem value="WIRES">Wires</SelectItem>
+                  <SelectItem value="LOCAL_AND_WIRES">Local and wires</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
-          {selectedCountry?.isMultiCurrency ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label>Currencies</Label>
-                <span className="text-sm font-medium text-[#62708a] dark:text-gray-400">
-                  {selectedCurrencies.length} selected
-                </span>
-              </div>
-              <div className="rounded-2xl border border-[#d7d7d2] bg-white p-3 dark:border-white/10 dark:bg-[#151b24]">
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                  {selectedCountry.currencies.map((item) => {
-                    const selected = selectedCurrencies.includes(item);
-
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => toggleCurrency(item)}
-                        className={`h-9 rounded-lg border px-2 text-sm font-semibold transition ${
-                          selected
-                            ? "border-[#16a34a] bg-[#ecfdf3] text-[#0f5f3b] shadow-sm dark:border-[#22c55e] dark:bg-[#22c55e]/15 dark:text-[#86efac]"
-                            : "border-[#d7d7d2] bg-[#fbfcfe] text-[#53627a] hover:border-[#16a34a] hover:text-[#0f2442] dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-[#22c55e] dark:hover:text-white"
-                        }`}
-                        translate="no"
-                      >
-                        {item}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null}
 
           <div className="space-y-2">
             <Label>Account alias</Label>
