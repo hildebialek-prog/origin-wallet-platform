@@ -61,6 +61,23 @@ export interface RequestConnectResponse {
   integration_request?: IntegrationRequest | null;
 }
 
+export interface VirtualAccount {
+  id: number;
+  user_provider_account_id: number;
+  provider_payment_id: string;
+  virtual_account_reference: string;
+  currency: string;
+  account_category: string;
+  account_type: string;
+  status: string;
+  assigned_at?: string | null;
+}
+
+export interface RequestVirtualAccountResponse {
+  message?: string;
+  virtual_account: VirtualAccount;
+}
+
 type AuthenticatedParams = {
   token: string;
   userId: string | number;
@@ -99,6 +116,27 @@ export const requestProviderConnect = (params: AuthenticatedParams & { providerC
       token: params.token,
       body: {
         note: params.note ?? "",
+      },
+    },
+  );
+
+export const requestVirtualAccount = (params: AuthenticatedParams & {
+  providerCode: string;
+  currency: string;
+  accountCategory: "SELF_FUNDING_ACCOUNT" | "COLLECTION_ACCOUNT" | "SELF_FUNDING_AND_COLLECTION_ACCOUNT";
+  accountType: "LOCAL" | "WIRES" | "LOCAL_AND_WIRES";
+  bankName?: string;
+}) =>
+  requestApi<RequestVirtualAccountResponse>(
+    `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/virtual-account`,
+    {
+      method: "POST",
+      token: params.token,
+      body: {
+        currency: params.currency,
+        account_category: params.accountCategory,
+        account_type: params.accountType,
+        ...(params.bankName ? { bank_name: params.bankName } : {}),
       },
     },
   );

@@ -17,7 +17,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { countryOptions } from "@/lib/money";
 import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
-import { getProviderReference, requestProviderConnect } from "@/services/providerAccountService";
+import { getProviderReference, requestVirtualAccount } from "@/services/providerAccountService";
 
 const countryCurrencyMap: Record<string, string> = {
   AU: "AUD",
@@ -172,29 +172,20 @@ const AccountVirtualAccountRequest = () => {
         throw new Error("Select at least one currency for the virtual account.");
       }
 
-      return requestProviderConnect({
+      return requestVirtualAccount({
         userId: user?.id as string,
         token: token as string,
         providerCode,
-        note: [
-          `Virtual account request`,
-          `Account type: ${accountType}`,
-          `Country: ${countryCode}${selectedCountry ? ` - ${selectedCountry.name}` : ""}`,
-          `Primary currency: ${currency}`,
-          `Requested currencies: ${requestCurrencies.join(", ")}`,
-          `Alias: ${alias.trim()}`,
-          storeLink.trim() ? `Store link: ${storeLink.trim()}` : null,
-          note.trim() ? `Customer note: ${note.trim()}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        currency,
+        accountCategory: "SELF_FUNDING_ACCOUNT",
+        accountType: "LOCAL",
       });
     },
     onSuccess: (payload) => {
       setFormError("");
       toast({
         title: "Request submitted",
-        description: payload.message || "Origin Wallet operations will review this virtual account request.",
+        description: payload.message || "Your virtual account was assigned successfully.",
       });
       navigate("/account/virtual-accounts?tab=pending");
     },
