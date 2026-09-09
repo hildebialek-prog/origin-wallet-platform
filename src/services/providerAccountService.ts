@@ -64,11 +64,11 @@ export interface RequestConnectResponse {
 export interface VirtualAccount {
   id: number;
   user_provider_account_id: number;
-  provider_payment_id: string;
-  virtual_account_reference: string;
+  provider_payment_id: string | null;
+  virtual_account_reference: string | null;
   currency: string;
-  account_category: string;
-  account_type: string;
+  account_category: string | null;
+  account_type: string | null;
   status: string;
   assigned_at?: string | null;
 }
@@ -145,6 +145,17 @@ export const requestVirtualAccount = (params: AuthenticatedParams & {
       },
     },
   );
+
+export const getVirtualAccounts = async (params: AuthenticatedParams & { providerCode: string }) => {
+  const payload = await requestApi<{ data: VirtualAccount[] }>(
+    `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/virtual-accounts`,
+    {
+      token: params.token,
+    },
+  );
+
+  return Array.isArray(payload?.data) ? payload.data : [];
+};
 
 export const completeProviderAccount = (params: AuthenticatedParams & {
   providerCode: string;

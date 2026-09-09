@@ -7,22 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProviders, type ProviderSummary } from "@/services/fxOrderService";
-import { getBankAccounts } from "@/services/moneyMovementService";
+import { getProviders } from "@/services/fxOrderService";
+import { getVirtualAccounts } from "@/services/providerAccountService";
 import { statusBadgeClassName } from "@/lib/money";
 import { normalizeStatus } from "@/lib/status";
-import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, isPrimaryProvider, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 const AccountVirtualAccounts = () => {
   const { user, token } = useAuth();
   const location = useLocation();
   const activeTab = new URLSearchParams(location.search).get("tab") || "approved";
-
-  const accountsQuery = useQuery({
-    queryKey: ["money-bank-accounts", user?.id, token],
-    enabled: !!user?.id && !!token,
-    queryFn: async () => getBankAccounts({ userId: user?.id as string, token: token as string }),
-  });
 
   const providersQuery = useQuery({
     queryKey: ["money-providers"],
@@ -34,20 +28,29 @@ const AccountVirtualAccounts = () => {
   });
 
   const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
+  const primaryProvider = useMemo(
+    () => providers.find((provider) => isPrimaryProvider(provider)),
+    [providers],
+  );
+  const accountsQuery = useQuery({
+    queryKey: ["nium-virtual-accounts", user?.id, primaryProvider?.code, token],
+    enabled: !!user?.id && !!token && !!primaryProvider?.code,
+    queryFn: async () =>
+      getVirtualAccounts({
+        userId: user?.id as string,
+        token: token as string,
+        providerCode: primaryProvider?.code as string,
+      }),
+  });
   const accounts = accountsQuery.data ?? [];
-  const providerById = useMemo(() => {
-    const map = new Map<number, ProviderSummary>();
-    providers.forEach((provider) => map.set(provider.id, provider));
-    return map;
-  }, [providers]);
 
   const visibleAccounts = accounts.filter((account) => {
     const normalized = normalizeStatus(account.status);
     if (activeTab === "pending") {
-      return !["active", "approved"].includes(normalized);
+      return normalized === "pending";
     }
 
-    return ["active", "approved"].includes(normalized);
+    return ["assigned", "active", "approved"].includes(normalized);
   });
 
   return (
@@ -125,8 +128,6 @@ const AccountVirtualAccounts = () => {
               </div>
               <CardContent className="p-0">
                 {visibleAccounts.map((account) => {
-                  const provider = providerById.get(account.provider_id);
-
                   return (
                     <div
                       key={account.id}
@@ -134,21 +135,21 @@ const AccountVirtualAccounts = () => {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-[1.05rem] font-semibold text-[#0f2442] dark:text-white">
-                          {account.account_name || account.external_account_id || "Origin Wallet account"}
+                          {account.provider_payment_id || account.virtual_account_reference || "Origin Wallet account"}
                         </p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
-                          {account.account_type || "wallet"}
+                          {account.account_type || "-"}
                         </p>
                       </div>
                       <div className="flex min-w-0 items-center gap-2">
                         <ProviderLogo
-                          provider={provider}
+                          provider={primaryProvider}
                           className="h-8 w-8 rounded-lg"
                           imageClassName="p-0.5"
                           fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
-                          {provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}
+                          {primaryProvider ? getProviderDisplayName(primaryProvider) : PRIMARY_PROVIDER_NAME}
                         </span>
                       </div>
                       <div>
@@ -158,14 +159,16 @@ const AccountVirtualAccounts = () => {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-[#0f2442] dark:text-white">
-                          {account.iban || account.account_number || account.external_account_id || "-"}
+                          {account.virtual_account_reference || account.provider_payment_id || "-"}
                         </p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
-                          {account.bank_name || account.swift_bic || account.routing_number || account.country_code || "Account details"}
+                          {account.account_type || "Account details"}
                         </p>
                       </div>
                       <div>
-                        <Badge className={statusBadgeClassName(account.status)}>{account.status}</Badge>
+                        <Badge className={statusBadgeClassName(normalizeStatus(account.status) === "assigned" ? "approved" : account.status)}>
+                          {account.status}
+                        </Badge>
                       </div>
                       <button className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] transition hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10">
                         <MoreHorizontal className="h-5 w-5" />
