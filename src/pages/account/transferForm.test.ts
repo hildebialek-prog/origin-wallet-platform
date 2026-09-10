@@ -3,6 +3,7 @@ import type { Beneficiary } from "@/services/moneyMovementService";
 import type { ProviderSummary } from "@/services/fxOrderService";
 import {
   buildTransferPayload,
+  beneficiaryTransferOption,
   createClientReference,
   NIUM_HK_USD_SWIFT_CONFIG,
   recipientAmountPresentation,
@@ -144,6 +145,29 @@ describe("provider-aware transfer contract", () => {
       targetCurrency: "USD",
       purposeCode: "IR01811",
     })).toContain("does not support transfers");
+  });
+
+  it("keeps active beneficiaries visible while disabling unsupported recipients", () => {
+    expect(beneficiaryTransferOption(beneficiary, niumProvider)).toEqual({
+      visible: true,
+      selectable: true,
+      reason: "",
+    });
+    expect(beneficiaryTransferOption({ ...beneficiary, payout_method: undefined }, niumProvider)).toEqual({
+      visible: true,
+      selectable: false,
+      reason: "The Nium beneficiary payout method must be SWIFT.",
+    });
+    expect(beneficiaryTransferOption({ ...beneficiary, country_code: "US" }, niumProvider)).toEqual({
+      visible: true,
+      selectable: false,
+      reason: "This Nium beneficiary corridor is not currently available. Select an active HK beneficiary receiving USD.",
+    });
+    expect(beneficiaryTransferOption({ ...beneficiary, status: "create_failed" }, niumProvider)).toEqual({
+      visible: false,
+      selectable: false,
+      reason: "The selected beneficiary must be active.",
+    });
   });
 
   it("preserves dynamic identifiers, amounts, references, and beneficiary names", () => {

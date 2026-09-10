@@ -56,9 +56,9 @@ import {
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 import {
   buildTransferPayload,
+  beneficiaryTransferOption,
   createClientReference,
   isNiumProvider,
-  isNiumBeneficiaryAvailable,
   purposeOptionsForProvider,
   recipientAmountPresentation,
   validateTransferConfiguration,
@@ -164,15 +164,11 @@ const AccountTransfers = () => {
   const selectedPurpose = purposeOptionsForProvider(selectedProvider?.code).find((purpose) => purpose.code === form.purposeCode);
   const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
 
-  const eligibleBeneficiaries = beneficiaries.filter((beneficiary) => {
+  const filteredBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
-    return provider?.supports_transfers && isNiumProvider(provider.code) && isNiumBeneficiaryAvailable(beneficiary);
-  });
-
-  const filteredBeneficiaries = eligibleBeneficiaries.filter((beneficiary) => {
+    if (!beneficiaryTransferOption(beneficiary, provider).visible) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
-    const provider = providerById.get(beneficiary.provider_id);
     return [
       beneficiary.full_name,
       beneficiary.company_name,
@@ -518,7 +514,7 @@ const AccountTransfers = () => {
   );
 };
 
-const PayeeStep = ({
+export const PayeeStep = ({
   search,
   onSearchChange,
   beneficiaries,
@@ -565,12 +561,14 @@ const PayeeStep = ({
         <div className="divide-y divide-[#e8edf5] rounded-2xl border border-[#d7d7d2] bg-white dark:divide-white/5 dark:border-white/10 dark:bg-[#10141b]">
           {beneficiaries.map((beneficiary) => {
             const provider = providerById.get(beneficiary.provider_id);
+            const eligibility = beneficiaryTransferOption(beneficiary, provider);
             return (
               <button
                 key={beneficiary.id}
                 type="button"
                 onClick={() => onSelect(beneficiary)}
-                className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-[#f3fdf9] dark:hover:bg-white/5"
+                disabled={!eligibility.selectable}
+                className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-[#f3fdf9] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:disabled:hover:bg-transparent"
               >
                 <ProviderLogo
                   provider={provider}
@@ -586,6 +584,9 @@ const PayeeStep = ({
                   <p className="mt-1 truncate text-sm text-[#62708a] dark:text-gray-400">
                     {beneficiarySubtitle(beneficiary, provider)}
                   </p>
+                  {!eligibility.selectable ? (
+                    <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-300">{eligibility.reason}</p>
+                  ) : null}
                 </div>
                 <Badge className="border-[#d7d7d2] bg-[#f3fdf9] text-[#0f2442] dark:border-white/10 dark:bg-white/5 dark:text-white">
                   <span translate="no">{beneficiary.currency}</span>

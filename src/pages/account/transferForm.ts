@@ -123,3 +123,23 @@ export const validateTransferConfiguration = ({ provider, beneficiary, sourceCur
   if (!isNiumProvider(provider.code)) return "This provider transfer rail is not currently available.";
   return validateNiumTransferConfiguration({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode });
 };
+
+export const beneficiaryTransferOption = (beneficiary: Beneficiary, provider?: ProviderSummary) => {
+  if (normalizeStatus(beneficiary.status) !== "active") {
+    return { visible: false, selectable: false, reason: "The selected beneficiary must be active." };
+  }
+
+  if (!provider) {
+    return { visible: true, selectable: false, reason: "Transfer rail is not available yet." };
+  }
+
+  const reason = validateTransferConfiguration({
+    provider,
+    beneficiary,
+    sourceCurrency: NIUM_HK_USD_SWIFT_CONFIG.sourceCurrency,
+    targetCurrency: beneficiary.currency,
+    purposeCode: NIUM_HK_USD_SWIFT_CONFIG.purposes[0].code,
+  });
+
+  return { visible: true, selectable: reason === "", reason };
+};

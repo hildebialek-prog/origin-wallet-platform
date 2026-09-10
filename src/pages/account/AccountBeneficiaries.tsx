@@ -29,6 +29,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
 import {
   Select,
   SelectContent,
@@ -405,7 +406,11 @@ const AccountBeneficiaries = () => {
       closeDialog();
     },
     onError: (error) => {
-      setFormError(error instanceof Error ? error.message : "Unable to save beneficiary.");
+      const message = error instanceof Error ? error.message : "Unable to save beneficiary.";
+      setFormError(message);
+      if (editing) {
+        toast({ variant: "destructive", title: "Beneficiary update failed", description: message });
+      }
     },
   });
 
