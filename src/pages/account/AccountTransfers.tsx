@@ -7,10 +7,8 @@ import {
   ArrowRight,
   Ban,
   Building2,
-  CalendarClock,
   CheckCircle2,
   Clock3,
-  FileText,
   Loader2,
   RefreshCcw,
   Search,
@@ -40,13 +38,11 @@ import {
   cancelTransfer,
   createTransfer,
   getBalances,
-  getBankAccounts,
   getBeneficiaries,
   getTransfers,
   submitTransfer,
   syncTransferStatus,
   type Balance,
-  type BankAccount,
   type Beneficiary,
   type Transfer,
 } from "@/services/moneyMovementService";
@@ -54,52 +50,42 @@ import {
   currencyOptions,
   formatAmount,
   formatDateTime,
-  purposeOptions,
   statusBadgeClassName,
   toNumber,
 } from "@/lib/money";
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
+import {
+  buildTransferPayload,
+  createClientReference,
+  isNiumProvider,
+  isNiumBeneficiaryAvailable,
+  purposeOptionsForProvider,
+  recipientAmountPresentation,
+  validateTransferConfiguration,
+} from "./transferForm";
 
 type WizardStep = "payee" | "details" | "review" | "result";
 
 type TransferForm = {
   providerId: string;
   beneficiaryId: string;
-  sourceBankAccountId: string;
   transferType: string;
   sourceCurrency: string;
   targetCurrency: string;
   sourceAmount: string;
-  targetAmount: string;
-  fxRate: string;
-  feeAmount: string;
-  feeCurrency: string;
   purposeCode: string;
   referenceText: string;
-  invoiceFileName: string;
-  notifyRecipient: boolean;
-  scheduled: boolean;
-  scheduledDate: string;
 };
 
 const defaultForm: TransferForm = {
   providerId: "",
   beneficiaryId: "",
-  sourceBankAccountId: "",
   transferType: "payout",
   sourceCurrency: "USD",
-  targetCurrency: "VND",
+  targetCurrency: "",
   sourceAmount: "",
-  targetAmount: "",
-  fxRate: "",
-  feeAmount: "0",
-  feeCurrency: "USD",
-  purposeCode: "business_payment",
+  purposeCode: "",
   referenceText: "",
-  invoiceFileName: "",
-  notifyRecipient: true,
-  scheduled: false,
-  scheduledDate: "",
 };
 
 const wizardSteps: { key: WizardStep; label: string }[] = [
@@ -113,8 +99,6 @@ const canSubmitProvider = (status?: string | null) => ["draft", "approved"].incl
 const canCancel = (status?: string | null) => ["draft", "approval_required", "approved"].includes(normalizeStatus(status));
 const canSync = (status?: string | null) =>
   ["pending", "processing", "submitted", "sent", "provider_pending"].includes(normalizeStatus(status));
-
-const blockedStatuses = new Set(["failed", "rejected", "cancelled", "canceled", "inactive", "disabled"]);
 
 const AccountTransfers = () => {
   const { user, token } = useAuth();
@@ -146,12 +130,6 @@ const AccountTransfers = () => {
     queryFn: async () => getBalances({ userId: user?.id as string, token: token as string }),
   });
 
-  const bankAccountsQuery = useQuery({
-    queryKey: ["money-bank-accounts", user?.id, token],
-    enabled: !!user?.id && !!token,
-    queryFn: async () => getBankAccounts({ userId: user?.id as string, token: token as string }),
-  });
-
   const transfersQuery = useQuery({
     queryKey: ["money-transfers", user?.id, token],
     enabled: !!user?.id && !!token,
@@ -162,7 +140,6 @@ const AccountTransfers = () => {
   const transferProviders = providers.filter((provider) => provider.supports_transfers);
   const beneficiaries = useMemo(() => beneficiariesQuery.data ?? [], [beneficiariesQuery.data]);
   const balances = balancesQuery.data ?? [];
-  const bankAccounts = bankAccountsQuery.data ?? [];
   const transfers = transfersQuery.data ?? [];
 
   const providerById = useMemo(() => {
@@ -179,26 +156,17 @@ const AccountTransfers = () => {
 
   const selectedProvider = transferProviders.find((provider) => String(provider.id) === form.providerId) ?? null;
   const selectedBeneficiary = beneficiaryById.get(Number(form.beneficiaryId)) ?? null;
-  const selectedSourceAccount = bankAccounts.find((account) => String(account.id) === form.sourceBankAccountId) ?? null;
   const providerBalances = balances.filter((balance) => String(balance.provider_id) === form.providerId);
-  const providerBankAccounts = bankAccounts.filter((account) => String(account.provider_id) === form.providerId);
   const balanceCurrencies = Array.from(new Set(providerBalances.map((balance) => balance.currency))).sort();
-  const sourceCurrencies = balanceCurrencies.length ? balanceCurrencies : currencyOptions;
+  const sourceCurrencies = isNiumProvider(selectedProvider?.code) ? ["USD"] : balanceCurrencies.length ? balanceCurrencies : currencyOptions;
   const selectedBalance = providerBalances.find((balance) => balance.currency === form.sourceCurrency);
-  const sourceAmountNumber = toNumber(form.sourceAmount);
-  const targetAmountNumber = toNumber(form.targetAmount);
-  const fxRateNumber = toNumber(form.fxRate);
-  const effectiveSourceAmount =
-    sourceAmountNumber > 0 ? sourceAmountNumber : targetAmountNumber > 0 && fxRateNumber > 0 ? targetAmountNumber / fxRateNumber : 0;
-  const effectiveTargetAmount =
-    targetAmountNumber > 0 ? targetAmountNumber : sourceAmountNumber > 0 && fxRateNumber > 0 ? sourceAmountNumber * fxRateNumber : 0;
-  const selectedPurpose = purposeOptions.find((purpose) => purpose.code === form.purposeCode);
+  const effectiveSourceAmount = toNumber(form.sourceAmount);
+  const selectedPurpose = purposeOptionsForProvider(selectedProvider?.code).find((purpose) => purpose.code === form.purposeCode);
   const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
 
   const eligibleBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
-    const normalizedStatus = normalizeStatus(beneficiary.status);
-    return provider?.supports_transfers && !blockedStatuses.has(normalizedStatus);
+    return provider?.supports_transfers && isNiumProvider(provider.code) && isNiumBeneficiaryAvailable(beneficiary);
   });
 
   const filteredBeneficiaries = eligibleBeneficiaries.filter((beneficiary) => {
@@ -238,37 +206,40 @@ const AccountTransfers = () => {
 
   const pickBeneficiary = (beneficiary: Beneficiary) => {
     const providerId = String(beneficiary.provider_id);
-    const nextBalance = balances.find((balance) => String(balance.provider_id) === providerId);
-    const nextBankAccount =
-      bankAccounts.find((account) => String(account.provider_id) === providerId && account.is_default) ??
-      bankAccounts.find((account) => String(account.provider_id) === providerId);
-
+    const provider = providerById.get(beneficiary.provider_id);
+    const nextBalance = balances.find(
+      (balance) => String(balance.provider_id) === providerId && (!isNiumProvider(provider?.code) || balance.currency === "USD"),
+    );
     setForm({
       ...form,
       providerId,
       beneficiaryId: String(beneficiary.id),
-      sourceBankAccountId: nextBankAccount ? String(nextBankAccount.id) : "",
       sourceCurrency: nextBalance?.currency ?? form.sourceCurrency,
       targetCurrency: beneficiary.currency,
-      feeCurrency: nextBalance?.currency ?? form.feeCurrency,
+      purposeCode: purposeOptionsForProvider(provider?.code)[0]?.code ?? "",
     });
     setFormError("");
     setStep("details");
   };
 
-  const updateSourceCurrency = (currency: string) => {
-    setForm({ ...form, sourceCurrency: currency, feeCurrency: currency });
-  };
+  const updateSourceCurrency = (currency: string) => setForm({ ...form, sourceCurrency: currency });
 
   const validateDetails = () => {
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
     if (!selectedProvider) return "Transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
-    if (effectiveSourceAmount <= 0) return "Enter a sending amount, or enter receiving amount together with an FX rate.";
+    const corridorValidation = validateTransferConfiguration({
+      provider: selectedProvider,
+      beneficiary: selectedBeneficiary,
+      sourceCurrency: form.sourceCurrency,
+      targetCurrency: form.targetCurrency,
+      purposeCode: form.purposeCode,
+    });
+    if (corridorValidation) return corridorValidation;
+    if (effectiveSourceAmount <= 0) return "Enter a sending amount.";
     if (!selectedBalance) return "No synced wallet balance is available for the selected source currency.";
     if (toNumber(selectedBalance.available_balance) < effectiveSourceAmount) return "Available balance is not enough for this payment.";
     if (!form.purposeCode) return "Select a payment purpose.";
-    if (form.scheduled && !form.scheduledDate) return "Select a scheduled payment date.";
     return "";
   };
 
@@ -291,32 +262,24 @@ const AccountTransfers = () => {
       return createTransfer({
         userId: user?.id as string,
         token: token as string,
-        payload: {
-          provider_id: Number(form.providerId),
-          source_bank_account_id: form.sourceBankAccountId ? Number(form.sourceBankAccountId) : null,
-          beneficiary_id: Number(form.beneficiaryId),
-          transfer_type: form.transferType,
-          source_currency: form.sourceCurrency,
-          target_currency: form.targetCurrency,
-          source_amount: effectiveSourceAmount,
-          target_amount: effectiveTargetAmount > 0 ? effectiveTargetAmount : null,
-          fx_rate: form.fxRate ? Number(form.fxRate) : null,
-          fee_amount: form.feeAmount ? Number(form.feeAmount) : 0,
-          fee_currency: form.feeCurrency,
-          purpose_code: form.purposeCode,
-          reference_text: form.referenceText.trim() || null,
-          client_reference: `OW-${Date.now()}`,
-          raw_data: {
-            source: "origin_wallet_web",
-            flow: "customer_single_payment",
-            provider_code: selectedProvider?.code ?? null,
-            beneficiary_name: selectedBeneficiary?.full_name ?? null,
-            invoice_file_name: form.invoiceFileName || null,
-            notify_recipient: form.notifyRecipient,
-            scheduled_payment: form.scheduled,
-            scheduled_date: form.scheduled ? form.scheduledDate : null,
-          },
-        },
+        payload: buildTransferPayload({
+          providerId: form.providerId,
+          sourceBankAccountId: "",
+          beneficiaryId: form.beneficiaryId,
+          transferType: form.transferType,
+          sourceCurrency: form.sourceCurrency,
+          targetCurrency: form.targetCurrency,
+          sourceAmount: effectiveSourceAmount,
+          targetAmount: 0,
+          fxRate: "",
+          feeAmount: "0",
+          feeCurrency: "USD",
+          purposeCode: form.purposeCode,
+          referenceText: form.referenceText,
+          clientReference: createClientReference(),
+          providerCode: selectedProvider?.code ?? "",
+          beneficiaryName: selectedBeneficiary?.full_name ?? "",
+        }),
       });
     },
     onSuccess: async (transfer) => {
@@ -461,12 +424,9 @@ const AccountTransfers = () => {
                     form={form}
                     selectedProvider={selectedProvider}
                     selectedBeneficiary={selectedBeneficiary}
-                    selectedSourceAccount={selectedSourceAccount}
                     selectedBalance={selectedBalance}
                     sourceCurrencies={sourceCurrencies}
-                    providerBankAccounts={providerBankAccounts}
                     effectiveSourceAmount={effectiveSourceAmount}
-                    effectiveTargetAmount={effectiveTargetAmount}
                     onBack={() => setStep("payee")}
                     onContinue={continueToReview}
                     onChange={setForm}
@@ -479,10 +439,8 @@ const AccountTransfers = () => {
                     form={form}
                     provider={selectedProvider}
                     beneficiary={selectedBeneficiary}
-                    sourceAccount={selectedSourceAccount}
                     balance={selectedBalance}
                     effectiveSourceAmount={effectiveSourceAmount}
-                    effectiveTargetAmount={effectiveTargetAmount}
                     purposeLabel={selectedPurpose?.label ?? form.purposeCode}
                     creating={createMutation.isPending}
                     onBack={() => setStep("details")}
@@ -511,10 +469,8 @@ const AccountTransfers = () => {
             <PaymentSummary
               provider={selectedProvider}
               beneficiary={selectedBeneficiary}
-              sourceAccount={selectedSourceAccount}
               balance={selectedBalance}
               sourceAmount={effectiveSourceAmount}
-              targetAmount={effectiveTargetAmount}
               form={form}
             />
 
@@ -646,7 +602,7 @@ const PayeeStep = ({
             {loading ? "Loading beneficiaries..." : "No usable beneficiary found"}
           </p>
           <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-            Add and verify a beneficiary before creating live payouts.
+            Only active Nium HK beneficiaries receiving USD by SWIFT are currently available for transfers.
           </p>
           <Button asChild className="mt-5 h-11 rounded-full bg-[#16a34a] px-6 text-white hover:bg-[#15803d]">
             <Link to="/account/beneficiaries">Add beneficiary</Link>
@@ -661,12 +617,9 @@ const DetailsStep = ({
   form,
   selectedProvider,
   selectedBeneficiary,
-  selectedSourceAccount,
   selectedBalance,
   sourceCurrencies,
-  providerBankAccounts,
   effectiveSourceAmount,
-  effectiveTargetAmount,
   onBack,
   onContinue,
   onChange,
@@ -675,24 +628,24 @@ const DetailsStep = ({
   form: TransferForm;
   selectedProvider: ProviderSummary | null;
   selectedBeneficiary: Beneficiary | null;
-  selectedSourceAccount: BankAccount | null;
   selectedBalance?: Balance;
   sourceCurrencies: string[];
-  providerBankAccounts: BankAccount[];
   effectiveSourceAmount: number;
-  effectiveTargetAmount: number;
   onBack: () => void;
   onContinue: () => void;
   onChange: (form: TransferForm) => void;
   onSourceCurrencyChange: (currency: string) => void;
-}) => (
+}) => {
+  const providerPurposeOptions = purposeOptionsForProvider(selectedProvider?.code);
+
+  return (
   <div className="mx-auto max-w-3xl space-y-6">
     <div className="text-center">
       <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#0f2442] sm:text-3xl dark:text-white">
         Complete payment details
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Enter either the sending amount or receiving amount. FX rate is required when the receiving amount drives the payment.
+        Enter the USD transfer amount. The final credited amount is determined during processing.
       </p>
     </div>
 
@@ -708,64 +661,20 @@ const DetailsStep = ({
       </div>
 
       <div className="mt-5 space-y-5">
-        <FormSelect
-          label="Funding source"
-          value={form.sourceBankAccountId || "none"}
-          selectedLabel={
-            selectedSourceAccount
-              ? sourceAccountLabel(selectedSourceAccount)
-              : "Use wallet balance"
-          }
-          onChange={(value) => onChange({ ...form, sourceBankAccountId: value === "none" ? "" : value })}
-        >
-          <SelectItem value="none">Use wallet balance</SelectItem>
-          {providerBankAccounts.map((account) => (
-            <SelectItem key={account.id} value={String(account.id)}>
-              {sourceAccountLabel(account)}
-            </SelectItem>
-          ))}
-        </FormSelect>
-
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="max-w-md">
           <AmountField
-            label="You send exactly"
+            label="Transfer amount"
             value={form.sourceAmount}
             currency={form.sourceCurrency}
             currencies={sourceCurrencies}
             onAmountChange={(value) => onChange({ ...form, sourceAmount: value })}
             onCurrencyChange={onSourceCurrencyChange}
           />
-          <AmountField
-            label="Recipient receives"
-            value={form.targetAmount}
-            currency={form.targetCurrency}
-            currencies={currencyOptions}
-            onAmountChange={(value) => onChange({ ...form, targetAmount: value })}
-            onCurrencyChange={(value) => onChange({ ...form, targetCurrency: value })}
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <FormInput label="FX rate" value={form.fxRate} inputMode="decimal" onChange={(value) => onChange({ ...form, fxRate: value })} />
-          <FormInput label="Total fee" value={form.feeAmount} inputMode="decimal" onChange={(value) => onChange({ ...form, feeAmount: value })} />
-          <FormSelect
-            label="Fee currency"
-            value={form.feeCurrency}
-            selectedLabel={<span translate="no">{form.feeCurrency}</span>}
-            onChange={(value) => onChange({ ...form, feeCurrency: value })}
-          >
-            {currencyOptions.map((currency) => (
-              <CurrencySelectItem key={currency} value={currency} />
-            ))}
-          </FormSelect>
         </div>
 
         <div className="rounded-2xl border border-[#e1e7f0] bg-[#f3fdf9] px-4 py-3 text-sm text-[#62708a] dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
-          Estimated send:{" "}
-          <strong className="text-[#0f2442] dark:text-white">{formatAmount(effectiveSourceAmount || form.sourceAmount, form.sourceCurrency)}</strong>
-          <span className="px-2">→</span>
-          estimated receive:{" "}
-          <strong className="text-[#0f2442] dark:text-white">{formatAmount(effectiveTargetAmount || form.targetAmount, form.targetCurrency)}</strong>
+          Estimated recipient amount: <strong className="text-[#0f2442] dark:text-white">Determined during processing</strong>
+          <span className="ml-2">Provider and intermediary bank fees may apply (SHA).</span>
         </div>
       </div>
     </div>
@@ -775,10 +684,10 @@ const DetailsStep = ({
         <FormSelect
           label="Payment purpose"
           value={form.purposeCode}
-          selectedLabel={purposeOptions.find((purpose) => purpose.code === form.purposeCode)?.label}
+          selectedLabel={providerPurposeOptions.find((purpose) => purpose.code === form.purposeCode)?.label}
           onChange={(value) => onChange({ ...form, purposeCode: value })}
         >
-          {purposeOptions.map((purpose) => (
+          {providerPurposeOptions.map((purpose) => (
             <SelectItem key={purpose.code} value={purpose.code}>
               {purpose.label}
             </SelectItem>
@@ -793,49 +702,9 @@ const DetailsStep = ({
         />
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Invoice or supporting document</Label>
-          <label className="flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-[#d7d7d2] bg-white px-4 text-sm font-medium text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white">
-            <FileText className="h-4 w-4 text-[#16a34a]" />
-            <span className="truncate">{form.invoiceFileName || "Upload optional file"}</span>
-            <input
-              type="file"
-              className="hidden"
-              onChange={(event) => onChange({ ...form, invoiceFileName: event.target.files?.[0]?.name ?? "" })}
-            />
-          </label>
-          <p className="text-xs text-[#7a879c]">
-            File metadata is stored with the payment request until a dedicated document-upload endpoint is connected.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <ToggleLine
-            checked={form.notifyRecipient}
-            label="Notify recipient"
-            description={selectedBeneficiary?.email || "Use beneficiary contact details when available."}
-            onChange={(checked) => onChange({ ...form, notifyRecipient: checked })}
-          />
-          <ToggleLine
-            checked={form.scheduled}
-            label="Schedule payment"
-            description="Keep off for immediate request creation."
-            onChange={(checked) => onChange({ ...form, scheduled: checked })}
-          />
-        </div>
-      </div>
-
-      {form.scheduled ? (
-        <div className="mt-4 max-w-xs">
-          <FormInput
-            label="Scheduled date"
-            value={form.scheduledDate}
-            type="date"
-            onChange={(value) => onChange({ ...form, scheduledDate: value })}
-          />
-        </div>
-      ) : null}
+      <p className="mt-4 text-xs text-[#7a879c]">
+        Document upload, payment scheduling, and recipient notifications are unavailable for this transfer rail.
+      </p>
     </div>
 
     <WizardActions
@@ -845,16 +714,15 @@ const DetailsStep = ({
       onNext={onContinue}
     />
   </div>
-);
+  );
+};
 
 const ReviewStep = ({
   form,
   provider,
   beneficiary,
-  sourceAccount,
   balance,
   effectiveSourceAmount,
-  effectiveTargetAmount,
   purposeLabel,
   creating,
   onBack,
@@ -863,10 +731,8 @@ const ReviewStep = ({
   form: TransferForm;
   provider: ProviderSummary | null;
   beneficiary: Beneficiary | null;
-  sourceAccount: BankAccount | null;
   balance?: Balance;
   effectiveSourceAmount: number;
-  effectiveTargetAmount: number;
   purposeLabel: string;
   creating: boolean;
   onBack: () => void;
@@ -895,17 +761,14 @@ const ReviewStep = ({
     <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#10141b]">
       <SectionTitle icon={<WalletCards className="h-5 w-5" />} title="Payment" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ReviewItem label="You send" value={formatAmount(effectiveSourceAmount, form.sourceCurrency)} />
-        <ReviewItem label="Recipient receives" value={formatAmount(effectiveTargetAmount || form.targetAmount, form.targetCurrency)} />
-        <ReviewItem label="FX rate" value={form.fxRate || "-"} />
-        <ReviewItem label="Total fee" value={formatAmount(form.feeAmount || 0, form.feeCurrency)} />
-        <ReviewItem label="Funding source" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Wallet balance"} />
+        <ReviewItem label="Transfer amount" value={formatAmount(effectiveSourceAmount, form.sourceCurrency)} />
+        <ReviewItem label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code) ?? "-"} />
+        <ReviewItem label="Provider fee" value="Calculated during processing" />
+        <ReviewItem label="Fee handling" value="Provider and intermediary bank fees may apply (SHA)" />
+        <ReviewItem label="Funding source" value="Nium wallet balance" />
         <ReviewItem label="Available balance" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
         <ReviewItem label="Purpose" value={purposeLabel} />
         <ReviewItem label="Reference" value={form.referenceText || "-"} />
-        <ReviewItem label="Invoice" value={form.invoiceFileName || "-"} />
-        <ReviewItem label="Recipient notification" value={form.notifyRecipient ? "Enabled" : "Disabled"} />
-        <ReviewItem label="Schedule" value={form.scheduled ? form.scheduledDate : "Immediate request"} />
       </div>
     </div>
 
@@ -960,9 +823,15 @@ const ResultStep = ({
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <ReviewItem label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
           <ReviewItem label="Beneficiary" value={beneficiary?.full_name ?? `Beneficiary #${transfer.beneficiary_id}`} />
-          <ReviewItem label="Send" value={formatAmount(transfer.source_amount, transfer.source_currency)} />
-          <ReviewItem label="Receive" value={formatAmount(transfer.target_amount, transfer.target_currency)} />
-          <ReviewItem label="Fee" value={formatAmount(transfer.fee_amount ?? 0, transfer.fee_currency || transfer.source_currency)} />
+          <ReviewItem label="Transfer amount" value={formatAmount(transfer.source_amount, transfer.source_currency)} />
+          <ReviewItem
+            label="Estimated recipient amount"
+            value={recipientAmountPresentation(provider?.code) ?? formatAmount(transfer.target_amount, transfer.target_currency)}
+          />
+          <ReviewItem
+            label="Provider fee"
+            value={isNiumProvider(provider?.code) ? "Calculated during processing" : formatAmount(transfer.fee_amount, transfer.fee_currency)}
+          />
           <ReviewItem label="Created" value={formatDateTime(transfer.created_at)} />
         </div>
 
@@ -1003,18 +872,14 @@ const ResultStep = ({
 const PaymentSummary = ({
   provider,
   beneficiary,
-  sourceAccount,
   balance,
   sourceAmount,
-  targetAmount,
   form,
 }: {
   provider: ProviderSummary | null;
   beneficiary: Beneficiary | null;
-  sourceAccount: BankAccount | null;
   balance?: Balance;
   sourceAmount: number;
-  targetAmount: number;
   form: TransferForm;
 }) => (
   <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
@@ -1024,11 +889,12 @@ const PaymentSummary = ({
     <CardContent className="space-y-4 text-sm">
       <SummaryLine label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
       <SummaryLine label="Payee" value={beneficiary?.full_name ?? "Not selected"} />
-      <SummaryLine label="Funding" value={sourceAccount ? sourceAccountLabel(sourceAccount) : "Wallet balance"} />
+      <SummaryLine label="Funding" value={isNiumProvider(provider?.code) ? "Nium wallet balance" : "Provider funding account"} />
       <SummaryLine label="Available" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
-      <SummaryLine label="Send" value={sourceAmount > 0 ? formatAmount(sourceAmount, form.sourceCurrency) : "-"} />
-      <SummaryLine label="Receive" value={targetAmount > 0 ? formatAmount(targetAmount, form.targetCurrency) : "-"} />
-      <SummaryLine label="Fee" value={formatAmount(form.feeAmount || 0, form.feeCurrency)} />
+      <SummaryLine label="Transfer amount" value={sourceAmount > 0 ? formatAmount(sourceAmount, form.sourceCurrency) : "-"} />
+      <SummaryLine label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code) ?? "-"} />
+      <SummaryLine label="Provider fee" value="Calculated during processing" />
+      <SummaryLine label="Fee handling" value="Provider and intermediary bank fees may apply (SHA)" />
     </CardContent>
   </Card>
 );
@@ -1086,7 +952,7 @@ const TransferRow = ({
             {formatAmount(transfer.source_amount, transfer.source_currency)}
           </p>
           <p className="text-xs text-[#62708a] dark:text-gray-400">
-            Receives {formatAmount(transfer.target_amount, transfer.target_currency)}
+            {recipientAmountPresentation(provider?.code) ?? `Receives ${formatAmount(transfer.target_amount, transfer.target_currency)}`}
           </p>
         </div>
       </div>
@@ -1312,31 +1178,6 @@ const FormSelect = ({
   </div>
 );
 
-const ToggleLine = ({
-  checked,
-  label,
-  description,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  description: string;
-  onChange: (checked: boolean) => void;
-}) => (
-  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d7d7d2] bg-white px-4 py-3 dark:border-white/10 dark:bg-[#10141b]">
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={(event) => onChange(event.target.checked)}
-      className="mt-1 h-4 w-4 rounded border-[#aab6c9] text-[#16a34a]"
-    />
-    <span>
-      <span className="block font-semibold text-[#0f2442] dark:text-white">{label}</span>
-      <span className="mt-1 block text-xs text-[#62708a] dark:text-gray-400">{description}</span>
-    </span>
-  </label>
-);
-
 const WizardActions = ({
   backLabel,
   nextLabel,
@@ -1409,11 +1250,6 @@ const beneficiarySubtitle = (beneficiary: Beneficiary, provider?: ProviderSummar
   ]
     .filter(Boolean)
     .join(" · ");
-
-const sourceAccountLabel = (account: BankAccount) =>
-  `${account.account_name || account.bank_name || "Bank account"} · ${account.currency} · ${maskAccount(
-    account.account_number || account.iban || account.external_account_id,
-  )}`;
 
 const maskAccount = (value?: string | number | null) => {
   const text = String(value ?? "");
