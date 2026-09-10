@@ -80,8 +80,7 @@ export const buildTransferPayload = (values: TransferPayloadValues): TransferPay
 };
 
 const beneficiaryPayoutMethod = (beneficiary: Beneficiary | null) => {
-  const nium = (beneficiary?.raw_data?.nium ?? {}) as Record<string, unknown>;
-  return String(nium.payoutMethod ?? nium.payout_method ?? "").toUpperCase();
+  return beneficiary?.payout_method ?? "";
 };
 
 export const isNiumBeneficiaryAvailable = (beneficiary: Beneficiary) =>

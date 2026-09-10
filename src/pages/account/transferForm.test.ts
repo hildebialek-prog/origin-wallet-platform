@@ -20,8 +20,8 @@ const beneficiary: Beneficiary = {
   full_name: "HK MACHINING LIMITED",
   country_code: "HK",
   currency: "USD",
+  payout_method: "SWIFT",
   status: "active",
-  raw_data: { nium: { payoutMethod: "SWIFT" } },
 };
 
 const values = (overrides = {}) => ({
@@ -108,6 +108,32 @@ describe("provider-aware transfer contract", () => {
       targetCurrency: "USD",
       purposeCode: "IR01811",
     })).toContain("must be active");
+  });
+
+  it("accepts only provider-verified top-level SWIFT beneficiary evidence", () => {
+    expect(validateTransferConfiguration({
+      provider: niumProvider,
+      beneficiary,
+      sourceCurrency: "USD",
+      targetCurrency: "USD",
+      purposeCode: "IR01811",
+    })).toBe("");
+
+    for (const unverifiedBeneficiary of [
+      { ...beneficiary, payout_method: undefined, raw_data: { nium: { payoutMethod: "SWIFT" } } },
+      { ...beneficiary, payout_method: null },
+      { ...beneficiary, payout_method: "LOCAL" },
+      { ...beneficiary, payout_method: "swift" },
+      { ...beneficiary, payout_method: " SWIFT " },
+    ]) {
+      expect(validateTransferConfiguration({
+        provider: niumProvider,
+        beneficiary: unverifiedBeneficiary,
+        sourceCurrency: "USD",
+        targetCurrency: "USD",
+        purposeCode: "IR01811",
+      })).toContain("payout method must be SWIFT");
+    }
   });
 
   it("blocks providers without transfer capability", () => {

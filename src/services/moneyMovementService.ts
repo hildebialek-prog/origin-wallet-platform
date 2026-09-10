@@ -50,6 +50,7 @@ export interface Beneficiary {
   phone?: string | null;
   country_code: string;
   currency: string;
+  payout_method?: string | null;
   bank_name?: string | null;
   bank_code?: string | null;
   branch_code?: string | null;
