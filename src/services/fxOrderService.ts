@@ -9,6 +9,7 @@ export interface ProviderSummary {
   status: string;
   is_available_for_onboarding?: boolean;
   supports_beneficiaries?: boolean;
+  supports_account_verification?: boolean;
   supports_data_sync?: boolean;
   supports_quotes?: boolean;
   supports_transfers?: boolean;

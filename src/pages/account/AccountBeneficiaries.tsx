@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +9,6 @@ import {
   Banknote,
   Building2,
   CheckCircle2,
-  FileText,
   Landmark,
   Loader2,
   Mail,
@@ -50,7 +50,7 @@ import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProv
 
 type BeneficiaryStep = "basic" | "accountType" | "bank" | "review";
 
-type BeneficiaryForm = {
+export type BeneficiaryForm = {
   providerId: string;
   beneficiaryType: string;
   fullName: string;
@@ -80,16 +80,16 @@ type BeneficiaryForm = {
   accountRoute: "bank" | "provider";
 };
 
-const emptyForm: BeneficiaryForm = {
+export const emptyForm: BeneficiaryForm = {
   providerId: "",
   beneficiaryType: "business",
   fullName: "",
   companyName: "",
   email: "",
-  phoneCountryCode: "+84",
+  phoneCountryCode: "+852",
   phone: "",
-  countryCode: "VN",
-  currency: "VND",
+  countryCode: "HK",
+  currency: "USD",
   bankName: "",
   bankCode: "",
   branchCode: "",
@@ -102,7 +102,7 @@ const emptyForm: BeneficiaryForm = {
   city: "",
   state: "",
   postalCode: "",
-  payoutMethod: "LOCAL",
+  payoutMethod: "SWIFT",
   bankAccountType: "CURRENT",
   verifyBeforeCreate: "false",
   vendorType: "supplier",
@@ -119,7 +119,7 @@ const beneficiarySteps: { key: BeneficiaryStep; label: string }[] = [
 
 const toRawData = (beneficiary?: Beneficiary | null) => (beneficiary?.raw_data ?? {}) as Record<string, unknown>;
 
-const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
+export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
   if (!beneficiary) return emptyForm;
 
   const rawData = toRawData(beneficiary);
@@ -132,10 +132,10 @@ const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
     fullName: beneficiary.full_name || "",
     companyName: beneficiary.company_name || "",
     email: beneficiary.email || "",
-    phoneCountryCode: String(nium.beneficiaryContactCountryCode ?? origin.phone_country_code ?? "+84"),
+    phoneCountryCode: String(nium.beneficiaryContactCountryCode ?? origin.phone_country_code ?? "+852"),
     phone: beneficiary.phone || "",
-    countryCode: beneficiary.country_code || "VN",
-    currency: beneficiary.currency || "VND",
+    countryCode: beneficiary.country_code || "HK",
+    currency: beneficiary.currency || "USD",
     bankName: beneficiary.bank_name || "",
     bankCode: beneficiary.bank_code || "",
     branchCode: beneficiary.branch_code || "",
@@ -148,7 +148,7 @@ const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
     city: beneficiary.city || "",
     state: beneficiary.state || "",
     postalCode: beneficiary.postal_code || "",
-    payoutMethod: String(nium.payoutMethod ?? "LOCAL"),
+    payoutMethod: String(nium.payoutMethod ?? "SWIFT"),
     bankAccountType: String(nium.bankAccountType ?? "CURRENT"),
     verifyBeforeCreate: String(Boolean(nium.verify_before_create ?? false)),
     vendorType: String(origin.vendor_type ?? nium.remitterBeneficiaryRelationship ?? "supplier"),
@@ -157,8 +157,9 @@ const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
   };
 };
 
-const buildPayload = (form: BeneficiaryForm): BeneficiaryPayload => {
+export const buildPayload = (form: BeneficiaryForm, supportsAccountVerification = false): BeneficiaryPayload => {
   const accountNumber = form.accountNumber.trim();
+  const phone = form.phone.trim();
 
   return {
     provider_id: Number(form.providerId),
@@ -166,7 +167,7 @@ const buildPayload = (form: BeneficiaryForm): BeneficiaryPayload => {
     full_name: form.fullName.trim(),
     company_name: form.beneficiaryType === "business" ? form.companyName.trim() || form.fullName.trim() : null,
     email: form.email.trim() || null,
-    phone: form.phone.trim() || null,
+    phone: phone || null,
     country_code: form.countryCode,
     currency: form.currency,
     bank_name: form.bankName.trim() || null,
@@ -184,16 +185,14 @@ const buildPayload = (form: BeneficiaryForm): BeneficiaryPayload => {
       origin: {
         account_route: form.accountRoute,
         vendor_type: form.vendorType,
-        phone_country_code: form.phoneCountryCode,
-        transaction_document_name: form.transactionDocumentName || null,
+        ...(phone ? { phone_country_code: form.phoneCountryCode } : {}),
       },
       nium: {
         payoutMethod: form.payoutMethod,
         bankAccountType: form.bankAccountType,
-        beneficiaryContactCountryCode: form.phoneCountryCode,
-        beneficiaryBankAccountType: bankAccountTypeLabels[form.bankAccountType] ?? form.bankAccountType,
-        remitterBeneficiaryRelationship: vendorRelationshipLabels[form.vendorType] ?? form.vendorType,
-        verify_before_create: form.verifyBeforeCreate === "true",
+        ...(phone ? { beneficiaryContactCountryCode: form.phoneCountryCode } : {}),
+        remitterBeneficiaryRelationship: form.vendorType,
+        ...(supportsAccountVerification ? { verify_before_create: form.verifyBeforeCreate === "true" } : {}),
       },
     },
   };
@@ -249,21 +248,34 @@ const phoneCountryOptions = [
   { code: "+1", label: "US/CA +1" },
 ];
 
-const countryCurrencyDefaults: Record<string, string> = {
-  AU: "AUD",
-  CA: "CAD",
-  CN: "CNY",
-  GB: "GBP",
-  HK: "HKD",
-  ID: "IDR",
-  JP: "JPY",
-  KR: "KRW",
-  MY: "MYR",
-  PH: "PHP",
-  SG: "SGD",
-  TH: "THB",
-  US: "USD",
-  VN: "VND",
+export const payoutMethodsFor = (countryCode: string, currency: string) =>
+  countryCode === "HK" && currency === "USD" ? ["SWIFT"] : ["LOCAL", "SWIFT"];
+
+export const applyCountryChange = (form: BeneficiaryForm, countryCode: string): BeneficiaryForm => ({
+  ...form,
+  countryCode,
+  payoutMethod: countryCode === "HK" && form.currency === "USD" ? "SWIFT" : form.payoutMethod,
+});
+
+export const validateBankForm = (form: BeneficiaryForm) => {
+  if (form.accountRoute !== "bank") return "Wallet account recipients will be enabled after account-recipient APIs are confirmed.";
+  if (!form.currency) return "Currency is required.";
+  if (!payoutMethodsFor(form.countryCode, form.currency).includes(form.payoutMethod)) {
+    return `${form.countryCode}/${form.currency} requires a supported payout method.`;
+  }
+  if (!form.bankName.trim()) return "Bank name is required.";
+  if (!form.accountNumber.trim() && !form.iban.trim()) return "Enter either account number or IBAN before saving the beneficiary.";
+  if (form.accountNumber.trim() && !form.confirmAccountNumber.trim()) return "Confirm the account number before saving the beneficiary.";
+  if (form.accountNumber.trim() && form.accountNumber.trim() !== form.confirmAccountNumber.trim()) {
+    return "Account number and confirmation do not match.";
+  }
+  if (form.payoutMethod === "SWIFT" && !form.swiftBic.trim()) return "SWIFT / BIC is required for SWIFT payouts.";
+  if (form.countryCode === "HK" && form.currency === "USD" && form.payoutMethod === "SWIFT") {
+    if (!form.addressLine1.trim()) return "Address line 1 is required for HK/USD SWIFT payouts.";
+    if (!form.city.trim()) return "City is required for HK/USD SWIFT payouts.";
+    if (!form.postalCode.trim()) return "Postcode is required for HK/USD SWIFT payouts.";
+  }
+  return "";
 };
 
 const AccountBeneficiaries = () => {
@@ -336,19 +348,7 @@ const AccountBeneficiaries = () => {
     return "";
   };
 
-  const validateBank = () => {
-    if (form.accountRoute !== "bank") {
-      return "Wallet account recipients will be enabled after account-recipient APIs are confirmed.";
-    }
-
-    if (!form.currency) return "Currency is required.";
-    if (!form.bankName.trim()) return "Bank name is required.";
-    if (!form.accountNumber.trim() && !form.iban.trim()) return "Enter either account number or IBAN before saving the beneficiary.";
-    if (form.accountNumber.trim() && form.confirmAccountNumber.trim() && form.accountNumber.trim() !== form.confirmAccountNumber.trim()) {
-      return "Account number and confirmation do not match.";
-    }
-    return "";
-  };
+  const validateBank = () => validateBankForm(form);
 
   const goNext = () => {
     const validation =
@@ -383,7 +383,7 @@ const AccountBeneficiaries = () => {
       const bankValidation = validateBank();
       if (bankValidation) throw new Error(bankValidation);
 
-      const payload = buildPayload(form);
+      const payload = buildPayload(form, selectedProvider?.supports_account_verification === true);
 
       if (editing) {
         return updateBeneficiary({
@@ -442,13 +442,7 @@ const AccountBeneficiaries = () => {
     setDialogOpen(true);
   };
 
-  const handleCountryChange = (countryCode: string) => {
-    setForm({
-      ...form,
-      countryCode,
-      currency: countryCurrencyDefaults[countryCode] ?? form.currency,
-    });
-  };
+  const handleCountryChange = (countryCode: string) => setForm(applyCountryChange(form, countryCode));
 
   return (
     <div className="bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
@@ -648,6 +642,7 @@ const AccountBeneficiaries = () => {
                   onBack={goBack}
                   onChange={setForm}
                   onContinue={goNext}
+                  supportsAccountVerification={selectedProvider?.supports_account_verification === true}
                 />
               )}
 
@@ -799,17 +794,8 @@ const BasicVendorStep = ({
           Transaction information <span className="font-normal text-[#62708a]">(Optional)</span>
         </h3>
         <p className="mt-2 text-sm leading-6 text-[#62708a] dark:text-gray-400">
-          Upload a contract, invoice, or logistics document that reflects your trade relationship with the recipient.
+          Document upload is not available yet. No file or local filename will be sent with this beneficiary.
         </p>
-        <label className="mt-4 inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-[#d7d7d2] bg-white px-5 text-sm font-semibold text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white">
-          <FileText className="h-4 w-4 text-[#16a34a]" />
-          <span className="max-w-[260px] truncate">{form.transactionDocumentName || "Upload file"}</span>
-          <input
-            type="file"
-            className="hidden"
-            onChange={(event) => onChange({ ...form, transactionDocumentName: event.target.files?.[0]?.name ?? "" })}
-          />
-        </label>
       </div>
     </div>
 
@@ -903,6 +889,7 @@ const BankAccountStep = ({
   onBack,
   onChange,
   onContinue,
+  supportsAccountVerification,
 }: {
   form: BeneficiaryForm;
   selectedCountry?: { code: string; name: string };
@@ -910,6 +897,7 @@ const BankAccountStep = ({
   onBack: () => void;
   onChange: (form: BeneficiaryForm) => void;
   onContinue: () => void;
+  supportsAccountVerification: boolean;
 }) => (
   <div className="space-y-7">
     <BackButton onClick={onBack} />
@@ -953,7 +941,13 @@ const BankAccountStep = ({
         label="Currency"
         value={form.currency}
         selectedLabel={<span translate="no">{form.currency}</span>}
-        onChange={(value) => onChange({ ...form, currency: value })}
+        onChange={(value) =>
+          onChange({
+            ...form,
+            currency: value,
+            payoutMethod: form.countryCode === "HK" && value === "USD" ? "SWIFT" : form.payoutMethod,
+          })
+        }
       >
         {currencyOptions.map((currency) => (
           <CurrencySelectItem key={currency} value={currency} />
@@ -1002,21 +996,22 @@ const BankAccountStep = ({
           selectedLabel={payoutMethodLabels[form.payoutMethod]}
           onChange={(value) => onChange({ ...form, payoutMethod: value })}
         >
-          <SelectItem value="LOCAL">Local bank transfer</SelectItem>
-          <SelectItem value="SWIFT">SWIFT</SelectItem>
-          <SelectItem value="CARD">Card payout</SelectItem>
-          <SelectItem value="PROXY">Proxy / wallet</SelectItem>
+          {payoutMethodsFor(form.countryCode, form.currency).map((method) => (
+            <SelectItem key={method} value={method}>{payoutMethodLabels[method]}</SelectItem>
+          ))}
         </FormSelect>
 
-        <FormSelect
-          label="Verify before create"
-          value={form.verifyBeforeCreate}
-          selectedLabel={verifyLabels[form.verifyBeforeCreate]}
-          onChange={(value) => onChange({ ...form, verifyBeforeCreate: value })}
-        >
-          <SelectItem value="false">No</SelectItem>
-          <SelectItem value="true">Yes</SelectItem>
-        </FormSelect>
+        {supportsAccountVerification ? (
+          <FormSelect
+            label="Verify before create"
+            value={form.verifyBeforeCreate}
+            selectedLabel={verifyLabels[form.verifyBeforeCreate]}
+            onChange={(value) => onChange({ ...form, verifyBeforeCreate: value })}
+          >
+            <SelectItem value="false">No</SelectItem>
+            <SelectItem value="true">Yes</SelectItem>
+          </FormSelect>
+        ) : null}
       </div>
     </div>
 
@@ -1063,7 +1058,6 @@ const ReviewBeneficiaryStep = ({
         <ReviewItem label="Phone" value={form.phone ? `${form.phoneCountryCode}${form.phone}` : "-"} />
         <ReviewItem label="Country" value={country ? `${country.code} - ${country.name}` : form.countryCode} />
         <ReviewItem label="Address" value={fullAddress(form) || "-"} />
-        <ReviewItem label="Document" value={form.transactionDocumentName || "-"} />
       </div>
     </div>
 
@@ -1079,7 +1073,9 @@ const ReviewBeneficiaryStep = ({
         <ReviewItem label={routingLabel(form.countryCode)} value={form.bankCode || "-"} />
         <ReviewItem label="Account / IBAN" value={maskAccount(form.accountNumber || form.iban)} />
         <ReviewItem label="Payout method" value={payoutMethodLabels[form.payoutMethod]} />
-        <ReviewItem label="Verify before create" value={verifyLabels[form.verifyBeforeCreate]} />
+        {provider?.supports_account_verification ? (
+          <ReviewItem label="Verify before create" value={verifyLabels[form.verifyBeforeCreate]} />
+        ) : null}
       </div>
     </div>
 
