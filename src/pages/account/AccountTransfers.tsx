@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { getProviders, type ProviderSummary } from "@/services/fxOrderService";
+import { getNiumPurposeCodes, getProviders, type ProviderSummary, type PurposeCodeOption } from "@/services/fxOrderService";
 import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import {
   cancelTransfer,
@@ -59,9 +59,13 @@ import {
   beneficiaryTransferOption,
   createClientReference,
   isNiumProvider,
+  isTransferAmountInput,
   purposeOptionsForProvider,
+  purposeOptionsForTransferProvider,
   recipientAmountPresentation,
+  shouldFetchNiumPurposeCodes,
   validateTransferConfiguration,
+  validateTransferAmount,
 } from "./transferForm";
 
 type WizardStep = "payee" | "details" | "review" | "result";
@@ -161,8 +165,27 @@ const AccountTransfers = () => {
   const sourceCurrencies = isNiumProvider(selectedProvider?.code) ? ["USD"] : balanceCurrencies.length ? balanceCurrencies : currencyOptions;
   const selectedBalance = providerBalances.find((balance) => balance.currency === form.sourceCurrency);
   const effectiveSourceAmount = toNumber(form.sourceAmount);
-  const selectedPurpose = purposeOptionsForProvider(selectedProvider?.code).find((purpose) => purpose.code === form.purposeCode);
+  const niumPurposeCodesEnabled = !!user?.id && !!token && shouldFetchNiumPurposeCodes(selectedProvider?.code);
+  const purposeCodesQuery = useQuery({
+    queryKey: ["nium-purpose-codes", user?.id, token],
+    enabled: niumPurposeCodesEnabled,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => (await getNiumPurposeCodes({ userId: user?.id as string, token: token as string })).data,
+  });
+  const niumPurposeOptions = useMemo<PurposeCodeOption[]>(() => purposeCodesQuery.data ?? [], [purposeCodesQuery.data]);
+  const purposeOptions = useMemo(
+    () => purposeOptionsForTransferProvider(selectedProvider?.code, niumPurposeOptions),
+    [niumPurposeOptions, selectedProvider?.code],
+  );
+  const selectedPurpose = purposeOptions.find((purpose) => purpose.code === form.purposeCode);
   const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
+
+  useEffect(() => {
+    const purposeCodeIsCompatible = purposeOptions.some((purpose) => purpose.code === form.purposeCode);
+    if (!purposeCodeIsCompatible && (purposeOptions.length > 0 || form.purposeCode)) {
+      setForm((current) => ({ ...current, purposeCode: purposeOptions[0]?.code ?? "" }));
+    }
+  }, [form.purposeCode, purposeOptions, selectedProvider?.code]);
 
   const filteredBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
@@ -212,7 +235,7 @@ const AccountTransfers = () => {
       beneficiaryId: String(beneficiary.id),
       sourceCurrency: nextBalance?.currency ?? form.sourceCurrency,
       targetCurrency: beneficiary.currency,
-      purposeCode: purposeOptionsForProvider(provider?.code)[0]?.code ?? "",
+      purposeCode: isNiumProvider(provider?.code) ? "" : purposeOptionsForProvider(provider?.code)[0]?.code ?? "",
     });
     setFormError("");
     setStep("details");
@@ -224,6 +247,8 @@ const AccountTransfers = () => {
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
     if (!selectedProvider) return "Transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
+    const amountValidation = validateTransferAmount(form.sourceAmount);
+    if (amountValidation) return amountValidation;
     const corridorValidation = validateTransferConfiguration({
       provider: selectedProvider,
       beneficiary: selectedBeneficiary,
@@ -427,6 +452,9 @@ const AccountTransfers = () => {
                     onContinue={continueToReview}
                     onChange={setForm}
                     onSourceCurrencyChange={updateSourceCurrency}
+                    purposeOptions={purposeOptions}
+                    purposeCodesLoading={niumPurposeCodesEnabled && purposeCodesQuery.isLoading}
+                    purposeCodesFailed={niumPurposeCodesEnabled && purposeCodesQuery.isError}
                   />
                 )}
 
@@ -614,7 +642,7 @@ export const PayeeStep = ({
   </div>
 );
 
-const DetailsStep = ({
+export const DetailsStep = ({
   form,
   selectedProvider,
   selectedBeneficiary,
@@ -625,6 +653,9 @@ const DetailsStep = ({
   onContinue,
   onChange,
   onSourceCurrencyChange,
+  purposeOptions,
+  purposeCodesLoading,
+  purposeCodesFailed,
 }: {
   form: TransferForm;
   selectedProvider: ProviderSummary | null;
@@ -636,8 +667,11 @@ const DetailsStep = ({
   onContinue: () => void;
   onChange: (form: TransferForm) => void;
   onSourceCurrencyChange: (currency: string) => void;
+  purposeOptions: readonly PurposeCodeOption[];
+  purposeCodesLoading: boolean;
+  purposeCodesFailed: boolean;
 }) => {
-  const providerPurposeOptions = purposeOptionsForProvider(selectedProvider?.code);
+  const providerPurposeOptions = purposeOptions;
 
   return (
   <div className="mx-auto max-w-3xl space-y-6">
@@ -694,6 +728,8 @@ const DetailsStep = ({
             </SelectItem>
           ))}
         </FormSelect>
+        {purposeCodesLoading ? <p className="text-xs text-[#62708a]">Loading payment purposes...</p> : null}
+        {purposeCodesFailed ? <p className="text-xs text-red-600">Payment purposes are temporarily unavailable.</p> : null}
 
         <FormInput
           label="Payment reference"
@@ -1084,7 +1120,7 @@ const SelectedPayee = ({
   </div>
 );
 
-const AmountField = ({
+export const AmountField = ({
   label,
   value,
   currency,
@@ -1103,9 +1139,15 @@ const AmountField = ({
     <Label>{label}</Label>
     <div className="grid h-12 grid-cols-[minmax(0,1fr)_112px] overflow-hidden rounded-xl border border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]">
       <Input
+        type="text"
         value={value}
         inputMode="decimal"
-        onChange={(event) => onAmountChange(event.target.value)}
+        pattern="[0-9]+(?:\.[0-9]{1,8})?"
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(event) => {
+          if (isTransferAmountInput(event.target.value)) onAmountChange(event.target.value);
+        }}
         placeholder="Enter an amount"
         className="h-12 rounded-none border-0 bg-transparent focus-visible:ring-0"
       />

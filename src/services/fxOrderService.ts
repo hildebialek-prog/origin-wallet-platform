@@ -74,6 +74,16 @@ export interface ProviderRateResponse {
   };
 }
 
+export interface PurposeCodeOption {
+  code: string;
+  label: string;
+}
+
+export const getNiumPurposeCodes = (params: { token: string; userId: string | number }) =>
+  requestApi<{ data: PurposeCodeOption[] }>(`/user/users/${params.userId}/transfers/nium-purpose-codes`, {
+    token: params.token,
+  });
+
 export const getProviders = async () => {
   const payload = await requestApi<{ data: ProviderSummary[] }>("/providers");
 

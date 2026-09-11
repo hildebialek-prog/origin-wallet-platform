@@ -5,10 +5,14 @@ import {
   buildTransferPayload,
   beneficiaryTransferOption,
   createClientReference,
+  isTransferAmountInput,
   NIUM_HK_USD_SWIFT_CONFIG,
   recipientAmountPresentation,
+  purposeOptionsForTransferProvider,
+  shouldFetchNiumPurposeCodes,
   validateNiumTransferConfiguration,
   validateTransferConfiguration,
+  validateTransferAmount,
 } from "./transferForm";
 
 const niumProvider: ProviderSummary = { id: 7, code: "nium", name: "Nium", status: "active", supports_transfers: true };
@@ -46,6 +50,36 @@ const values = (overrides = {}) => ({
 });
 
 describe("provider-aware transfer contract", () => {
+  it("uses backend Nium purposes only for Nium and keeps provider mappings for other rails", () => {
+    const backendNiumPurposes = [{ code: "IR01811", label: "Backend-confirmed business payment" }];
+
+    expect(shouldFetchNiumPurposeCodes("nium")).toBe(true);
+    expect(shouldFetchNiumPurposeCodes("airwallex")).toBe(false);
+    expect(purposeOptionsForTransferProvider("nium", backendNiumPurposes)).toEqual(backendNiumPurposes);
+    expect(purposeOptionsForTransferProvider("airwallex", backendNiumPurposes)).toEqual([]);
+  });
+
+  it("does not reuse a Nium purpose for another provider", () => {
+    const options = purposeOptionsForTransferProvider("airwallex", [{ code: "IR01811", label: "Nium purpose" }]);
+    expect(options.some((purpose) => purpose.code === "IR01811")).toBe(false);
+  });
+
+  it("accepts valid positive monetary amounts and rejects malformed values", () => {
+    expect(validateTransferAmount("1250.50")).toBe("");
+    for (const value of ["", "aaaa", "12abc", "NaN", "Infinity", "0", "-1", "1.123456789", "1."]) {
+      expect(validateTransferAmount(value)).toContain("valid positive amount");
+    }
+  });
+
+  it("allows decimal editing but rejects alphabetic, exponent, and over-scale input", () => {
+    for (const value of ["", "0", "1250", "1250.", "1250.12345678"]) {
+      expect(isTransferAmountInput(value)).toBe(true);
+    }
+    for (const value of ["abc", "12abc", "1e3", "1.123456789", "1.2.3", "-1"]) {
+      expect(isTransferAmountInput(value)).toBe(false);
+      expect(validateTransferAmount(value)).toContain("valid positive amount");
+    }
+  });
   it("builds the exact Nium HK/USD/SWIFT API payload", () => {
     expect(buildTransferPayload(values())).toEqual({
       provider_id: 7,

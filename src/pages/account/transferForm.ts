@@ -1,5 +1,5 @@
 import type { Beneficiary, TransferPayload } from "@/services/moneyMovementService";
-import type { ProviderSummary } from "@/services/fxOrderService";
+import type { ProviderSummary, PurposeCodeOption } from "@/services/fxOrderService";
 import { normalizeStatus } from "@/lib/status";
 
 export const NIUM_HK_USD_SWIFT_CONFIG = {
@@ -38,7 +38,28 @@ export const isNiumProvider = (providerCode?: string | null) =>
 export const purposeOptionsForProvider = (providerCode?: string | null) =>
   isNiumProvider(providerCode) ? NIUM_HK_USD_SWIFT_CONFIG.purposes : [];
 
+export const shouldFetchNiumPurposeCodes = (providerCode?: string | null) => isNiumProvider(providerCode);
+
+export const purposeOptionsForTransferProvider = (
+  providerCode: string | null | undefined,
+  niumPurposeOptions: PurposeCodeOption[],
+): readonly PurposeCodeOption[] =>
+  isNiumProvider(providerCode) ? niumPurposeOptions : purposeOptionsForProvider(providerCode);
+
 export const createClientReference = () => `OW-${crypto.randomUUID()}`;
+
+export const validateTransferAmount = (value: string, maximumFractionDigits = 8) => {
+  const normalized = value.trim();
+  const pattern = new RegExp(`^\\d+(?:\\.\\d{1,${maximumFractionDigits}})?$`);
+  if (!pattern.test(normalized) || !Number.isFinite(Number(normalized)) || Number(normalized) <= 0) {
+    return "Enter a valid positive amount with no more than 8 decimal places.";
+  }
+
+  return "";
+};
+
+export const isTransferAmountInput = (value: string, maximumFractionDigits = 8) =>
+  new RegExp(`^\\d*(?:\\.\\d{0,${maximumFractionDigits}})?$`).test(value);
 
 export const recipientAmountPresentation = (providerCode?: string | null) =>
   isNiumProvider(providerCode) ? "Determined during processing" : null;
