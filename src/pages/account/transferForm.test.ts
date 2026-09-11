@@ -51,12 +51,39 @@ const values = (overrides = {}) => ({
 
 describe("provider-aware transfer contract", () => {
   it("uses backend Nium purposes only for Nium and keeps provider mappings for other rails", () => {
-    const backendNiumPurposes = [{ code: "IR01811", label: "Backend-confirmed business payment" }];
+    const backendNiumPurposes = [
+      { code: "IR004", label: "Medical Treatment" },
+      { code: "IR01811", label: "General Goods Trades - Offline trade" },
+    ];
 
     expect(shouldFetchNiumPurposeCodes("nium")).toBe(true);
     expect(shouldFetchNiumPurposeCodes("airwallex")).toBe(false);
     expect(purposeOptionsForTransferProvider("nium", backendNiumPurposes)).toEqual(backendNiumPurposes);
     expect(purposeOptionsForTransferProvider("airwallex", backendNiumPurposes)).toEqual([]);
+  });
+
+  it("accepts the explicitly selected backend Nium code and preserves it in the payload", () => {
+    const purposeOptions = [
+      { code: "IR004", label: "Medical Treatment" },
+      { code: "IR01811", label: "General Goods Trades - Offline trade" },
+    ];
+    expect(validateNiumTransferConfiguration({
+      provider: niumProvider,
+      beneficiary,
+      sourceCurrency: "USD",
+      targetCurrency: "USD",
+      purposeCode: "IR004",
+      purposeOptions,
+    })).toBe("");
+    expect(buildTransferPayload(values({ purposeCode: "IR004" })).purpose_code).toBe("IR004");
+    expect(validateNiumTransferConfiguration({
+      provider: niumProvider,
+      beneficiary,
+      sourceCurrency: "USD",
+      targetCurrency: "USD",
+      purposeCode: "STALE_CODE",
+      purposeOptions,
+    })).toBe("Select a supported Nium payment purpose.");
   });
 
   it("does not reuse a Nium purpose for another provider", () => {

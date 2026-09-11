@@ -110,12 +110,13 @@ export const isNiumBeneficiaryAvailable = (beneficiary: Beneficiary) =>
   beneficiary.currency === NIUM_HK_USD_SWIFT_CONFIG.destinationCurrency &&
   beneficiaryPayoutMethod(beneficiary) === NIUM_HK_USD_SWIFT_CONFIG.payoutMethod;
 
-export const validateNiumTransferConfiguration = ({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode }: {
+export const validateNiumTransferConfiguration = ({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode, purposeOptions }: {
   provider: ProviderSummary;
   beneficiary: Beneficiary;
   sourceCurrency: string;
   targetCurrency: string;
   purposeCode: string;
+  purposeOptions?: readonly PurposeCodeOption[];
 }) => {
   if (!isNiumProvider(provider.code)) return "";
   const config = NIUM_HK_USD_SWIFT_CONFIG;
@@ -124,25 +125,27 @@ export const validateNiumTransferConfiguration = ({ provider, beneficiary, sourc
     return "This Nium beneficiary corridor is not currently available. Select an active HK beneficiary receiving USD.";
   }
   if (beneficiaryPayoutMethod(beneficiary) !== config.payoutMethod) return "The Nium beneficiary payout method must be SWIFT.";
-  if (!config.purposes.some((purpose) => purpose.code === purposeCode)) return "Select a supported Nium payment purpose.";
+  const supportedPurposes = purposeOptions ?? config.purposes;
+  if (!purposeCode || !supportedPurposes.some((purpose) => purpose.code === purposeCode)) return "Select a supported Nium payment purpose.";
   return "";
 };
 
 // These checks improve UX only. The API remains authoritative for authenticated ownership,
 // provider/beneficiary association, active/clear/reconciled provider accounts, fees, corridor,
 // currency, amount and purpose/source-of-funds/SWIFT-fee allowlists, idempotency, and submission.
-export const validateTransferConfiguration = ({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode }: {
+export const validateTransferConfiguration = ({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode, purposeOptions }: {
   provider: ProviderSummary | null;
   beneficiary: Beneficiary | null;
   sourceCurrency: string;
   targetCurrency: string;
   purposeCode: string;
+  purposeOptions?: readonly PurposeCodeOption[];
 }) => {
   if (!provider?.supports_transfers) return "The selected provider does not support transfers.";
   if (!beneficiary || normalizeStatus(beneficiary.status) !== "active") return "The selected beneficiary must be active.";
   if (beneficiary.provider_id !== provider.id) return "The selected beneficiary is not associated with this provider.";
   if (!isNiumProvider(provider.code)) return "This provider transfer rail is not currently available.";
-  return validateNiumTransferConfiguration({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode });
+  return validateNiumTransferConfiguration({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode, purposeOptions });
 };
 
 export const beneficiaryTransferOption = (beneficiary: Beneficiary, provider?: ProviderSummary) => {

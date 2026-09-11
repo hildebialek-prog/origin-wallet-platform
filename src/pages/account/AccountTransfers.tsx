@@ -257,6 +257,7 @@ const AccountTransfers = () => {
       sourceCurrency: form.sourceCurrency,
       targetCurrency: form.targetCurrency,
       purposeCode: form.purposeCode,
+      purposeOptions,
     });
     if (corridorValidation) return corridorValidation;
     if (effectiveSourceAmount <= 0) return "Enter a sending amount.";
@@ -457,6 +458,10 @@ const AccountTransfers = () => {
                     purposeOptions={purposeOptions}
                     purposeCodesLoading={niumPurposeCodesEnabled && purposeCodesQuery.isLoading}
                     purposeCodesFailed={niumPurposeCodesEnabled && purposeCodesQuery.isError}
+                    onPurposeChange={(purposeCode) => {
+                      setForm((current) => ({ ...current, purposeCode }));
+                      if (purposeOptions.some((purpose) => purpose.code === purposeCode)) setFormError("");
+                    }}
                   />
                 )}
 
@@ -658,6 +663,7 @@ export const DetailsStep = ({
   purposeOptions,
   purposeCodesLoading,
   purposeCodesFailed,
+  onPurposeChange,
 }: {
   form: TransferForm;
   selectedProvider: ProviderSummary | null;
@@ -672,6 +678,7 @@ export const DetailsStep = ({
   purposeOptions: readonly PurposeCodeOption[];
   purposeCodesLoading: boolean;
   purposeCodesFailed: boolean;
+  onPurposeChange: (purposeCode: string) => void;
 }) => {
   const providerPurposeOptions = purposeOptions;
 
@@ -722,7 +729,7 @@ export const DetailsStep = ({
           label="Payment purpose"
           value={form.purposeCode}
           selectedLabel={providerPurposeOptions.find((purpose) => purpose.code === form.purposeCode)?.label}
-          onChange={(value) => onChange({ ...form, purposeCode: value })}
+          onChange={onPurposeChange}
         >
           {providerPurposeOptions.map((purpose) => (
             <SelectItem key={purpose.code} value={purpose.code}>
