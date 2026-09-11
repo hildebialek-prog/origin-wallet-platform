@@ -182,7 +182,9 @@ const AccountTransfers = () => {
 
   useEffect(() => {
     const purposeCodeIsCompatible = purposeOptions.some((purpose) => purpose.code === form.purposeCode);
-    if (!purposeCodeIsCompatible && (purposeOptions.length > 0 || form.purposeCode)) {
+    if (isNiumProvider(selectedProvider?.code)) {
+      if (form.purposeCode && !purposeCodeIsCompatible) setForm((current) => ({ ...current, purposeCode: "" }));
+    } else if (!purposeCodeIsCompatible && (purposeOptions.length > 0 || form.purposeCode)) {
       setForm((current) => ({ ...current, purposeCode: purposeOptions[0]?.code ?? "" }));
     }
   }, [form.purposeCode, purposeOptions, selectedProvider?.code]);
