@@ -883,7 +883,9 @@ const ResultStep = ({
 
         {transfer.status === "approval_required" ? (
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Admin approval is required before this payment can be submitted.
+            {isNiumProvider(provider?.code)
+              ? "Waiting for admin approval. This payment will be submitted automatically once approved."
+              : "Admin approval is required before this payment can be submitted."}
           </div>
         ) : null}
 
@@ -896,6 +898,7 @@ const ResultStep = ({
     ) : null}
 
     <div className="flex flex-col justify-center gap-3 sm:flex-row">
+      {!isNiumProvider(provider?.code) ? (
       <Button
         className="h-12 rounded-full bg-[#16a34a] px-7 text-white hover:bg-[#15803d]"
         disabled={!transfer || !canSubmitProvider(transfer.status) || submitting}
@@ -904,6 +907,7 @@ const ResultStep = ({
         {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SendHorizonal className="mr-2 h-4 w-4" />}
         Submit payment
       </Button>
+      ) : null}
       <Button
         variant="outline"
         className="h-12 rounded-full border-[#d7d7d2] bg-white px-7 text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white"
@@ -1004,7 +1008,7 @@ const TransferRow = ({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button
+        {!isNiumProvider(provider?.code) ? <Button
           size="sm"
           disabled={!canSubmitProvider(transfer.status) || submitting}
           onClick={onSubmit}
@@ -1012,7 +1016,7 @@ const TransferRow = ({
         >
           {submitting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="mr-2 h-3.5 w-3.5" />}
           Submit
-        </Button>
+        </Button> : null}
         <Button
           size="sm"
           variant="outline"
