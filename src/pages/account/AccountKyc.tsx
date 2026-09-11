@@ -798,6 +798,8 @@ const AccountKyc = () => {
   const [draftReady, setDraftReady] = useState(false);
   const [message, setMessage] = useState("");
   const [formError, setFormError] = useState("");
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const touchField = (field: string) => setTouchedFields((current) => ({ ...current, [field]: true }));
   const [requirementFiles, setRequirementFiles] = useState<Record<number, File | null>>({});
   const [requirementNotes, setRequirementNotes] = useState<Record<number, string>>({});
   const [resubmittingRequirementId, setResubmittingRequirementId] = useState<number | null>(null);
@@ -2020,7 +2022,7 @@ const AccountKyc = () => {
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Business name" value={businessForm.businessName} onChange={(value) => updateBusiness("businessName", value)} />
                       <Field label="Trade name" value={businessForm.tradeName} onChange={(value) => updateBusiness("tradeName", value)} />
-                      <Field label="Registration number" value={businessForm.businessRegistration} onChange={(value) => updateBusiness("businessRegistration", value)} />
+                      <div><Field label="Registration number" value={businessForm.businessRegistration} onChange={(value) => updateBusiness("businessRegistration", value)} onBlur={() => touchField("business-registration-number")} />{touchedFields["business-registration-number"] && businessForm.businessRegistration.trim() && !/^\d{8}$/.test(businessForm.businessRegistration.trim()) ? <p className="text-xs text-red-600">Registration number must be exactly 8 digits.</p> : null}</div>
                       <Field label="Tax ID" value={businessForm.taxId} onChange={(value) => updateBusiness("taxId", value)} />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
@@ -2028,7 +2030,9 @@ const AccountKyc = () => {
                         label="Registered date"
                         value={businessForm.registeredDate}
                         onChange={(value) => updateBusiness("registeredDate", value)}
-                        placeholder="YYYY-MM-DD"
+                        type="date"
+                        max={todayInputValue}
+                        onBlur={() => touchField("registered-date")}
                       />
                       <SelectField
                         label="Company type"
@@ -2068,9 +2072,9 @@ const AccountKyc = () => {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <SelectField label="Industry" value={businessForm.industry} onChange={(value) => updateBusiness("industry", value)} options={industryOptions} placeholder="Select industry" />
-                      <div data-kyc-field="business-website"><Field label="Business website" value={businessForm.website} onChange={(value) => updateBusiness("website", value)} type="url" placeholder="https://example.com" helperText="Required. Example: https://example.com" />{businessForm.website.trim() && !isValidWebsite(businessForm.website) ? <p className="text-xs text-red-600">Enter a valid website URL including http:// or https://.</p> : null}</div>
+                    <div data-kyc-field="business-website"><Field label="Business website" value={businessForm.website} onChange={(value) => updateBusiness("website", value)} onBlur={() => touchField("business-website")} type="url" placeholder="https://example.com" helperText="Required. Example: https://example.com" />{touchedFields["business-website"] && businessForm.website.trim() && !isValidWebsite(businessForm.website) ? <p className="text-xs text-red-600">Enter a valid website URL including http:// or https://.</p> : null}</div>
                     </div>
-                    <div data-kyc-field="business-activity"><Field label="Business activity" value={businessForm.businessActivity} onChange={(value) => updateBusiness("businessActivity", value)} maxLength={255} helperText="Describe the company's business activity (up to 255 characters)." /></div>
+                    <div data-kyc-field="business-activity"><Field label="Business activity" value={businessForm.businessActivity} onChange={(value) => updateBusiness("businessActivity", value)} onBlur={() => touchField("business-activity")} maxLength={255} helperText="Describe the company's business activity (up to 255 characters)." />{touchedFields["business-activity"] && businessForm.businessActivity.length > 255 ? <p className="text-xs text-red-600">Business activity must be 255 characters or fewer.</p> : null}</div>
                     <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 text-sm">
                       <Checkbox checked={businessForm.isMultiLayeredCompany} onCheckedChange={(checked) => updateBusiness("isMultiLayeredCompany", checked === true)} />
                       <span><span className="block">The company has multiple ownership layers</span><span className="mt-1 block text-xs text-gray-500">Select this if one or more shareholders are corporate entities or the ownership structure contains multiple corporate levels.</span>{businessForm.isMultiLayeredCompany ? <span className="mt-2 block rounded-lg bg-emerald-50 p-2 text-xs text-emerald-800">You will provide a complete ownership chart showing intermediate corporate shareholders and ultimate beneficial owners.</span> : null}</span>
@@ -2085,7 +2089,7 @@ const AccountKyc = () => {
                     <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone countryOptions={niumCountryOptions} />
                     <div data-kyc-field="beneficial-owner-ownership">{beneficialOwnerForms.map((form, index) => (
                       <div key={form.clientId} className="space-y-3">
-                        <PersonDetails title={`Beneficial owner / UBO ${index + 1}`} form={form} onChange={(field, value) => updateBeneficialOwner(form.clientId, field, value)} includeOwnership includePhone={false} countryOptions={niumCountryOptions} />
+                        <PersonDetails title={`Beneficial owner / UBO ${index + 1}`} form={form} onChange={(field, value) => updateBeneficialOwner(form.clientId, field, value)} onOwnershipBlur={() => touchField(`ubo-${form.clientId}`)} includeOwnership includePhone={false} countryOptions={niumCountryOptions} ownershipError={touchedFields[`ubo-${form.clientId}`] && (!Number.isFinite(Number(form.ownershipPercentage)) || Number(form.ownershipPercentage) <= 0 || Number(form.ownershipPercentage) > 100) ? "Ownership percentage must be a number greater than 0 and no more than 100%." : beneficialOwnerForms.every((owner) => touchedFields[`ubo-${owner.clientId}`]) && beneficialOwnerForms.reduce((total, owner) => total + (Number(owner.ownershipPercentage) || 0), 0) > 100 ? "Total beneficial ownership cannot exceed 100%." : undefined} />
                         {beneficialOwnerForms.length > 1 ? <Button type="button" variant="outline" onClick={() => removeBeneficialOwner(form.clientId)}>Remove UBO</Button> : null}
                       </div>
                     ))}</div>
@@ -2221,7 +2225,7 @@ const AccountKyc = () => {
                             helperText="Upload your business registration document."
                           />
                           <div className="space-y-5">
-                            <Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                            <div><Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} onBlur={() => touchField("registration-issued-at")} type="date" max={todayInputValue} />{touchedFields["registration-issued-at"] && businessForm.registrationDocumentIssuedAt && !isRecentDocumentDate(businessForm.registrationDocumentIssuedAt) ? <p className="text-xs text-red-600">Enter a valid recent business registration issue date.</p> : null}</div>
                             <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
                           </div>
                         </div>
@@ -2241,7 +2245,7 @@ const AccountKyc = () => {
                               updateBusiness("filingDocumentType", value);
                               updateBusiness("filingNiumDocumentType", value);
                             }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
-                            <Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} type="date" max={todayInputValue} />
+                            <div><Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} onBlur={() => touchField("filing-issued-at")} type="date" max={todayInputValue} />{touchedFields["filing-issued-at"] && businessForm.filingDocumentIssuedAt && !isDateValue(businessForm.filingDocumentIssuedAt) ? <p className="text-xs text-red-600">Enter a valid filing issue date.</p> : null}</div>
                             <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
                           </div>
                         </div>
@@ -2942,6 +2946,7 @@ const Field = ({
   maxLength,
   min,
   onChange,
+  onBlur,
   placeholder,
   type = "text",
   value,
@@ -2952,6 +2957,7 @@ const Field = ({
   maxLength?: number;
   min?: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   type?: HTMLInputTypeAttribute;
   value: string;
@@ -2964,6 +2970,7 @@ const Field = ({
       maxLength={maxLength}
       min={min}
       onChange={(event) => onChange(event.target.value)}
+      onBlur={onBlur}
       placeholder={placeholder}
       type={type}
       className="h-12 rounded-xl border-gray-200"
@@ -3234,6 +3241,8 @@ const PersonDetails = ({
   includeOwnership,
   onChange,
   title,
+  ownershipError,
+  onOwnershipBlur,
 }: {
   countryOptions: { label: string; value: string }[];
   form: PersonForm;
@@ -3241,6 +3250,8 @@ const PersonDetails = ({
   includeOwnership: boolean;
   onChange: (field: keyof PersonForm, value: string) => void;
   title: string;
+  ownershipError?: string;
+  onOwnershipBlur?: () => void;
 }) => (
   <div className="rounded-2xl border border-gray-200 p-4">
     <h3 className="font-semibold text-gray-900">{title}</h3>
@@ -3248,7 +3259,7 @@ const PersonDetails = ({
       <Field label="Legal name" value={form.legalName} onChange={(value) => onChange("legalName", value)} />
       <Field label="Date of birth" value={form.dateOfBirth} onChange={(value) => onChange("dateOfBirth", value)} type="date" max={todayInputValue} />
       {includeOwnership ? (
-        <Field label="Ownership %" value={form.ownershipPercentage} onChange={(value) => onChange("ownershipPercentage", value)} type="number" min="0" max="100" />
+        <div><Field label="Ownership %" value={form.ownershipPercentage} onChange={(value) => onChange("ownershipPercentage", value)} onBlur={onOwnershipBlur} type="number" min="0" max="100" />{ownershipError ? <p className="text-xs text-red-600">{ownershipError}</p> : null}</div>
       ) : (
         <SelectField label="Residence" value={form.residence} onChange={(value) => onChange("residence", value)} options={countryOptions} placeholder="Select residence" />
       )}
