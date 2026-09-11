@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCorporateSubdivisionOptions } from "@/services/kycService";
-import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload, readPersistedAddress } from "./AccountKyc";
+import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload, isValidWebsite, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
 
 vi.mock("@/services/kycService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/kycService")>()),
@@ -100,6 +100,17 @@ describe("related-person address subdivisions", () => {
 
     const stateField = screen.getAllByRole("textbox").find((input) => (input as HTMLInputElement).value === "");
     expect(stateField).toBeDefined();
+  });
+});
+
+describe("KYB website and UBO validation", () => {
+  it.each([["", false], ["abc", false], ["www.google.com", false], ["google.com", false], ["https://google.com", true], ["http://example.hk", true]] as const)("validates website %s", (value, valid) => {
+    expect(isValidWebsite(value)).toBe(valid);
+  });
+
+  it("rejects UBO ownership totals above 100", () => {
+    expect(validBeneficialOwnerOwnership([{ ownershipPercentage: "60" }, { ownershipPercentage: "41" }])).toBe(false);
+    expect(validBeneficialOwnerOwnership([{ ownershipPercentage: "60" }, { ownershipPercentage: "40" }])).toBe(true);
   });
 });
 
