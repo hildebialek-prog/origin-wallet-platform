@@ -2003,6 +2003,14 @@ const AccountKyc = () => {
             {!isKycReadOnly && step === 1 ? (
               <section className="space-y-5">
                 <SectionTitle title={applicantType === "business" ? "Business and people details" : "Personal details"} />
+                {applicantType === "business" ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                    <p className="font-semibold">Nium service disclosure</p>
+                    <p className="mt-1 leading-6 text-emerald-800 dark:text-emerald-200">
+                      Certain financial and payment services available through Origin Wallet are provided by or supported through Nium, a third-party financial and payment platform/provider. These services are subject to applicable eligibility, compliance review, availability, and relevant terms.
+                    </p>
+                  </div>
+                ) : null}
                 <Field label={applicantType === "business" ? "Company legal name" : "Legal name"} value={profileForm.legalName} onChange={applicantType === "business" ? updateCompanyLegalName : (value) => updateProfile("legalName", value)} />
                 {applicantType === "individual" ? (
                   <>
@@ -2086,7 +2094,7 @@ const AccountKyc = () => {
                       <Field label="Agent name (optional)" value={businessForm.agentName} onChange={(value) => updateBusiness("agentName", value)} />
                       <Field label="Agent address (optional)" value={businessForm.agentAddress} onChange={(value) => updateBusiness("agentAddress", value)} />
                     </div>
-                    <PersonDetails title="Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone countryOptions={niumCountryOptions} />
+                    <PersonDetails title="Director / Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone countryOptions={niumCountryOptions} />
                     <div data-kyc-field="beneficial-owner-ownership">{beneficialOwnerForms.map((form, index) => (
                       <div key={form.clientId} className="space-y-3">
                         <PersonDetails title={`Beneficial owner / UBO ${index + 1}`} form={form} onChange={(field, value) => updateBeneficialOwner(form.clientId, field, value)} onOwnershipBlur={() => touchField(`ubo-${form.clientId}`)} includeOwnership includePhone={false} countryOptions={niumCountryOptions} ownershipError={touchedFields[`ubo-${form.clientId}`] && (!Number.isFinite(Number(form.ownershipPercentage)) || Number(form.ownershipPercentage) <= 0 || Number(form.ownershipPercentage) > 100) ? "Ownership percentage must be a number greater than 0 and no more than 100%." : beneficialOwnerForms.every((owner) => touchedFields[`ubo-${owner.clientId}`]) && beneficialOwnerForms.reduce((total, owner) => total + (Number(owner.ownershipPercentage) || 0), 0) > 100 ? "Total beneficial ownership cannot exceed 100%." : undefined} />
@@ -2274,7 +2282,7 @@ const AccountKyc = () => {
                       </div>
                     </div>
                     <PersonDocumentFields
-                      title="Authorized representative documents"
+                      title="Director / Authorized representative documents"
                       form={representativeForm}
                       onChange={updateRepresentative}
                       uploadSubject="authorized_representative"
@@ -2329,6 +2337,14 @@ const AccountKyc = () => {
             {!isKycReadOnly && ((applicantType === "business" && step === 4) || (applicantType === "individual" && step === 5)) ? (
               <section className="space-y-4">
                 <SectionTitle title="Review and submit" />
+                {applicantType === "business" ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                    <p className="font-semibold">Nium service disclosure</p>
+                    <p className="mt-1 leading-6 text-emerald-800 dark:text-emerald-200">
+                      Certain financial and payment services available through Origin Wallet are provided by or supported through Nium, a third-party financial and payment platform/provider. These services are subject to applicable eligibility, compliance review, availability, and relevant terms.
+                    </p>
+                  </div>
+                ) : null}
                 <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-white/10 dark:bg-white/5">
                   <SummaryRow label="Type" value={applicantType === "business" ? "Business KYB" : "Individual KYC"} />
                   <SummaryRow label="Legal name" value={profileForm.legalName || "-"} />
@@ -2338,7 +2354,7 @@ const AccountKyc = () => {
                       <SummaryRow label="Trade type" value={businessForm.tradeType || "-"} />
                       <SummaryRow label="Main product" value={businessForm.mainProduct || "-"} />
                       <SummaryRow label="Exporting regions" value={businessForm.exportingRegions || "-"} />
-                      <SummaryRow label="Representative" value={representativeForm.legalName || "-"} />
+                      <SummaryRow label="Director / Authorized representative" value={`${representativeForm.legalName || "-"}${representativeForm.role ? ` — ${representativeForm.role.replace(/_/g, " ")}` : ""}`} />
                       <SummaryRow label="Beneficial owners" value={beneficialOwnerForms.map((form) => `${form.legalName || "-"} (${form.ownershipPercentage || "-"}%)`).join(", ")} />
                       <SummaryRow label="Expected monthly volume" value={businessForm.expectedMonthlyVolume || "-"} />
                       <SummaryRow label="Average transaction value" value={businessForm.averageTransactionValue || "-"} />
@@ -2355,7 +2371,7 @@ const AccountKyc = () => {
                     </>
                   ) : null}
                   <SummaryRow label="Address" value={[profileForm.addressLine1, profileForm.city, profileForm.state, profileForm.postalCode, profileForm.countryCode].filter(Boolean).join(", ") || "-"} />
-                  <SummaryRow label="Documents" value={applicantType === "business" ? "Company + representative + UBO" : "Identity + address"} />
+                  <SummaryRow label="Documents" value={applicantType === "business" ? "Company + Director / Authorized Representative + UBO" : "Identity + address"} />
                   {applicantType === "individual" ? <SummaryRow label="Face check" value="Submitted" /> : null}
                 </div>
                 {applicantType === "business" ? (
