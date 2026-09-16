@@ -4,13 +4,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getKycProfile, type KycProfile } from "@/services/kycService";
 import {
   getBalances,
-  getBankAccounts,
   getBeneficiaries,
   getTransactions,
 } from "@/services/moneyMovementService";
-import { formatAmount, formatDateTime, toNumber } from "@/lib/money";
+import { getProviders } from "@/services/fxOrderService";
+import { getVirtualAccounts } from "@/services/providerAccountService";
+import { formatAmount, formatDateTime, statusBadgeClassName, toNumber } from "@/lib/money";
+import { getProviderDisplayName, isPrimaryProvider, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 import { formatStatusLabel, getSemanticStatus, isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowDownLeft,
@@ -129,10 +132,27 @@ const AccountDashboard = () => {
     enabled: !!user?.id && !!token,
     queryFn: async () => getBalances({ userId: user?.id as string, token: token as string }),
   });
-  const accountsQuery = useQuery({
-    queryKey: ["money-bank-accounts", user?.id, token],
-    enabled: !!user?.id && !!token,
-    queryFn: async () => getBankAccounts({ userId: user?.id as string, token: token as string }),
+  const providersQuery = useQuery({
+    queryKey: ["money-providers"],
+    enabled: !!token,
+    queryFn: async () => {
+      const payload = await getProviders();
+      return payload.data.filter((provider) => provider.status === "active");
+    },
+  });
+
+  const providers = providersQuery.data ?? [];
+  const primaryProvider = providers.find((provider) => isPrimaryProvider(provider));
+
+  const virtualAccountsQuery = useQuery({
+    queryKey: ["nium-virtual-accounts", user?.id, primaryProvider?.code, token],
+    enabled: !!user?.id && !!token && !!primaryProvider?.code,
+    queryFn: async () =>
+      getVirtualAccounts({
+        userId: user?.id as string,
+        token: token as string,
+        providerCode: primaryProvider?.code as string,
+      }),
   });
   const beneficiariesQuery = useQuery({
     queryKey: ["money-beneficiaries", user?.id, token],
@@ -145,12 +165,12 @@ const AccountDashboard = () => {
     queryFn: async () => getTransactions({ userId: user?.id as string, token: token as string }),
   });
   const balances = balancesQuery.data ?? [];
-  const bankAccounts = accountsQuery.data ?? [];
+  const virtualAccounts = virtualAccountsQuery.data ?? [];
   const beneficiaries = beneficiariesQuery.data ?? [];
   const transactions = transactionsQuery.data ?? [];
   const totalVisibleBalance = balances.reduce((sum, balance) => sum + toNumber(balance.available_balance), 0);
   const topBalances = balances.slice(0, 4);
-  const topVirtualAccounts = bankAccounts.slice(0, 3);
+  const topVirtualAccounts = virtualAccounts.slice(0, 3);
   const recentActivity = transactions.slice(0, 5);
 
   return (
@@ -229,39 +249,112 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base font-semibold dark:text-white">Your virtual accounts</CardTitle>
-                <Link to="/account/virtual-accounts" className="text-sm font-medium text-[#16a34a] hover:underline dark:text-[#86efac]">
+            <Card className="overflow-hidden border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">
+                    Your virtual accounts
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Receiving details connected to your Origin Wallet.
+                  </p>
+                </div>
+                <Link
+                  to="/account/virtual-accounts"
+                  className="text-sm font-semibold text-[#16a34a] hover:underline dark:text-[#86efac]"
+                >
                   View all
                 </Link>
               </CardHeader>
+
               <CardContent className="pt-0">
-                {topVirtualAccounts.length > 0 ? (
+                {virtualAccountsQuery.isLoading ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-5 py-8 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                    Loading virtual accounts...
+                  </div>
+                ) : topVirtualAccounts.length > 0 ? (
                   <div className="space-y-3">
-                    {topVirtualAccounts.map((account) => (
-                      <div
-                        key={account.id}
-                        className="flex items-center justify-between rounded-lg border border-gray-100 p-4 transition-colors hover:border-gray-200 dark:border-white/5 dark:hover:border-white/10"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{account.currency}</span>
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">
-                              {account.account_name || account.external_account_id || "Origin Wallet account"}
-                            </p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {account.country_code || "Wallet"} - {account.currency}
-                            </p>
+                    {topVirtualAccounts.map((account) => {
+                      const normalizedStatus = normalizeStatus(account.status);
+                      const accountCategory = String(account.account_category || "Virtual account")
+                        .replace(/_/g, " ")
+                        .toLowerCase();
+                      const accountType = String(account.account_type || "Account")
+                        .replace(/_/g, " ")
+                        .toLowerCase();
+
+                      return (
+                        <Link
+                          key={account.id}
+                          to={`/account/virtual-accounts?tab=${normalizedStatus === "pending" ? "pending" : "approved"}`}
+                          className="group flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/60 p-4 transition-all hover:border-[#bbf7d0] hover:bg-[#f0fdf4] dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-[#16a34a]/30 dark:hover:bg-[#16a34a]/5"
+                        >
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ecfdf3] text-sm font-bold text-[#15803d] dark:bg-[#16a34a]/10 dark:text-[#86efac]">
+                              {account.currency}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-gray-900 dark:text-white">
+                                {account.provider_payment_id ||
+                                  account.virtual_account_reference ||
+                                  `${account.currency} virtual account`}
+                              </p>
+
+                              <p className="mt-1 truncate text-xs capitalize text-gray-500 dark:text-gray-400">
+                                {accountCategory} · {accountType}
+                              </p>
+
+                              {account.virtual_account_reference &&
+                              account.virtual_account_reference !== account.provider_payment_id ? (
+                                <p className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">
+                                  Ref: {account.virtual_account_reference}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      </div>
-                    ))}
+
+                          <div className="flex shrink-0 items-center gap-3">
+                            <div className="hidden text-right sm:block">
+                              <Badge
+                                className={statusBadgeClassName(
+                                  normalizedStatus === "assigned" ? "approved" : account.status,
+                                )}
+                              >
+                                {formatStatusLabel(account.status)}
+                              </Badge>
+                              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                {primaryProvider
+                                  ? getProviderDisplayName(primaryProvider)
+                                  : PRIMARY_PROVIDER_NAME}
+                              </p>
+                            </div>
+
+                            <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-[#16a34a]" />
+                          </div>
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed border-gray-200 p-6 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
-                    No virtual accounts yet. This section is waiting for dynamic account data.
+                  <div className="rounded-xl border border-dashed border-gray-200 px-5 py-8 text-center dark:border-white/10">
+                    <Wallet className="mx-auto h-7 w-7 text-gray-300 dark:text-gray-600" />
+                    <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+                      No virtual accounts yet
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Request an account to receive funds directly into Origin Wallet.
+                    </p>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="mt-4 rounded-full border-[#bbf7d0] text-[#15803d] hover:bg-[#ecfdf3] dark:border-[#16a34a]/30 dark:text-[#86efac]"
+                    >
+                      <Link to="/account/virtual-accounts/request">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Request account
+                      </Link>
+                    </Button>
                   </div>
                 )}
               </CardContent>
