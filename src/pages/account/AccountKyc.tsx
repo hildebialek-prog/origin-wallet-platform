@@ -1933,7 +1933,9 @@ const AccountKyc = () => {
     }
   };
 
-  const isKycReadOnly = isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo;
+  // TEMPORARY SCREENSHOT PREVIEW ONLY.
+  // Remove immediately after capturing the Nium onboarding screenshots.
+  const isKycReadOnly = false;
   const lockedProfile = profile && isKycReadOnly ? profile : null;
   const lockedStatusOnly = isKycReadOnly && !lockedProfile;
 
