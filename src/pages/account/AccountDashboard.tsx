@@ -118,7 +118,6 @@ const getKycSetupSteps = (profile: KycProfile | null, accountStatus?: string | n
 
 const AccountDashboard = () => {
   const { user, token, onboarding } = useAuth();
-  const displayName = user?.name || user?.email?.split("@")[0] || "Account";
   const kycQuery = useQuery({
     queryKey: ["kyc-profile", user?.id, token],
     enabled: !!user?.id && !!token,
@@ -127,6 +126,17 @@ const AccountDashboard = () => {
   const kycProfile = kycQuery.data?.kyc_profile ?? null;
   const kycStatus = kycProfile?.status ?? user?.kycStatus ?? "pending";
   const setupSteps = getKycSetupSteps(kycProfile, user?.status);
+
+  const preferredDisplayName =
+    kycProfile?.applicant_type === "business"
+      ? kycProfile.business_name || kycProfile.legal_name
+      : kycProfile?.legal_name || user?.name;
+
+  const displayName =
+    preferredDisplayName &&
+    !/^synthetic applicant\b/i.test(preferredDisplayName.trim())
+      ? preferredDisplayName.trim()
+      : "Origin Wallet account";
   const balancesQuery = useQuery({
     queryKey: ["money-balances", user?.id, token],
     enabled: !!user?.id && !!token,
@@ -168,7 +178,23 @@ const AccountDashboard = () => {
   const virtualAccounts = virtualAccountsQuery.data ?? [];
   const beneficiaries = beneficiariesQuery.data ?? [];
   const transactions = transactionsQuery.data ?? [];
-  const totalVisibleBalance = balances.reduce((sum, balance) => sum + toNumber(balance.available_balance), 0);
+  const visibleCurrencies = Array.from(
+    new Set(balances.map((balance) => balance.currency).filter(Boolean)),
+  );
+  const hasSingleCurrency = visibleCurrencies.length === 1;
+  const singleCurrency = hasSingleCurrency ? visibleCurrencies[0] : null;
+
+  const totalVisibleBalance = hasSingleCurrency
+    ? balances.reduce((sum, balance) => sum + toNumber(balance.available_balance), 0)
+    : null;
+
+  const balanceHeadline =
+    totalVisibleBalance !== null && singleCurrency
+      ? formatAmount(totalVisibleBalance, singleCurrency)
+      : balances.length > 0
+        ? `${visibleCurrencies.length} currencies`
+        : "Waiting for live data";
+
   const topBalances = balances.slice(0, 4);
   const topVirtualAccounts = virtualAccounts.slice(0, 3);
   const recentActivity = transactions.slice(0, 5);
@@ -178,16 +204,32 @@ const AccountDashboard = () => {
       <div className="mx-auto max-w-7xl p-6">
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            <div>
-              <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">{displayName}</h1>
-              <p className="text-4xl font-bold text-gray-900 dark:text-white">
-                {balances.length ? formatAmount(totalVisibleBalance, "mixed") : "Waiting for live data"}
+            <div className="pb-1">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#16a34a] dark:text-[#86efac]">
+                Account overview
               </p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {balances.length
-                  ? `${balances.length} synced balance records across your wallet accounts.`
-                  : "Your total balance will appear here once synced."}
-              </p>
+
+              <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[#0f2442] dark:text-white">
+                {displayName}
+              </h1>
+
+              <div className="mt-5">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {hasSingleCurrency ? "Available balance" : "Available balances"}
+                </p>
+
+                <p className="mt-1 text-[2.6rem] font-bold leading-none tracking-[-0.045em] text-[#0f2442] dark:text-white">
+                  {balanceHeadline}
+                </p>
+
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  {balances.length === 0
+                    ? "Your balance will appear here once synced."
+                    : hasSingleCurrency
+                      ? `${balances.length} synced wallet ${balances.length === 1 ? "balance" : "balances"}`
+                      : `${balances.length} synced balances across ${visibleCurrencies.length} currencies`}
+                </p>
+              </div>
             </div>
 
             <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
