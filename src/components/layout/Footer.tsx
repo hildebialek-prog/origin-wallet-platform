@@ -86,7 +86,7 @@ const Footer = () => {
               </p>
 
               <p>
-                Origin Wallet, operated by HONG KONG MACHINING GROUP CO., LIMITED, is powered by Nium Limited, a registered Money Service Operator under License No. 16-01-01797.
+                Origin Wallet is powered by Nium Limited, a registered Money Service Operator under License No. 16-01-01797. Certain financial and payment services are provided through Nium under applicable terms, eligibility requirements, compliance review, and availability conditions.
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">

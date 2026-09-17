@@ -57,7 +57,7 @@ const sections: LegalSection[] = [
   {
     title: "Third-Party Services",
     paragraphs: [
-      "Origin Wallet integrates with Nium as a third-party financial and payment platform/provider under the Company's commercial relationship with Nium. Relevant functions may also depend on banks, payment networks, identity-verification providers, technology vendors, or other third parties. Their separate terms may apply, and their availability, processing decisions, and service performance may affect your use of Origin Wallet.",
+      "Origin Wallet services are powered by Nium Limited, a registered Money Service Operator under License No. 16-01-01797. Certain financial and payment services may be subject to Nium's applicable terms, eligibility requirements, compliance review, and availability.",
       "We are not responsible for a third party's independent products, websites, or actions, but this does not limit any responsibility we have under applicable law for the services we provide to you.",
     ],
   },
