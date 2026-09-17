@@ -2430,7 +2430,7 @@ const AccountKyc = () => {
                             helperText="Upload your business registration document."
                             balancedCard
                           >
-                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <div><Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} onBlur={() => touchField("registration-issued-at")} type="date" max={todayInputValue} />{touchedFields["registration-issued-at"] && businessForm.registrationDocumentIssuedAt && !isRecentDocumentDate(businessForm.registrationDocumentIssuedAt) ? <p className="mt-2 text-xs text-red-600">Enter a valid recent business registration issue date.</p> : null}</div>
                               <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
                             </div>
@@ -2445,12 +2445,12 @@ const AccountKyc = () => {
                             required
                             helperText="Upload your latest company filing document showing directors and shareholders."
                             balancedCard
+                            beforeUpload={<SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
+                              updateBusiness("filingDocumentType", value);
+                              updateBusiness("filingNiumDocumentType", value);
+                            }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />}
                           >
-                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
-                              <SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
-                                updateBusiness("filingDocumentType", value);
-                                updateBusiness("filingNiumDocumentType", value);
-                              }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <div><Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} onBlur={() => touchField("filing-issued-at")} type="date" max={todayInputValue} />{touchedFields["filing-issued-at"] && businessForm.filingDocumentIssuedAt && !isDateValue(businessForm.filingDocumentIssuedAt) ? <p className="mt-2 text-xs text-red-600">Enter a valid filing issue date.</p> : null}</div>
                               <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
                             </div>
@@ -3312,6 +3312,7 @@ const FieldWithUpload = ({
 }: {
   acceptedTypes?: string;
   balancedCard?: boolean;
+  beforeUpload?: ReactNode;
   children?: ReactNode;
   helperText?: string;
   label: string;
@@ -3323,10 +3324,10 @@ const FieldWithUpload = ({
   required?: boolean;
 }) => (
   <div className={balancedCard
-    ? "flex h-full min-h-[360px] flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
+    ? "flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
     : "space-y-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]"
   }>
-    <div className={balancedCard ? "flex min-h-[132px] flex-col gap-2" : "space-y-2"}>
+    <div className={balancedCard ? "flex flex-col gap-2" : "space-y-2"}>
       <div className="flex items-center justify-between gap-3">
         <Label>{label}</Label>
         {required ? <span className="text-xs font-semibold text-red-600">Required</span> : null}
@@ -3339,6 +3340,7 @@ const FieldWithUpload = ({
         {value ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
       </div>
     </div>
+    {beforeUpload ? <div className="-mt-1">{beforeUpload}</div> : null}
     <EvidenceUpload
       accept="image/*,.pdf"
       capture="environment"
