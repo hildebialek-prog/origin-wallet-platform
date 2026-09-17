@@ -1049,6 +1049,7 @@ const AccountKyc = () => {
         postalCode: director.postal_code ?? "",
         countryCode: normalizeCountryCode(director.country_code),
         role: director.position?.trim().toLowerCase().replace(/[ -]+/g, "_") || "director",
+        ...readPersonDocuments(director.documents ?? []),
       };
     }));
     setUploadedDocuments(hydratedDocuments);
@@ -1347,7 +1348,7 @@ const AccountKyc = () => {
   };
 
   const uploadKycDocumentFile = async (params: {
-    subjectType: KycDocumentSubjectType;
+    subjectType?: KycDocumentSubjectType;
     uploadKey: string;
     type: string;
     file: File;
@@ -1443,6 +1444,55 @@ const AccountKyc = () => {
     });
   };
 
+  const uploadCompanyDirectorDocument = (
+    localSubjectKey: string,
+    form: PersonForm,
+    update: (field: DocumentFieldKey, value: string) => void,
+    captureType: IdentityCaptureType,
+    field: DocumentFieldKey,
+    file: File,
+  ) => {
+    const isFront = captureType === "identity_front";
+    const isBack = captureType === "identity_back";
+    const documentType = isFront
+      ? `${form.idDocumentType}_front`
+      : isBack
+        ? `${form.idDocumentType}_back`
+        : "proof_of_address";
+
+    const issuingCountryCode = isFront || isBack
+      ? normalizeCountryCode(form.idIssuingCountry)
+        || normalizeCountryCode(form.nationality)
+        || normalizeCountryCode(form.residence)
+        || normalizeCountryCode(form.countryCode)
+      : normalizeCountryCode(form.countryCode)
+        || normalizeCountryCode(form.residence)
+        || normalizeCountryCode(form.nationality);
+
+    if (!issuingCountryCode) {
+      setFormError("Select a valid nationality, residence, or issuing country before uploading the document.");
+      return;
+    }
+
+    void uploadKycDocumentFile({
+      documentNumber: isFront || isBack ? form.idDocumentNumber : null,
+      expiresAt: isFront || isBack ? form.idExpiresAt : null,
+      file,
+      issuedAt: isFront || isBack ? form.idIssuedAt : null,
+      issuingCountryCode,
+      metadata: {
+        capture_type: captureType,
+        document_type: form.idDocumentType,
+        subject: "company_director_internal",
+        internal_only: true,
+      },
+      onUploaded: (document) => update(field, document.file_url),
+      side: isFront ? "front" : isBack ? "back" : null,
+      type: documentType,
+      uploadKey: captureKey(localSubjectKey, captureType),
+    });
+  };
+
   const uploadBusinessDocument = (
     type: string,
     field: keyof BusinessForm,
@@ -1499,6 +1549,28 @@ const AccountKyc = () => {
       ));
   };
 
+  const validInternalCompanyDirectorDocuments = (
+    form: Pick<PersonForm, DocumentFieldKey>,
+  ) => {
+    const identityFiles =
+      form.idDocumentType === "passport"
+        ? requiredFilled([form.idFrontUrl])
+        : requiredFilled([form.idFrontUrl, form.idBackUrl]);
+
+    return (
+      requiredFilled([form.idDocumentNumber]) &&
+      identityFiles &&
+      (
+        form.idDocumentType !== "passport" ||
+        (
+          isCountryCode(form.idIssuingCountry) &&
+          isDateValue(form.idIssuedAt) &&
+          isDateValue(form.idExpiresAt)
+        )
+      )
+    );
+  };
+
   const validateCurrentStep = () => {
     if (step === 1) {
       if (applicantType === "individual") {
@@ -1534,6 +1606,7 @@ const AccountKyc = () => {
         representativeForm.role.trim() !== "" &&
         requiredFilled([e164Phone(representativeForm.phoneCallingCode, representativeForm.phoneNumber)]) &&
         beneficialOwnerForms.every(validPersonDetails) &&
+        companyDirectorForms.every(validPersonDetails) &&
         validBeneficialOwnerOwnership(beneficialOwnerForms) &&
         isValidWebsite(businessForm.website) &&
         businessForm.businessActivity.trim().length <= 255
@@ -1555,6 +1628,7 @@ const AccountKyc = () => {
           ])
         )) &&
         validAddress(representativeForm) &&
+        companyDirectorForms.every(validAddress) &&
         beneficialOwnerForms.every(validAddress) &&
         requiredFilled([
           businessForm.expectedMonthlyVolume,
@@ -1588,6 +1662,7 @@ const AccountKyc = () => {
           businessForm.businessAddressProofNiumDocumentType,
         ]) &&
         validIdentityDocuments(representativeForm, true) &&
+        companyDirectorForms.every(validInternalCompanyDirectorDocuments) &&
         beneficialOwnerForms.every((form) => validIdentityDocuments(form, true)) &&
         isRecentDocumentDate(businessForm.registrationDocumentIssuedAt) &&
         businessForm.isMostRecentFiling &&
@@ -1762,6 +1837,10 @@ const AccountKyc = () => {
                 metadata: {
                   source: "origin_wallet_onboarding",
                 },
+                documents: buildInternalCompanyDirectorDocuments(
+                  directorForm,
+                  documentEvidence(`company_director:${directorForm.clientId}`),
+                ),
               }))
           : [],
       metadata: {
@@ -2000,7 +2079,7 @@ const AccountKyc = () => {
   };
 
   // TEMPORARY SCREENSHOT PREVIEW ONLY
-  const isKycReadOnly = false;
+  const isKycReadOnly = isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo;
   const lockedProfile = profile && isKycReadOnly ? profile : null;
   const lockedStatusOnly = isKycReadOnly && !lockedProfile;
 
@@ -2419,6 +2498,31 @@ const AccountKyc = () => {
                         )
                       }
                     />
+                    {companyDirectorForms.map((form, index) => (
+                      <PersonDocumentFields
+                        key={form.clientId}
+                        title={`Company director ${index + 2} documents`}
+                        form={form}
+                        onChange={(field, value) =>
+                          updateCompanyDirector(form.clientId, field, value)
+                        }
+                        uploadSubject={`company_director:${form.clientId}`}
+                        uploadingCapture={uploadingDocument}
+                        corporate
+                        countryOptions={niumCountryOptions}
+                        onUploadCapture={(captureType, field, file) =>
+                          uploadCompanyDirectorDocument(
+                            `company_director:${form.clientId}`,
+                            form,
+                            (documentField, value) =>
+                              updateCompanyDirector(form.clientId, documentField, value),
+                            captureType,
+                            field,
+                            file,
+                          )
+                        }
+                      />
+                    ))}
                     {beneficialOwnerForms.map((form, index) => <PersonDocumentFields key={form.clientId} title={`Beneficial owner / UBO ${index + 1} documents`} form={form} onChange={(field, value) => updateBeneficialOwner(form.clientId, field, value)} uploadSubject={`beneficial_owner:${form.clientId}`} uploadingCapture={uploadingDocument} corporate countryOptions={niumCountryOptions} onUploadCapture={(captureType, field, file) => uploadPersonDocument("beneficial_owner", `beneficial_owner:${form.clientId}`, form, (f, v) => updateBeneficialOwner(form.clientId, f, v), captureType, field, file)} />)}
                   </>
                 )}
@@ -2926,6 +3030,52 @@ export const assertFilingDocumentEvidence = (
   if (!filingDocument || requiredEvidence.some((value) => typeof value !== "string" || value.trim() === "")) {
     throw new Error("Uploaded filing document metadata is missing. Please re-upload the NAR1/NNC1 document.");
   }
+};
+
+const buildInternalCompanyDirectorDocuments = (
+  form: PersonForm,
+  evidence: (captureType: string) => Partial<KycDocumentPayload>,
+): KycDocumentPayload[] => {
+  const issuingCountry =
+    normalizeCountryCode(form.idIssuingCountry)
+    || normalizeCountryCode(form.nationality)
+    || null;
+
+  const documentType = form.idDocumentType || "identity_document";
+
+  const baseMetadata = {
+    subject: "company_director_internal",
+    internal_only: true,
+    document_type: documentType,
+  };
+
+  const documents: KycDocumentPayload[] = [
+    {
+      type: `${documentType}_front`,
+      file_url: form.idFrontUrl.trim(),
+      side: "front",
+      document_number: form.idDocumentNumber.trim(),
+      issuing_country_code: issuingCountry,
+      issued_at: normalizeDateValue(form.idIssuedAt) || null,
+      expires_at: normalizeDateValue(form.idExpiresAt) || null,
+      metadata: baseMetadata,
+      ...evidence("identity_front"),
+    },
+  ];
+
+  if (documentType !== "passport") {
+    documents.push({
+      type: `${documentType}_back`,
+      file_url: form.idBackUrl.trim(),
+      side: "back",
+      document_number: form.idDocumentNumber.trim(),
+      issuing_country_code: issuingCountry,
+      metadata: baseMetadata,
+      ...evidence("identity_back"),
+    });
+  }
+
+  return documents;
 };
 
 const buildPersonDocuments = (

@@ -89,6 +89,7 @@ export interface KycCompanyDirectorPayload {
   postal_code?: string | null;
   country_code?: string | null;
   metadata?: Record<string, unknown>;
+  documents?: KycDocumentPayload[];
 }
 
 export interface HkCorporateUsagePayload {
