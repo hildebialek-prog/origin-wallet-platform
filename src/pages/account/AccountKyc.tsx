@@ -2079,7 +2079,7 @@ const AccountKyc = () => {
   };
 
   // TEMPORARY SCREENSHOT PREVIEW ONLY
-  const isKycReadOnly = isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo;
+  const isKycReadOnly = false;
   const lockedProfile = profile && isKycReadOnly ? profile : null;
   const lockedStatusOnly = isKycReadOnly && !lockedProfile;
 
