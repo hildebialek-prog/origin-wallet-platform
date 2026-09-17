@@ -75,6 +75,22 @@ export interface HkCorporateFullFields {
   };
 }
 
+export interface KycCompanyDirectorPayload {
+  id?: number;
+  legal_name: string;
+  date_of_birth?: string | null;
+  nationality_country_code?: string | null;
+  residence_country_code?: string | null;
+  position?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country_code?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
 export interface HkCorporateUsagePayload {
   averageTransactionValue: string;
   monthlyTransactionVolume: string;
@@ -99,6 +115,7 @@ export interface KycSubmissionPayload {
   country_code: string;
   documents?: KycDocumentPayload[];
   related_persons?: KycRelatedPersonPayload[];
+  company_directors?: KycCompanyDirectorPayload[];
   metadata?: Record<string, unknown> & {
     nium_region?: "HK";
     nium_kyc_type?: "full";

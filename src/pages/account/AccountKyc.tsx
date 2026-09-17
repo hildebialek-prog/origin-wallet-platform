@@ -294,6 +294,7 @@ type KycDraft = {
   businessForm: BusinessForm;
   representativeForm: PersonForm;
   beneficialOwnerForms: PersonForm[];
+  companyDirectorForms?: PersonForm[];
   verificationConsent: boolean;
   savedAt: string;
 };
@@ -789,6 +790,7 @@ const AccountKyc = () => {
   const [businessForm, setBusinessForm] = useState<BusinessForm>(() => defaultBusinessForm());
   const [representativeForm, setRepresentativeForm] = useState<PersonForm>(() => defaultPersonForm());
   const [beneficialOwnerForms, setBeneficialOwnerForms] = useState<PersonForm[]>(() => [defaultPersonForm()]);
+  const [companyDirectorForms, setCompanyDirectorForms] = useState<PersonForm[]>([]);
   const [captureSessions, setCaptureSessions] = useState<CaptureSessionMap>({});
   const [captureArtifacts, setCaptureArtifacts] = useState<CaptureArtifactMap>({});
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocumentMap>({});
@@ -855,6 +857,9 @@ const AccountKyc = () => {
         ? draft.beneficialOwnerForms.map((form) => normalizePersonDraftForm(form))
         : [defaultPersonForm()],
     );
+    setCompanyDirectorForms(
+      draft.companyDirectorForms?.map((form) => normalizePersonDraftForm(form)) ?? [],
+    );
     setVerificationConsent(Boolean(draft.verificationConsent));
   }, [user?.name]);
 
@@ -866,6 +871,7 @@ const AccountKyc = () => {
     const beneficialOwners = nextProfile.related_persons?.filter((person) =>
       ["beneficial_owner", "ubo"].includes(person.relationship_type.toLowerCase()),
     ) ?? [];
+    const companyDirectors = nextProfile.company_directors ?? [];
     const profileIdentity = readPersonDocuments(profileDocs);
     const representativeIdentity = readPersonDocuments(representative?.documents ?? []);
     const metadata = nextProfile.metadata ?? {};
@@ -1027,6 +1033,24 @@ const AccountKyc = () => {
         ...readPersonDocuments(beneficialOwner.documents ?? []),
       };
     }) : [defaultPersonForm()]);
+    setCompanyDirectorForms(companyDirectors.map((director) => {
+      const form = defaultPersonForm();
+
+      return {
+        ...form,
+        clientId: director.id ? `company-director-${director.id}` : form.clientId,
+        legalName: director.legal_name ?? "",
+        dateOfBirth: toDateInputValue(director.date_of_birth),
+        nationality: normalizeCountryCode(director.nationality_country_code),
+        residence: normalizeCountryCode(director.residence_country_code),
+        addressLine1: director.address_line1 ?? "",
+        city: director.city ?? "",
+        state: director.state ?? "",
+        postalCode: director.postal_code ?? "",
+        countryCode: normalizeCountryCode(director.country_code),
+        role: director.position?.trim().toLowerCase().replace(/[ -]+/g, "_") || "director",
+      };
+    }));
     setUploadedDocuments(hydratedDocuments);
     setVerificationConsent(Boolean(metadata.verification_consent));
   }, [user?.name]);
@@ -1100,6 +1124,7 @@ const AccountKyc = () => {
       businessForm: withoutBusinessUploads(businessForm),
       representativeForm: withoutPersonUploads(representativeForm),
       beneficialOwnerForms: beneficialOwnerForms.map(withoutPersonUploads),
+      companyDirectorForms: companyDirectorForms.map(withoutPersonUploads),
       verificationConsent,
       savedAt: new Date().toISOString(),
     };
@@ -1107,6 +1132,7 @@ const AccountKyc = () => {
     localStorage.setItem(draftStorageKey, JSON.stringify(draft));
   }, [
     beneficialOwnerForms,
+    companyDirectorForms,
     businessForm,
     draftReady,
     draftStorageKey,
@@ -1155,6 +1181,21 @@ const AccountKyc = () => {
     setBeneficialOwnerForms((current) => current.map((form) =>
       form.clientId === clientId ? { ...form, [field]: value } : form,
     ));
+  };
+
+  const updateCompanyDirector = (clientId: string, field: keyof PersonForm, value: string) => {
+    setCompanyDirectorForms((current) => current.map((form) =>
+      form.clientId === clientId ? { ...form, [field]: value } : form,
+    ));
+  };
+
+  const addCompanyDirector = () => setCompanyDirectorForms((current) => [
+    ...current,
+    defaultPersonForm(),
+  ]);
+
+  const removeCompanyDirector = (clientId: string) => {
+    setCompanyDirectorForms((current) => current.filter((form) => form.clientId !== clientId));
   };
 
   const addBeneficialOwner = () => setBeneficialOwnerForms((current) => [...current, defaultPersonForm()]);
@@ -1703,6 +1744,26 @@ const AccountKyc = () => {
               })),
             ]
           : [],
+      company_directors:
+        applicantType === "business"
+          ? companyDirectorForms
+              .filter((directorForm) => directorForm.legalName.trim())
+              .map((directorForm) => ({
+                legal_name: directorForm.legalName.trim(),
+                date_of_birth: normalizeDateValue(directorForm.dateOfBirth),
+                nationality_country_code: normalizeCountryCode(directorForm.nationality) || null,
+                residence_country_code: normalizeCountryCode(directorForm.residence) || null,
+                position: directorForm.role.trim() || "director",
+                address_line1: directorForm.addressLine1.trim() || null,
+                city: directorForm.city.trim() || null,
+                state: directorForm.state.trim() || null,
+                postal_code: directorForm.postalCode.trim() || null,
+                country_code: normalizeCountryCode(directorForm.countryCode) || null,
+                metadata: {
+                  source: "origin_wallet_onboarding",
+                },
+              }))
+          : [],
       metadata: {
         source: "origin_wallet_platform",
         verification_consent: verificationConsent,
@@ -1779,7 +1840,12 @@ const AccountKyc = () => {
   };
 
   const buildProfileResubmissionPayload = () => {
-    const { documents: _documents, related_persons: _relatedPersons, ...profilePayload } = buildCurrentKycPayload();
+    const {
+      documents: _documents,
+      related_persons: _relatedPersons,
+      company_directors: _companyDirectors,
+      ...profilePayload
+    } = buildCurrentKycPayload();
 
     return profilePayload;
   };
@@ -1933,9 +1999,7 @@ const AccountKyc = () => {
     }
   };
 
-  // TEMPORARY SCREENSHOT PREVIEW ONLY.
-  // Remove immediately after capturing the Nium onboarding screenshots.
-  const isKycReadOnly = false;
+  const isKycReadOnly = isLockedKycStatus(profile?.status ?? user?.kycStatus) && !editingRequestedInfo;
   const lockedProfile = profile && isKycReadOnly ? profile : null;
   const lockedStatusOnly = isKycReadOnly && !lockedProfile;
 
@@ -2097,6 +2161,42 @@ const AccountKyc = () => {
                       <Field label="Agent address (optional)" value={businessForm.agentAddress} onChange={(value) => updateBusiness("agentAddress", value)} />
                     </div>
                     <PersonDetails title="Director / Authorized representative" form={representativeForm} onChange={updateRepresentative} includeOwnership={false} includePhone countryOptions={niumCountryOptions} />
+
+                    <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">Additional company directors</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          Add any other directors of the company. The Director / Authorized Representative above remains the primary representative for this application.
+                        </p>
+                      </div>
+
+                      {companyDirectorForms.map((form, index) => (
+                        <div key={form.clientId} className="space-y-3">
+                          <PersonDetails
+                            title={`Company director ${index + 2}`}
+                            form={form}
+                            onChange={(field, value) => updateCompanyDirector(form.clientId, field, value)}
+                            includeOwnership={false}
+                            includePhone={false}
+                            countryOptions={niumCountryOptions}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => removeCompanyDirector(form.clientId)}
+                          >
+                            Remove director
+                          </Button>
+                        </div>
+                      ))}
+
+                      <div>
+                        <Button type="button" variant="outline" onClick={addCompanyDirector}>
+                          + Add another director
+                        </Button>
+                      </div>
+                    </div>
+
                     <div data-kyc-field="beneficial-owner-ownership">{beneficialOwnerForms.map((form, index) => (
                       <div key={form.clientId} className="space-y-3">
                         <PersonDetails title={`Beneficial owner / UBO ${index + 1}`} form={form} onChange={(field, value) => updateBeneficialOwner(form.clientId, field, value)} onOwnershipBlur={() => touchField(`ubo-${form.clientId}`)} includeOwnership includePhone={false} countryOptions={niumCountryOptions} ownershipError={touchedFields[`ubo-${form.clientId}`] && (!Number.isFinite(Number(form.ownershipPercentage)) || Number(form.ownershipPercentage) <= 0 || Number(form.ownershipPercentage) > 100) ? "Ownership percentage must be a number greater than 0 and no more than 100%." : beneficialOwnerForms.every((owner) => touchedFields[`ubo-${owner.clientId}`]) && beneficialOwnerForms.reduce((total, owner) => total + (Number(owner.ownershipPercentage) || 0), 0) > 100 ? "Total beneficial ownership cannot exceed 100%." : undefined} />
@@ -2168,7 +2268,7 @@ const AccountKyc = () => {
                       /></div> : null}
                     </div>
                     <AddressFields
-                      title="Authorized representative address"
+                      title="Director / Authorized representative address"
                       countryCode={representativeForm.countryCode}
                       addressLine1={representativeForm.addressLine1}
                       city={representativeForm.city}
@@ -2179,6 +2279,21 @@ const AccountKyc = () => {
                       countryOptions={addressCountryOptions}
                       onChange={(field, value) => updateRepresentative(field, value)}
                     />
+                    {companyDirectorForms.map((form, index) => (
+                      <AddressFields
+                        key={form.clientId}
+                        title={`Company director ${index + 2} address`}
+                        countryCode={form.countryCode}
+                        addressLine1={form.addressLine1}
+                        city={form.city}
+                        state={form.state}
+                        postalCode={form.postalCode}
+                        token={token ?? undefined}
+                        userId={user?.id}
+                        countryOptions={addressCountryOptions}
+                        onChange={(field, value) => updateCompanyDirector(form.clientId, field, value)}
+                      />
+                    ))}
                     {beneficialOwnerForms.map((form, index) => <AddressFields key={form.clientId} title={`Beneficial owner / UBO ${index + 1} address`} countryCode={form.countryCode} addressLine1={form.addressLine1} city={form.city} state={form.state} postalCode={form.postalCode} token={token ?? undefined} userId={user?.id} countryOptions={addressCountryOptions} onChange={(field, value) => updateBeneficialOwner(form.clientId, field, value)} />)}
                   </>
                 ) : null}
@@ -2357,6 +2472,15 @@ const AccountKyc = () => {
                       <SummaryRow label="Main product" value={businessForm.mainProduct || "-"} />
                       <SummaryRow label="Exporting regions" value={businessForm.exportingRegions || "-"} />
                       <SummaryRow label="Director / Authorized representative" value={`${representativeForm.legalName || "-"}${representativeForm.role ? ` — ${representativeForm.role.replace(/_/g, " ")}` : ""}`} />
+                      {companyDirectorForms
+                        .filter((directorForm) => directorForm.legalName.trim())
+                        .map((directorForm, index) => (
+                          <SummaryRow
+                            key={directorForm.clientId}
+                            label={`Company director ${index + 2}`}
+                            value={`${directorForm.legalName.trim()}${directorForm.role ? ` — ${directorForm.role.replace(/_/g, " ")}` : ""}`}
+                          />
+                        ))}
                       <SummaryRow label="Beneficial owners" value={beneficialOwnerForms.map((form) => `${form.legalName || "-"} (${form.ownershipPercentage || "-"}%)`).join(", ")} />
                       <SummaryRow label="Expected monthly volume" value={businessForm.expectedMonthlyVolume || "-"} />
                       <SummaryRow label="Average transaction value" value={businessForm.averageTransactionValue || "-"} />
