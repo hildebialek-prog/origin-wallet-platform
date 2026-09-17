@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type HTMLInputTypeAttribute, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type HTMLInputTypeAttribute } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, CheckCircle2, ChevronsUpDown, Circle, Loader2, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -2407,7 +2407,7 @@ const AccountKyc = () => {
                         </div>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Upload clear, complete documents so we can verify your company and its ownership.</p>
                       </div>
-                      <div className="mt-6 grid items-stretch gap-5 md:grid-cols-2">
+                      <div className="mt-6 grid items-start gap-5 md:grid-cols-2">
                           <FieldWithUpload
                             label="Certificate of Incorporation"
                             value={businessForm.certificateOfIncorporationUrl}
@@ -2417,44 +2417,43 @@ const AccountKyc = () => {
                             onFile={(file) => uploadBusinessDocument("certificate_of_incorporation", "certificateOfIncorporationUrl", file)}
                             required
                             helperText="Upload the certificate of incorporation."
-                            balancedCard
                           />
-                          <FieldWithUpload
-                            label="Business Registration Document"
-                            value={businessForm.registrationDocumentUrl}
-                            onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
-                            uploadLabel="Upload incorporation or registration document"
-                            uploading={uploadingDocument === captureKey("business", "business_registration")}
-                            onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt, businessForm.registrationDocumentNumber, businessForm.registrationDocumentExpiresAt)}
-                            required
-                            helperText="Upload your business registration document."
-                            balancedCard
-                          >
+                          <div className="space-y-4">
+                            <FieldWithUpload
+                              label="Business Registration Document"
+                              value={businessForm.registrationDocumentUrl}
+                              onChange={(value) => updateBusiness("registrationDocumentUrl", value)}
+                              uploadLabel="Upload incorporation or registration document"
+                              uploading={uploadingDocument === captureKey("business", "business_registration")}
+                              onFile={(file) => uploadBusinessDocument("business_registration", "registrationDocumentUrl", file, { nium_document_type: businessForm.registrationNiumDocumentType }, businessForm.registrationDocumentIssuedAt, businessForm.registrationDocumentNumber, businessForm.registrationDocumentExpiresAt)}
+                              required
+                              helperText="Upload your business registration document."
+                            />
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <div><Field label="Business registration issue date" value={businessForm.registrationDocumentIssuedAt} onChange={(value) => updateBusiness("registrationDocumentIssuedAt", value)} onBlur={() => touchField("registration-issued-at")} type="date" max={todayInputValue} />{touchedFields["registration-issued-at"] && businessForm.registrationDocumentIssuedAt && !isRecentDocumentDate(businessForm.registrationDocumentIssuedAt) ? <p className="mt-2 text-xs text-red-600">Enter a valid recent business registration issue date.</p> : null}</div>
                               <Field label="Business registration expiry date" value={businessForm.registrationDocumentExpiresAt} onChange={(value) => updateBusiness("registrationDocumentExpiresAt", value)} type="date" />
                             </div>
-                          </FieldWithUpload>
-                          <FieldWithUpload
-                            label="Latest Company Filing Document (NNC1/NAR1)"
-                            value={businessForm.filingDocumentUrl}
-                            onChange={(value) => updateBusiness("filingDocumentUrl", value)}
-                            uploadLabel="Upload latest filing"
-                            uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
-                            onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt, businessForm.filingDocumentNumber, businessForm.filingDocumentExpiresAt)}
-                            required
-                            helperText="Upload your latest company filing document showing directors and shareholders."
-                            balancedCard
-                            beforeUpload={<SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
+                          </div>
+                          <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+                            <SelectField label="Filing document type" value={businessForm.filingDocumentType} onChange={(value) => {
                               updateBusiness("filingDocumentType", value);
                               updateBusiness("filingNiumDocumentType", value);
-                            }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />}
-                          >
+                            }} options={[{ label: "Annual return (NAR1)", value: "nar1" }, { label: "Incorporation form (NNC1)", value: "nnc1" }]} />
+                            <FieldWithUpload
+                              label="Latest Company Filing Document (NNC1/NAR1)"
+                              value={businessForm.filingDocumentUrl}
+                              onChange={(value) => updateBusiness("filingDocumentUrl", value)}
+                              uploadLabel="Upload latest filing"
+                              uploading={uploadingDocument === captureKey("business", businessForm.filingDocumentType)}
+                              onFile={(file) => uploadBusinessDocument(businessForm.filingDocumentType, "filingDocumentUrl", file, { is_most_recent_filing: true, nium_document_type: businessForm.filingNiumDocumentType }, businessForm.filingDocumentIssuedAt, businessForm.filingDocumentNumber, businessForm.filingDocumentExpiresAt)}
+                              required
+                              helperText="Upload your latest company filing document showing directors and shareholders."
+                            />
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <div><Field label="Filing issue date" value={businessForm.filingDocumentIssuedAt} onChange={(value) => updateBusiness("filingDocumentIssuedAt", value)} onBlur={() => touchField("filing-issued-at")} type="date" max={todayInputValue} />{touchedFields["filing-issued-at"] && businessForm.filingDocumentIssuedAt && !isDateValue(businessForm.filingDocumentIssuedAt) ? <p className="mt-2 text-xs text-red-600">Enter a valid filing issue date.</p> : null}</div>
                               <Field label="Filing expiry date" value={businessForm.filingDocumentExpiresAt} onChange={(value) => updateBusiness("filingDocumentExpiresAt", value)} type="date" />
                             </div>
-                          </FieldWithUpload>
+                          </div>
                           <FieldWithUpload
                             label="Business Address Proof"
                             value={businessForm.businessAddressProofUrl}
@@ -2464,7 +2463,6 @@ const AccountKyc = () => {
                             onFile={(file) => uploadBusinessDocument("proof_of_business_address", "businessAddressProofUrl", file, { nium_document_type: businessForm.businessAddressProofNiumDocumentType })}
                             required
                             helperText="Upload a recent utility bill, bank statement, or official document showing your business address."
-                            balancedCard
                           />
                           {businessForm.isMultiLayeredCompany ? <FieldWithUpload
                             label="Corporate ownership structure / ownership chart"
@@ -2475,7 +2473,6 @@ const AccountKyc = () => {
                             onFile={(file) => uploadBusinessDocument("ownership_chart", "ownershipStructureUrl", file, { nium_document_type: businessForm.ownershipNiumDocumentType })}
                             required
                             helperText="Required for multi-layered companies. Upload a complete ownership chart showing all intermediate corporate shareholders, ownership percentages, and ultimate beneficial owners."
-                            balancedCard
                           /> : null}
                       </div>
                     </div>
@@ -3300,8 +3297,6 @@ const TextareaField = ({
 
 const FieldWithUpload = ({
   acceptedTypes = "JPG, PNG or PDF",
-  balancedCard = false,
-  children,
   helperText,
   label,
   onFile,
@@ -3311,9 +3306,6 @@ const FieldWithUpload = ({
   required = false,
 }: {
   acceptedTypes?: string;
-  balancedCard?: boolean;
-  beforeUpload?: ReactNode;
-  children?: ReactNode;
   helperText?: string;
   label: string;
   onChange: (value: string) => void;
@@ -3323,11 +3315,8 @@ const FieldWithUpload = ({
   value: string;
   required?: boolean;
 }) => (
-  <div className={balancedCard
-    ? "flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
-    : "space-y-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]"
-  }>
-    <div className={balancedCard ? "flex flex-col gap-2" : "space-y-2"}>
+  <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <Label>{label}</Label>
         {required ? <span className="text-xs font-semibold text-red-600">Required</span> : null}
@@ -3340,7 +3329,6 @@ const FieldWithUpload = ({
         {value ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
       </div>
     </div>
-    {beforeUpload ? <div className="-mt-1">{beforeUpload}</div> : null}
     <EvidenceUpload
       accept="image/*,.pdf"
       capture="environment"
@@ -3349,7 +3337,6 @@ const FieldWithUpload = ({
       uploading={uploading}
     />
     <p className="text-xs text-gray-500 dark:text-gray-400">Accepted: {acceptedTypes}</p>
-    {children ? <div className="mt-1 border-t border-gray-100 pt-5 dark:border-white/10">{children}</div> : null}
   </div>
 );
 
