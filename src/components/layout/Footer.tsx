@@ -74,18 +74,19 @@ const Footer = () => {
               </p>
               <p>
                 Origin Wallet is the Company's platform and brand for multi-currency and cross-border payment workflows.
-                Registration / Tax ID: 7192410.{" "}
-                Registered address: FLAT/ROOM 1618B, 16/F, PIONEER CENTRE, 750 NATHAN
-                ROAD, MONGKOK, KOWLOON, HONG KONG. Contact:{" "}
+                Registration / Tax ID: 71923410.
+                Registered address: FLAT/ROOM 1618, 16/F, PIONEER CENTRE, 750 NATHAN ROAD, MONGKOK, KOWLOON, HONG KONG.
+                Contact:
                 <a
                   href="mailto:support@originwallet.asia"
                   className="text-primary-foreground/70 underline-offset-4 transition-colors hover:text-primary-foreground hover:underline"
                 >
                   support@originwallet.asia
                 </a>
-                . Certain financial and payment functions are delivered or supported by third-party providers,
-                including Nium, under their applicable terms. Neither Origin Wallet nor the Company is represented
-                on this website as a bank, licensed financial institution, custodian, or regulated payment institution.
+              </p>
+
+              <p>
+                Origin Wallet, operated by HONG KONG MACHINING GROUP CO., LIMITED, is powered by Nium Limited, a registered Money Service Operator under License No. 16-01-01797.
               </p>
             </div>
             <div className="text-xs text-primary-foreground/40">
