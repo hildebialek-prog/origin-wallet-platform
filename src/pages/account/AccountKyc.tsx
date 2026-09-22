@@ -2078,8 +2078,8 @@ const AccountKyc = () => {
     }
   };
 
-  // TEMPORARY SCREENSHOT PREVIEW ONLY
-  const isKycReadOnly = false;
+  // KYC/KYB is locked after submission/approval
+  const isKycReadOnly = true;
   const lockedProfile = profile && isKycReadOnly ? profile : null;
   const lockedStatusOnly = isKycReadOnly && !lockedProfile;
 
