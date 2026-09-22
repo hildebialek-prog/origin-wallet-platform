@@ -63,7 +63,7 @@ const Layout = () => {
                   </p>
                   <button
                     onClick={() => setShowLangMenu(false)}
-                    className="rounded-full p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
+                    className="rounded-full p-1 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:hover:bg-emerald-900/60"
                   >
                     <X className="h-4 w-4 text-emerald-900 dark:text-emerald-200" />
                   </button>

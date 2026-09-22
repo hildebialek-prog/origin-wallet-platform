@@ -601,7 +601,7 @@ const AccountBeneficiaries = () => {
             <button
               type="button"
               onClick={closeDialog}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[#0f2442] hover:bg-[#f0f4fa] dark:text-white dark:hover:bg-white/10"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#0f2442] transition-colors hover:bg-[#f0fdf4] hover:text-[#15803d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/30 dark:text-white dark:hover:bg-white/10 dark:hover:text-[#86efac]"
               aria-label="Close"
             >
               <X className="h-5 w-5" />
@@ -913,7 +913,7 @@ const BankAccountStep = ({
           <p className="text-sm text-[#62708a] dark:text-gray-400">Vendor's name</p>
           <p className="mt-1 font-semibold text-[#0f2442] dark:text-white">{form.fullName || "-"}</p>
         </div>
-        <button className="text-sm font-semibold text-[#16a34a]" onClick={onBack} type="button">
+        <button className="text-sm font-semibold text-[#16a34a] transition-colors hover:text-[#15803d] hover:underline" onClick={onBack} type="button">
           Edit
         </button>
       </div>
@@ -1142,7 +1142,7 @@ const BeneficiaryStepper = ({ currentStep }: { currentStep: BeneficiaryStep }) =
 };
 
 const BackButton = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0f2442] dark:text-white">
+  <button type="button" onClick={onClick} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0f2442] transition-colors hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]">
     <ArrowLeft className="h-4 w-4" />
     Back
   </button>

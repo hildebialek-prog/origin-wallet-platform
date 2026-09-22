@@ -587,7 +587,7 @@ export const PayeeStep = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-[#7a879c]">
         <span>All recipients</span>
-        <Link to="/account/beneficiaries" className="normal-case tracking-normal text-[#16a34a]">
+        <Link to="/account/beneficiaries" className="normal-case tracking-normal text-[#16a34a] transition-colors hover:text-[#15803d] hover:underline">
           Manage beneficiaries
         </Link>
       </div>

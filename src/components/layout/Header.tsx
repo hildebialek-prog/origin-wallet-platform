@@ -156,7 +156,7 @@ const Header = () => {
         </div>
 
         <button
-          className="xl:hidden p-2 text-foreground"
+          className="xl:hidden rounded-lg p-2 text-foreground transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >

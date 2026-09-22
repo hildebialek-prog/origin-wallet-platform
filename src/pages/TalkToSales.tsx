@@ -104,7 +104,7 @@ const contactMethods: Array<{
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const optionClassName = (active: boolean) =>
-  `flex min-h-[70px] items-center rounded-[14px] border bg-white px-6 text-left text-base font-semibold text-slate-950 transition hover:border-emerald-600 hover:shadow-sm ${
+  `flex min-h-[70px] items-center rounded-[14px] border bg-white px-6 text-left text-base font-semibold text-slate-950 transition hover:border-emerald-600 hover:bg-emerald-50/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/30 ${
     active ? "border-emerald-600 ring-2 ring-emerald-600/25" : "border-slate-200"
   }`;
 

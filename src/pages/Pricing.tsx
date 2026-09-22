@@ -180,7 +180,7 @@ const Pricing = () => {
                 ) : (
                   <button
                     onClick={refreshRates}
-                    className="flex items-center gap-1 text-sm text-accent hover:underline"
+                    className="flex items-center gap-1 text-sm text-accent transition-colors hover:text-accent/80 hover:underline"
                   >
                     <RefreshCw className="h-3 w-3" />
                     Refresh

@@ -33,8 +33,8 @@ const AccountSettings = () => {
             to="/account/settings/general"
             className={
               !isSecurity
-                ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] dark:text-white"
-                : "pb-3 text-[#5e5e5e] dark:text-gray-400"
+                ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] transition-colors hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]"
+                : "pb-3 text-[#5e5e5e] transition-colors hover:text-[#16a34a] dark:text-gray-400 dark:hover:text-[#86efac]"
             }
           >
             General
@@ -43,8 +43,8 @@ const AccountSettings = () => {
             to="/account/settings/security"
             className={
               isSecurity
-                ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] dark:text-white"
-                : "pb-3 text-[#5e5e5e] dark:text-gray-400"
+                ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] transition-colors hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]"
+                : "pb-3 text-[#5e5e5e] transition-colors hover:text-[#16a34a] dark:text-gray-400 dark:hover:text-[#86efac]"
             }
           >
             Security

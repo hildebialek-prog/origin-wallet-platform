@@ -261,7 +261,7 @@ const AccountTransactions = () => {
                         type="button"
                         aria-label={`View transaction ${transaction.external_transaction_id || transaction.id}`}
                         onClick={() => setSelectedTransaction(transaction)}
-                        className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10"
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] transition-colors hover:bg-[#f0fdf4] hover:text-[#15803d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/30 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-[#86efac]"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </button>
@@ -426,11 +426,21 @@ const AccountTransactions = () => {
         ) : null}
 
         <div className="mt-10 flex items-center justify-center gap-5 text-[#bdbdb6] dark:text-gray-500">
-          <button className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/10">
+          <button
+            type="button"
+            disabled
+            aria-label="Previous page"
+            className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[#f0fdf4] hover:text-[#15803d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/30 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-[#86efac]"
+          >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <span className="text-[1rem] font-medium text-[#535353] dark:text-gray-300">1</span>
-          <button className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/10">
+          <button
+            type="button"
+            disabled
+            aria-label="Next page"
+            className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[#f0fdf4] hover:text-[#15803d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/30 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-[#86efac]"
+          >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>

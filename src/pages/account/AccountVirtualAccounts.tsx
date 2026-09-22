@@ -67,10 +67,10 @@ const AccountVirtualAccounts = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button className="inline-flex items-center gap-2 text-[1rem] font-semibold text-[#53627a] dark:text-gray-300">
+            <div className="inline-flex items-center gap-2 text-[1rem] font-semibold text-[#53627a] dark:text-gray-300">
               <Info className="h-4 w-4" />
               Capabilities
-            </button>
+            </div>
             <Button
               asChild
               variant="outline"
@@ -87,8 +87,8 @@ const AccountVirtualAccounts = () => {
               to="/account/virtual-accounts?tab=approved"
               className={
                 activeTab === "approved"
-                  ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] dark:text-white"
-                  : "pb-3 text-[#62708a] dark:text-gray-400"
+                  ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] transition-colors hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]"
+                  : "pb-3 text-[#62708a] transition-colors hover:text-[#16a34a] dark:text-gray-400 dark:hover:text-[#86efac]"
               }
             >
               Approved
@@ -97,8 +97,8 @@ const AccountVirtualAccounts = () => {
               to="/account/virtual-accounts?tab=pending"
               className={
                 activeTab === "pending"
-                  ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] dark:text-white"
-                  : "pb-3 text-[#62708a] dark:text-gray-400"
+                  ? "border-b-2 border-[#16a34a] pb-3 text-[#0f2442] transition-colors hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]"
+                  : "pb-3 text-[#62708a] transition-colors hover:text-[#16a34a] dark:text-gray-400 dark:hover:text-[#86efac]"
               }
             >
               Pending

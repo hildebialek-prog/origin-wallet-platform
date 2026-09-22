@@ -3483,7 +3483,7 @@ const SearchableMultiSelectField = ({
               <button
                 type="button"
                 aria-label={`Remove ${option.label}`}
-                className="rounded-full p-0.5 hover:bg-emerald-100"
+                className="rounded-full p-0.5 transition-colors hover:bg-emerald-100 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
                 onClick={() => toggleOption(option.value)}
               >
                 <X className="h-3 w-3" />
