@@ -536,7 +536,7 @@ const AccountBeneficiaries = () => {
                           {beneficiary.bank_name || beneficiary.swift_bic || "Bank account"}
                         </p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
-                          {maskAccount(beneficiary.iban || beneficiary.account_number)}
+                          {beneficiary.iban || beneficiary.account_number || "No account number"}
                         </p>
                       </div>
                       <div>
@@ -1076,7 +1076,7 @@ const ReviewBeneficiaryStep = ({
         <ReviewItem label="Bank name" value={form.bankName || "-"} />
         <ReviewItem label="SWIFT / BIC" value={form.swiftBic || "-"} />
         <ReviewItem label={routingLabel(form.countryCode)} value={form.bankCode || "-"} />
-        <ReviewItem label="Account / IBAN" value={maskAccount(form.accountNumber || form.iban)} />
+        <ReviewItem label="Account / IBAN" value={form.accountNumber || form.iban || "No account number"} />
         <ReviewItem label="Payout method" value={payoutMethodLabels[form.payoutMethod]} />
         {provider?.supports_account_verification ? (
           <ReviewItem label="Verify before create" value={verifyLabels[form.verifyBeforeCreate]} />
@@ -1236,12 +1236,5 @@ const routingLabel = (countryCode: string) => {
 
 const fullAddress = (form: BeneficiaryForm) =>
   [form.addressLine1, form.addressLine2, form.city, form.state, form.postalCode, form.countryCode].filter(Boolean).join(", ");
-
-const maskAccount = (value?: string | number | null) => {
-  const text = String(value ?? "");
-  if (!text) return "No account number";
-  if (text.length <= 4) return text;
-  return `${"*".repeat(Math.min(6, text.length - 4))}${text.slice(-4)}`;
-};
 
 export default AccountBeneficiaries;
