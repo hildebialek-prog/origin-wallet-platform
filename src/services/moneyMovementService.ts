@@ -117,6 +117,20 @@ export interface Transaction {
   status: string;
   booked_at?: string | null;
   value_date?: string | null;
+  wallet_context?: {
+    provider_account_id: number;
+    virtual_account_id?: number | null;
+    virtual_account_reference?: string | null;
+    provider_payment_id?: string | null;
+    virtual_account_currency?: string | null;
+    account_category?: string | null;
+    account_type?: string | null;
+    virtual_account_status?: string | null;
+    currency: string;
+    available_balance?: string | number | null;
+    reserved_balance?: string | number | null;
+    ledger_balance?: string | number | null;
+  } | null;
   raw_data?: Record<string, unknown> | null;
   created_at?: string | null;
   updated_at?: string | null;

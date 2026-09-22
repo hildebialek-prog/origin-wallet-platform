@@ -44,6 +44,7 @@ const AccountTransactions = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [syncError, setSyncError] = useState("");
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const transactionsQuery = useQuery({
     queryKey: ["money-transactions", user?.id, token],
@@ -85,6 +86,8 @@ const AccountTransactions = () => {
         transaction.reference_text,
         transaction.transaction_type,
         transaction.direction,
+        transaction.wallet_context?.virtual_account_reference,
+        transaction.wallet_context?.provider_payment_id,
         getProviderDisplayName(provider),
       ]
         .filter(Boolean)
@@ -237,13 +240,29 @@ const AccountTransactions = () => {
                       </div>
                       <div className={`text-right font-semibold ${directionClassName(transaction.direction)}`}>
                         {transactionAmount(transaction)}
+                        {transaction.wallet_context?.virtual_account_reference ||
+                        transaction.wallet_context?.provider_payment_id ? (
+                          <p className="mt-1 text-xs font-normal text-[#62708a] dark:text-gray-400">
+                            VA • {transaction.wallet_context.virtual_account_reference ||
+                              transaction.wallet_context.provider_payment_id}
+                          </p>
+                        ) : transaction.wallet_context ? (
+                          <p className="mt-1 text-xs font-normal text-[#62708a] dark:text-gray-400">
+                            {transaction.currency} Wallet
+                          </p>
+                        ) : null}
                         {transaction.fee_amount ? (
                           <p className="mt-1 text-xs font-normal text-[#62708a] dark:text-gray-400">
                             Fee {formatAmount(transaction.fee_amount, transaction.currency)}
                           </p>
                         ) : null}
                       </div>
-                      <button className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10">
+                      <button
+                        type="button"
+                        aria-label={`View transaction ${transaction.external_transaction_id || transaction.id}`}
+                        onClick={() => setSelectedTransaction(transaction)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10"
+                      >
                         <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>
@@ -267,6 +286,152 @@ const AccountTransactions = () => {
           </div>
         </Card>
 
+        {selectedTransaction ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Transaction details"
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target) {
+                setSelectedTransaction(null);
+              }
+            }}
+          >
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-[#151b24] sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-[#0f2442] dark:text-white">
+                    Transaction details
+                  </h2>
+                  <p className="mt-1 text-sm text-[#62708a] dark:text-gray-400">
+                    {selectedTransaction.external_transaction_id ||
+                      selectedTransaction.reference_text ||
+                      `Transaction #${selectedTransaction.id}`}
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => setSelectedTransaction(null)}
+                >
+                  Close
+                </Button>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <TransactionDetail
+                  label="Transaction ID"
+                  value={selectedTransaction.external_transaction_id || `#${selectedTransaction.id}`}
+                />
+                <TransactionDetail label="Type" value={selectedTransaction.transaction_type || "-"} />
+                <TransactionDetail label="Direction" value={selectedTransaction.direction || "-"} />
+                <TransactionDetail label="Status" value={selectedTransaction.status || "-"} />
+                <TransactionDetail label="Amount" value={transactionAmount(selectedTransaction)} />
+                <TransactionDetail
+                  label="Fee"
+                  value={formatAmount(selectedTransaction.fee_amount || 0, selectedTransaction.currency)}
+                />
+                <TransactionDetail
+                  label="Reference"
+                  value={selectedTransaction.reference_text || "-"}
+                />
+                <TransactionDetail
+                  label="Booked"
+                  value={formatDateTime(selectedTransaction.booked_at || selectedTransaction.created_at)}
+                />
+              </div>
+
+              <div className="mt-7 rounded-2xl border border-[#d7d7d2] p-5 dark:border-white/10">
+                <h3 className="font-semibold text-[#0f2442] dark:text-white">
+                  Virtual account
+                </h3>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <TransactionDetail
+                    label="VA number"
+                    value={
+                      selectedTransaction.wallet_context?.virtual_account_reference ||
+                      selectedTransaction.wallet_context?.provider_payment_id ||
+                      "-"
+                    }
+                  />
+                  <TransactionDetail
+                    label="Currency"
+                    value={
+                      selectedTransaction.wallet_context?.virtual_account_currency ||
+                      selectedTransaction.currency
+                    }
+                  />
+                  <TransactionDetail
+                    label="Account type"
+                    value={selectedTransaction.wallet_context?.account_type || "-"}
+                  />
+                  <TransactionDetail
+                    label="Category"
+                    value={selectedTransaction.wallet_context?.account_category || "-"}
+                  />
+                  <TransactionDetail
+                    label="VA status"
+                    value={selectedTransaction.wallet_context?.virtual_account_status || "-"}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-[#d7d7d2] p-5 dark:border-white/10">
+                <h3 className="font-semibold text-[#0f2442] dark:text-white">
+                  Current wallet balance
+                </h3>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <TransactionDetail
+                    label="Available"
+                    value={
+                      selectedTransaction.wallet_context?.available_balance !== null &&
+                      selectedTransaction.wallet_context?.available_balance !== undefined
+                        ? formatAmount(
+                            selectedTransaction.wallet_context.available_balance,
+                            selectedTransaction.wallet_context.currency
+                          )
+                        : "-"
+                    }
+                  />
+                  <TransactionDetail
+                    label="Reserved"
+                    value={
+                      selectedTransaction.wallet_context?.reserved_balance !== null &&
+                      selectedTransaction.wallet_context?.reserved_balance !== undefined
+                        ? formatAmount(
+                            selectedTransaction.wallet_context.reserved_balance,
+                            selectedTransaction.wallet_context.currency
+                          )
+                        : "-"
+                    }
+                  />
+                  <TransactionDetail
+                    label="Ledger"
+                    value={
+                      selectedTransaction.wallet_context?.ledger_balance !== null &&
+                      selectedTransaction.wallet_context?.ledger_balance !== undefined
+                        ? formatAmount(
+                            selectedTransaction.wallet_context.ledger_balance,
+                            selectedTransaction.wallet_context.currency
+                          )
+                        : "-"
+                    }
+                  />
+                </div>
+
+                <p className="mt-3 text-xs text-[#7a879c] dark:text-gray-500">
+                  Current wallet balance, not the historical balance at the time of the transaction.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-10 flex items-center justify-center gap-5 text-[#bdbdb6] dark:text-gray-500">
           <button className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/10">
             <ChevronLeft className="h-4 w-4" />
@@ -280,5 +445,16 @@ const AccountTransactions = () => {
     </div>
   );
 };
+
+const TransactionDetail = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-xl bg-[#f8f8f6] px-4 py-3 dark:bg-white/5">
+    <p className="text-xs font-medium uppercase tracking-wide text-[#7a879c] dark:text-gray-500">
+      {label}
+    </p>
+    <p className="mt-1 break-words font-medium text-[#0f2442] dark:text-white">
+      {value || "-"}
+    </p>
+  </div>
+);
 
 export default AccountTransactions;
