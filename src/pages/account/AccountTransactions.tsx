@@ -382,51 +382,44 @@ const AccountTransactions = () => {
 
               <div className="mt-4 rounded-2xl border border-[#d7d7d2] p-5 dark:border-white/10">
                 <h3 className="font-semibold text-[#0f2442] dark:text-white">
-                  Current wallet balance
+                  Wallet balance after transaction
                 </h3>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <TransactionDetail
-                    label="Available"
-                    value={
-                      selectedTransaction.wallet_context?.available_balance !== null &&
-                      selectedTransaction.wallet_context?.available_balance !== undefined
-                        ? formatAmount(
-                            selectedTransaction.wallet_context.available_balance,
-                            selectedTransaction.wallet_context.currency
-                          )
-                        : "-"
-                    }
-                  />
-                  <TransactionDetail
-                    label="Reserved"
-                    value={
-                      selectedTransaction.wallet_context?.reserved_balance !== null &&
-                      selectedTransaction.wallet_context?.reserved_balance !== undefined
-                        ? formatAmount(
-                            selectedTransaction.wallet_context.reserved_balance,
-                            selectedTransaction.wallet_context.currency
-                          )
-                        : "-"
-                    }
-                  />
-                  <TransactionDetail
-                    label="Ledger"
-                    value={
-                      selectedTransaction.wallet_context?.ledger_balance !== null &&
-                      selectedTransaction.wallet_context?.ledger_balance !== undefined
-                        ? formatAmount(
-                            selectedTransaction.wallet_context.ledger_balance,
-                            selectedTransaction.wallet_context.currency
-                          )
-                        : "-"
-                    }
-                  />
-                </div>
+                {selectedTransaction.wallet_context?.balance_after_transaction ? (
+                  <>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <TransactionDetail
+                        label="Available"
+                        value={formatAmount(
+                          selectedTransaction.wallet_context.balance_after_transaction.available_balance,
+                          selectedTransaction.wallet_context.balance_after_transaction.currency
+                        )}
+                      />
+                      <TransactionDetail
+                        label="Reserved"
+                        value={formatAmount(
+                          selectedTransaction.wallet_context.balance_after_transaction.reserved_balance,
+                          selectedTransaction.wallet_context.balance_after_transaction.currency
+                        )}
+                      />
+                      <TransactionDetail
+                        label="Ledger"
+                        value={formatAmount(
+                          selectedTransaction.wallet_context.balance_after_transaction.ledger_balance,
+                          selectedTransaction.wallet_context.balance_after_transaction.currency
+                        )}
+                      />
+                    </div>
 
-                <p className="mt-3 text-xs text-[#7a879c] dark:text-gray-500">
-                  Current wallet balance, not the historical balance at the time of the transaction.
-                </p>
+                    <p className="mt-3 text-xs text-[#7a879c] dark:text-gray-500">
+                      Balance recorded immediately after this transaction event.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-4 text-sm text-[#62708a] dark:text-gray-400">
+                    Historical balance is unavailable for this transaction.
+                  </p>
+                )}
               </div>
             </div>
           </div>

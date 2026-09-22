@@ -126,10 +126,15 @@ export interface Transaction {
     account_category?: string | null;
     account_type?: string | null;
     virtual_account_status?: string | null;
-    currency: string;
-    available_balance?: string | number | null;
-    reserved_balance?: string | number | null;
-    ledger_balance?: string | number | null;
+    balance_after_transaction?: {
+      currency: string;
+      available_balance: string | number;
+      reserved_balance: string | number;
+      ledger_balance: string | number;
+      source?: string | null;
+      entry_type?: string | null;
+      posted_at?: string | null;
+    } | null;
   } | null;
   raw_data?: Record<string, unknown> | null;
   created_at?: string | null;
