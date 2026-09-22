@@ -125,7 +125,7 @@ const AccountBalances = () => {
                       variant="outline"
                       disabled={syncMutation.isPending}
                       onClick={() => syncMutation.mutate(provider.code)}
-                      className="h-10 rounded-full border-[#d7d7d2] bg-white px-4 text-sm font-semibold text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white"
+                      className="h-10 rounded-full border-[#d7d7d2] bg-white px-4 text-sm font-semibold text-[#0f2442] hover:border-[#86efac] hover:bg-[#f0fdf4] hover:text-[#15803d] dark:border-white/10 dark:bg-[#10141b] dark:text-white dark:hover:border-[#16a34a]/40 dark:hover:bg-[#16a34a]/10 dark:hover:text-[#86efac]"
                     >
                       {syncMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
                       {getProviderDisplayName(provider)}
@@ -153,13 +153,13 @@ const AccountBalances = () => {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" className="h-11 rounded-full border-[#d7d7d2] bg-white px-5 font-semibold text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#151b24] dark:text-white">
+            <Button asChild variant="outline" className="h-11 rounded-full border-[#d7d7d2] bg-white px-5 font-semibold text-[#0f2442] hover:border-[#86efac] hover:bg-[#f0fdf4] hover:text-[#15803d] dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:hover:border-[#16a34a]/40 dark:hover:bg-[#16a34a]/10 dark:hover:text-[#86efac]">
               <Link to="/account/transfers">
                 <ArrowRight className="mr-2 h-4 w-4" />
                 Move funds
               </Link>
             </Button>
-            <Button variant="outline" className="h-11 rounded-full border-[#d7d7d2] bg-white px-5 font-semibold text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#151b24] dark:text-white">
+            <Button variant="outline" className="h-11 rounded-full border-[#d7d7d2] bg-white px-5 font-semibold text-[#0f2442] hover:border-[#86efac] hover:bg-[#f0fdf4] hover:text-[#15803d] dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:hover:border-[#16a34a]/40 dark:hover:bg-[#16a34a]/10 dark:hover:text-[#86efac]">
               <Download className="mr-2 h-4 w-4" />
               Statement
             </Button>
