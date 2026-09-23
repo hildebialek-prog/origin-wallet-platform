@@ -1,7 +1,7 @@
 import { Info, MoreHorizontal, RefreshCcw } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ProviderLogo } from "@/components/account/ProviderLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { normalizeStatus } from "@/lib/status";
 import { getProviderDisplayName, isPrimaryProvider, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 const AccountVirtualAccounts = () => {
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+
   const { user, token } = useAuth();
   const location = useLocation();
   const activeTab = new URLSearchParams(location.search).get("tab") || "approved";
@@ -170,7 +172,10 @@ const AccountVirtualAccounts = () => {
                           {account.status}
                         </Badge>
                       </div>
-                      <button className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] transition hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10">
+                      <button
+                        onClick={() => setSelectedAccount(account)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] transition hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10"
+                      >
                         <MoreHorizontal className="h-5 w-5" />
                       </button>
                     </div>
@@ -194,6 +199,70 @@ const AccountVirtualAccounts = () => {
           </div>
         </Card>
       </div>
+
+      {selectedAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-[#151b24]">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-[#0f2442] dark:text-white">
+                Receiving account details
+              </h2>
+
+              <button
+                onClick={() => setSelectedAccount(null)}
+                className="text-[#62708a] hover:text-black dark:hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="text-[#62708a]">Virtual Account Number</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">
+                  {selectedAccount.provider_payment_id || "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[#62708a]">Currency</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">
+                  {selectedAccount.currency || "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[#62708a]">Account Name</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">
+                  {selectedAccount.detail?.account_name || "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[#62708a]">Bank Name</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">
+                  {selectedAccount.detail?.bank_name || "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[#62708a]">Bank Address</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">
+                  {selectedAccount.detail?.bank_address || "-"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[#62708a]">Routing Code</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">
+                  {selectedAccount.detail?.routing_code_type || "-"}{" "}
+                  {selectedAccount.detail?.routing_code_value || ""}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

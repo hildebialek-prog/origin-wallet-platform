@@ -65,6 +65,13 @@ export interface VirtualAccount {
   id: number;
   user_provider_account_id: number;
   provider_payment_id: string | null;
+  detail?: {
+    account_name?: string | null;
+    bank_name?: string | null;
+    bank_address?: string | null;
+    routing_code_type?: string | null;
+    routing_code_value?: string | null;
+  } | null;
   virtual_account_reference: string | null;
   currency: string;
   account_category: string | null;
