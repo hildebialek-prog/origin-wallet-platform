@@ -49,6 +49,7 @@ export interface ProviderRate {
   provider: ProviderSummary;
   quote_status: "ready" | "managed" | "reference" | "unavailable" | "error" | string;
   quote: {
+    id?: number;
     source_currency: string;
     target_currency: string;
     source_amount: number | null;
@@ -124,13 +125,7 @@ export const createFxOrder = (params: {
   token: string;
   userId: string | number;
   providerId: number;
-  sourceCurrency: string;
-  targetCurrency: string;
-  sourceAmount: number;
-  targetAmount?: number | null;
-  fxRate?: number | null;
-  feeAmount?: number | null;
-  feeCurrency?: string | null;
+  fxQuoteId: number;
   rawData?: Record<string, unknown>;
 }) =>
   requestApi<FxOrderResponse>(`/user/users/${params.userId}/fx-orders`, {
@@ -138,13 +133,7 @@ export const createFxOrder = (params: {
     token: params.token,
     body: {
       provider_id: params.providerId,
-      source_currency: params.sourceCurrency.toUpperCase(),
-      target_currency: params.targetCurrency.toUpperCase(),
-      source_amount: params.sourceAmount,
-      target_amount: params.targetAmount ?? null,
-      fx_rate: params.fxRate ?? null,
-      fee_amount: params.feeAmount ?? 0,
-      fee_currency: params.feeCurrency?.toUpperCase() ?? params.targetCurrency.toUpperCase(),
+      fx_quote_id: params.fxQuoteId,
       raw_data: params.rawData ?? {},
     },
   });

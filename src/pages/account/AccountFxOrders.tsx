@@ -173,17 +173,15 @@ const AccountFxOrders = () => {
         throw new Error("FX rail, currency pair, and valid source amount are required first.");
       }
 
+      if (!selectedRate?.quote?.id) {
+        throw new Error("FX quote is unavailable. Please refresh the rate and try again.");
+      }
+
       return createFxOrder({
         token: token as string,
         userId: user?.id as string,
         providerId: Number(providerId),
-        sourceCurrency,
-        targetCurrency,
-        sourceAmount: numericAmount,
-        targetAmount: quote?.target_amount ?? null,
-        fxRate: getRateValue(selectedRate),
-        feeAmount: quote?.fee_amount ?? 0,
-        feeCurrency: targetCurrency,
+        fxQuoteId: Number(selectedRate.quote.id),
         rawData: {
           source: "origin_wallet_web",
           provider_code: selectedProvider.code,
