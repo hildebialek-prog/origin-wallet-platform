@@ -26,12 +26,26 @@ const Login = () => {
   const [error, setError] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [isVerifyLoading, setIsVerifyLoading] = useState(false);
+  const [isResendLoading, setIsResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
     clearAuthError();
     setError("");
     setNotice("");
   }, [clearAuthError]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setResendCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleEmailLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -43,11 +57,61 @@ const Login = () => {
       const challenge = await login(email.trim(), password);
       setEmail(challenge.email || email.trim());
       setNotice(challenge.message || "Verification code sent to your email.");
+      setResendCooldown(120);
       setStep("verify");
     } catch (authFailure) {
       setError(getAuthErrorMessage(authFailure, "Unable to sign in with email."));
     } finally {
       setIsEmailLoading(false);
+    }
+  };
+
+  const handleResendLoginCode = async () => {
+    if (isResendLoading || resendCooldown > 0) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    setIsResendLoading(true);
+
+    try {
+      const payload = await requestApi(
+        import.meta.env.VITE_AUTH_LOGIN_RESEND_PATH || "/auth/login/resend",
+        {
+          method: "POST",
+          body: {
+            email: email.trim(),
+          },
+        },
+      );
+
+      const message =
+        typeof payload === "object" &&
+        payload !== null &&
+        "message" in payload &&
+        typeof payload.message === "string"
+          ? payload.message
+          : "A new verification code has been sent to your email.";
+
+      setNotice(message);
+      setVerificationCode("");
+      setResendCooldown(
+        typeof payload === "object" &&
+        payload !== null &&
+        "resend_cooldown_seconds" in payload &&
+        typeof payload.resend_cooldown_seconds === "number"
+          ? payload.resend_cooldown_seconds
+          : 120,
+      );
+    } catch (resendFailure) {
+      setError(
+        resendFailure instanceof Error
+          ? resendFailure.message
+          : "Unable to resend verification code.",
+      );
+    } finally {
+      setIsResendLoading(false);
     }
   };
 
@@ -207,6 +271,26 @@ const Login = () => {
                   {isVerifyLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                   Verify and sign in
                 </Button>
+
+                <div className="text-center text-sm text-slate-600">
+                  {resendCooldown > 0 ? (
+                    <span>
+                      Resend code in{" "}
+                      <span className="font-semibold text-slate-800">
+                        {resendCooldown}s
+                      </span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendLoginCode}
+                      disabled={isResendLoading}
+                      className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isResendLoading ? "Sending..." : "Resend verification code"}
+                    </button>
+                  )}
+                </div>
 
                 <Button
                   type="button"
