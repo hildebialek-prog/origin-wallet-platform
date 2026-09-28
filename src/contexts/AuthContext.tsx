@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { apiBaseUrl, requestApi } from "@/services/apiClient";
+import { ApiRequestError, apiBaseUrl, requestApi } from "@/services/apiClient";
 
 const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
 const authStorageKey = "origin-wallet-auth-session";
@@ -438,7 +438,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             onboarding: refreshed.onboarding ?? parsed.onboarding ?? null,
             providers: refreshed.providers?.length ? refreshed.providers : parsed.providers ?? [],
           });
-        } catch {
+        } catch (error) {
+          if (error instanceof ApiRequestError && error.status === 401) {
+            clearSession();
+            setUser(null);
+            setToken(null);
+            setOnboarding(null);
+            setProviders([]);
+            setAuthError("Your account no longer exists. Please sign in again.");
+            return;
+          }
+
           applySession(parsed);
         }
       } catch (error) {
