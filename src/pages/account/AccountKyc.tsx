@@ -2078,8 +2078,9 @@ const AccountKyc = () => {
     }
   };
 
-  // KYC/KYB is locked after submission/approval
-  const isKycReadOnly = true;
+  // KYC/KYB is editable until a profile has been submitted.
+  // When a reviewer requests additional information, allow the user to edit again.
+  const isKycReadOnly = Boolean(profile) && !editingRequestedInfo;
   const lockedProfile = profile && isKycReadOnly ? profile : null;
   const lockedStatusOnly = isKycReadOnly && !lockedProfile;
 
