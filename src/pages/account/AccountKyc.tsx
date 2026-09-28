@@ -206,6 +206,8 @@ type BusinessForm = {
   bankCountry: string;
   bankName: string;
   bankCurrency: string;
+  bankCode: string;
+  branchCode: string;
   bankRoutingType: string;
   bankRoutingValue: string;
   annualTurnover: string;
@@ -471,6 +473,8 @@ const defaultBusinessForm = (): BusinessForm => ({
   bankCountry: "HK",
   bankName: "",
   bankCurrency: "HKD",
+  bankCode: "",
+  branchCode: "",
   bankRoutingType: "SWIFT",
   bankRoutingValue: "",
   annualTurnover: "",
@@ -956,6 +960,8 @@ const AccountKyc = () => {
       bankCountry: normalizeCountryCode(stringifyMetadata(bankAccountDetails.bankCountry)) || "HK",
       bankName: stringifyMetadata(bankAccountDetails.bankName),
       bankCurrency: stringifyMetadata(bankAccountDetails.currency) || "HKD",
+      bankCode: stringifyMetadata(niumFields.bankCode),
+      branchCode: stringifyMetadata(niumFields.branchCode),
       bankRoutingType: stringifyMetadata(routingCode.type) || "SWIFT",
       bankRoutingValue: stringifyMetadata(routingCode.value),
       annualTurnover: stringifyMetadata(sizeOfBusiness.annualTurnover),
@@ -1902,6 +1908,14 @@ const AccountKyc = () => {
                 intendedUses: selectedValues(businessForm.intendedUses),
               })
             : null,
+        bankCode:
+          applicantType === "business"
+            ? businessForm.bankCode.trim() || null
+            : null,
+        branchCode:
+          applicantType === "business"
+            ? businessForm.branchCode.trim() || null
+            : null,
         historical_trade_comment:
           applicantType === "business" ? businessForm.historicalTradeComment.trim() || null : null,
         agent:
@@ -2308,6 +2322,68 @@ const AccountKyc = () => {
                 />
                 {applicantType === "business" ? (
                   <>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
+                      <div className="border-b border-gray-100 pb-4 dark:border-white/10">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">Bank account details</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          Enter the bank account that will be used for the company.
+                        </p>
+                      </div>
+
+                      <div className="mt-5 grid gap-x-5 gap-y-6 md:grid-cols-2">
+                        <Field
+                          label="Account name"
+                          value={businessForm.bankAccountName}
+                          onChange={(value) => updateBusiness("bankAccountName", value)}
+                        />
+
+                        <Field
+                          label="Account number"
+                          value={businessForm.bankAccountNumber}
+                          onChange={(value) => updateBusiness("bankAccountNumber", value)}
+                        />
+
+                        <Field
+                          label="Bank name"
+                          value={businessForm.bankName}
+                          onChange={(value) => updateBusiness("bankName", value)}
+                        />
+
+                        <Field
+                          label="Bank country"
+                          value={businessForm.bankCountry}
+                          onChange={(value) => updateBusiness("bankCountry", value)}
+                        />
+
+                        <Field
+                          label="Currency"
+                          value={businessForm.bankCurrency}
+                          onChange={(value) => updateBusiness("bankCurrency", value)}
+                        />
+
+                        <Field
+                          label="Bank code"
+                          value={businessForm.bankCode}
+                          onChange={(value) => updateBusiness("bankCode", value)}
+                          placeholder="e.g. 016"
+                        />
+
+                        <Field
+                          label="Branch code"
+                          value={businessForm.branchCode}
+                          onChange={(value) => updateBusiness("branchCode", value)}
+                          placeholder="e.g. 478"
+                        />
+
+                        <Field
+                          label="SWIFT code"
+                          value={businessForm.bankRoutingValue}
+                          onChange={(value) => updateBusiness("bankRoutingValue", value)}
+                          placeholder="e.g. DHBKHKHH"
+                        />
+                      </div>
+                    </div>
+
                     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03] md:p-6">
                       <div className="border-b border-gray-100 pb-4 dark:border-white/10">
                         <h3 className="font-semibold text-gray-900 dark:text-white">Expected account usage</h3>
