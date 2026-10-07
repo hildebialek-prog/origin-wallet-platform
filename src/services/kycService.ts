@@ -155,6 +155,14 @@ export interface KycSubmissionResponse {
   kyc_status: string;
   kyc_profile: KycProfile | null;
   kyc_submission?: KycProfile | null;
+  biometric_kyc?: BiometricKycAction | null;
+}
+
+export interface BiometricKycAction {
+  status: "initiated";
+  mode: "biometric_kyc";
+  url: string;
+  reference_id: string | null;
 }
 
 export type KycDocumentSubjectType =

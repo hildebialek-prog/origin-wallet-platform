@@ -2,12 +2,28 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCorporateSubdivisionOptions } from "@/services/kycService";
-import { AddressFields, assertFilingDocumentEvidence, buildFilingDocumentPayload, isValidWebsite, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
+import { AddressFields, assertFilingDocumentEvidence, BiometricKycAction, buildFilingDocumentPayload, isValidWebsite, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
 
 vi.mock("@/services/kycService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/kycService")>()),
   getCorporateSubdivisionOptions: vi.fn(),
 }));
+
+describe("biometric KYC action", () => {
+  it("opens the current biometric KYC URL without rendering it as text", () => {
+    const url = "https://idv.nium.com/prod/jumio/start?referenceNumber=current";
+    render(createElement(BiometricKycAction, { url }));
+
+    expect(screen.getByRole("link", { name: /continue kyc/i })).toHaveAttribute("href", url);
+    expect(screen.queryByText(url)).not.toBeInTheDocument();
+  });
+
+  it("renders no action when no current biometric KYC URL is available", () => {
+    render(createElement(BiometricKycAction, { url: null }));
+
+    expect(screen.queryByRole("link", { name: /continue kyc/i })).not.toBeInTheDocument();
+  });
+});
 
 describe("related-person address subdivisions", () => {
   beforeEach(() => vi.mocked(getCorporateSubdivisionOptions).mockReset());

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type HTMLInputTypeAttribute } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Check, CheckCircle2, ChevronsUpDown, Circle, Loader2, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronsUpDown, Circle, ExternalLink, Loader2, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/services/apiClient";
 import {
@@ -849,6 +849,7 @@ const AccountKyc = () => {
   const addressCountryOptions = applicantType === "business" ? niumCountryOptions : countryOptions;
 
   const profile = kycQuery.data?.kyc_profile ?? null;
+  const biometricKyc = kycQuery.data?.biometric_kyc ?? null;
 
   const applyDraft = useCallback((draft: KycDraft) => {
     setStep(Number.isFinite(draft.step) ? Math.min(Math.max(draft.step, 1), 4) : 1);
@@ -2714,6 +2715,7 @@ const AccountKyc = () => {
               <SummaryRow label="KYC/KYB" value={profile?.status || user?.kycStatus || "pending"} />
               <SummaryRow label="Submitted" value={formatDate(profile?.submitted_at)} />
               <SummaryRow label="Reviewed" value={formatDate(profile?.reviewed_at)} />
+              {biometricKyc ? <BiometricKycAction url={biometricKyc.url} /> : null}
             </CardContent>
           </Card>
 
@@ -4557,5 +4559,16 @@ const SummaryRow = ({ label, value }: { label: string; value: string | number })
     <span className="text-right font-semibold capitalize text-gray-900 dark:text-white">{String(value).replace(/_/g, " ")}</span>
   </div>
 );
+
+export const BiometricKycAction = ({ url }: { url?: string | null }) => url ? (
+  <div className="pt-3">
+    <Button asChild className="w-full rounded-full bg-green-600 text-white hover:bg-green-700">
+      <a href={url} target="_blank" rel="noreferrer noopener">
+        Continue KYC
+        <ExternalLink className="ml-2 h-4 w-4" />
+      </a>
+    </Button>
+  </div>
+) : null;
 
 export default AccountKyc;
