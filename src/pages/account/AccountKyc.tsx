@@ -2108,6 +2108,7 @@ const AccountKyc = () => {
   return (
     <div className="min-h-screen bg-[#f5f5f5] p-6 dark:bg-[#161a20]">
       <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-6">
         <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl dark:text-white">
@@ -2705,6 +2706,9 @@ const AccountKyc = () => {
           </CardContent>
         </Card>
 
+        {biometricKyc ? <BiometricKycCard biometricKyc={biometricKyc} /> : null}
+        </div>
+
         <aside className="space-y-4">
           <Card className={`border shadow-sm ${statusTone(profile?.status ?? user?.kycStatus)}`}>
             <CardHeader>
@@ -2715,7 +2719,6 @@ const AccountKyc = () => {
               <SummaryRow label="KYC/KYB" value={profile?.status || user?.kycStatus || "pending"} />
               <SummaryRow label="Submitted" value={formatDate(profile?.submitted_at)} />
               <SummaryRow label="Reviewed" value={formatDate(profile?.reviewed_at)} />
-              {biometricKyc ? <BiometricKycAction url={biometricKyc.url} /> : null}
             </CardContent>
           </Card>
 
@@ -4560,15 +4563,32 @@ const SummaryRow = ({ label, value }: { label: string; value: string | number })
   </div>
 );
 
-export const BiometricKycAction = ({ url }: { url?: string | null }) => url ? (
-  <div className="pt-3">
-    <Button asChild className="w-full rounded-full bg-green-600 text-white hover:bg-green-700">
-      <a href={url} target="_blank" rel="noreferrer noopener">
-        Continue KYC
-        <ExternalLink className="ml-2 h-4 w-4" />
-      </a>
-    </Button>
-  </div>
+export const BiometricKycCard = ({ biometricKyc }: { biometricKyc?: { status: string; url: string } | null }) => biometricKyc ? (
+  <Card className="overflow-hidden border border-emerald-200 bg-white shadow-sm dark:border-emerald-500/25 dark:bg-[#1b2027]">
+    <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400" />
+    <CardHeader className="pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Next step</div>
+          <CardTitle className="mt-2 text-xl dark:text-white">Biometric verification</CardTitle>
+        </div>
+        <span className="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
+          {formatStatusLabel(biometricKyc.status).replace(/\b\w/g, (letter) => letter.toUpperCase())}
+        </span>
+      </div>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+        Your KYC/KYB profile review is complete, but an additional identity verification step is still required before biometric KYC is finished.
+      </p>
+      <Button asChild className="w-full rounded-full bg-green-600 text-white hover:bg-green-700 sm:w-auto sm:px-7">
+        <a href={biometricKyc.url} target="_blank" rel="noreferrer noopener">
+          Continue KYC
+          <ExternalLink className="ml-2 h-4 w-4" />
+        </a>
+      </Button>
+    </CardContent>
+  </Card>
 ) : null;
 
 export default AccountKyc;

@@ -159,7 +159,7 @@ export interface KycSubmissionResponse {
 }
 
 export interface BiometricKycAction {
-  status: "initiated";
+  status: "initiated" | "retry";
   mode: "biometric_kyc";
   url: string;
   reference_id: string | null;
