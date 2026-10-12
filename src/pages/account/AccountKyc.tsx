@@ -156,6 +156,8 @@ const isExpiredIdentitySessionError = (error: unknown) =>
 
 type ProfileForm = {
   legalName: string;
+  firstName: string;
+  lastName: string;
   dateOfBirth: string;
   nationality: string;
   residence: string;
@@ -249,6 +251,8 @@ type PersonForm = {
   clientId: string;
   subjectId: number | null;
   legalName: string;
+  firstName: string;
+  lastName: string;
   dateOfBirth: string;
   nationality: string;
   residence: string;
@@ -303,7 +307,7 @@ type KycDraft = {
 
 const individualStepLabels = ["Profile type", "Applicant details", "Address & risk", "Documents", "Face check", "Submit"];
 const businessStepLabels = ["Applicant details", "Business / Address information", "Documents", "Review & Submit"];
-const kycDraftVersion = 3;
+const kycDraftVersion = 4;
 const kycDraftKey = (userId: string | number) => `origin-wallet-kyc-draft:${userId}`;
 const todayInputValue = new Date().toISOString().slice(0, 10);
 const tomorrowInputValue = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
@@ -423,6 +427,8 @@ const providerIdentityDocumentType = (type: IdentityDocumentType) => type === "p
 
 const defaultProfileForm = (name = ""): ProfileForm => ({
   legalName: name,
+  firstName: "",
+  lastName: "",
   dateOfBirth: "",
   nationality: "",
   residence: "",
@@ -519,6 +525,8 @@ const defaultPersonForm = (): PersonForm => ({
   clientId: createUboClientId(),
   subjectId: null,
   legalName: "",
+  firstName: "",
+  lastName: "",
   dateOfBirth: "",
   nationality: "",
   residence: "",
@@ -921,6 +929,8 @@ const AccountKyc = () => {
     setProfileForm({
       ...defaultProfileForm(user?.name ?? ""),
       legalName: nextProfile.legal_name ?? "",
+      firstName: nextProfile.first_name ?? "",
+      lastName: nextProfile.last_name ?? "",
       dateOfBirth: toDateInputValue(nextProfile.date_of_birth),
       nationality: normalizeCountryCode(nextProfile.nationality_country_code),
       residence: normalizeCountryCode(nextProfile.residence_country_code),
@@ -1004,6 +1014,8 @@ const AccountKyc = () => {
     setRepresentativeForm({
       ...defaultPersonForm(),
       legalName: representative?.legal_name ?? "",
+      firstName: representative?.first_name ?? "",
+      lastName: representative?.last_name ?? "",
       dateOfBirth: toDateInputValue(representative?.date_of_birth),
       nationality: normalizeCountryCode(representative?.nationality_country_code),
       residence: normalizeCountryCode(representative?.residence_country_code),
@@ -1024,6 +1036,8 @@ const AccountKyc = () => {
         clientId: `related-${beneficialOwner.id}`,
         subjectId: beneficialOwner.id,
         legalName: beneficialOwner.legal_name ?? "",
+        firstName: beneficialOwner.first_name ?? "",
+        lastName: beneficialOwner.last_name ?? "",
         dateOfBirth: toDateInputValue(beneficialOwner.date_of_birth),
         nationality: normalizeCountryCode(beneficialOwner.nationality_country_code),
         residence: normalizeCountryCode(beneficialOwner.residence_country_code),
@@ -1046,7 +1060,10 @@ const AccountKyc = () => {
       return {
         ...form,
         clientId: director.id ? `company-director-${director.id}` : form.clientId,
+        subjectId: director.id ?? null,
         legalName: director.legal_name ?? "",
+        firstName: director.first_name ?? "",
+        lastName: director.last_name ?? "",
         dateOfBirth: toDateInputValue(director.date_of_birth),
         nationality: normalizeCountryCode(director.nationality_country_code),
         residence: normalizeCountryCode(director.residence_country_code),
@@ -1534,8 +1551,8 @@ const AccountKyc = () => {
 
   const requiredFilled = (values: string[]) => values.every((value) => value.trim() !== "");
   const requiredSelects = (values: string[]) => values.every((value) => value.trim() !== "");
-  const validPersonDetails = (form: Pick<PersonForm, "legalName" | "dateOfBirth" | "nationality" | "residence">) =>
-    requiredFilled([form.legalName]) && isDateValue(form.dateOfBirth) && isCountryCode(form.nationality) && isCountryCode(form.residence);
+  const validPersonDetails = (form: Pick<PersonForm, "legalName" | "firstName" | "lastName" | "dateOfBirth" | "nationality" | "residence">) =>
+    requiredFilled([form.legalName, form.firstName, form.lastName]) && isDateValue(form.dateOfBirth) && isCountryCode(form.nationality) && isCountryCode(form.residence);
   const validAddress = (form: Pick<PersonForm, "countryCode" | "addressLine1" | "city">) =>
     isCountryCode(form.countryCode) && requiredFilled([form.addressLine1, form.city]);
   const validIdentityDocuments = (form: Pick<PersonForm, DocumentFieldKey>, corporate = false) => {
@@ -1582,7 +1599,10 @@ const AccountKyc = () => {
     if (step === 1) {
       if (applicantType === "individual") {
         return (
-          validPersonDetails(profileForm) &&
+          requiredFilled([profileForm.legalName, profileForm.firstName, profileForm.lastName]) &&
+          isDateValue(profileForm.dateOfBirth) &&
+          isCountryCode(profileForm.nationality) &&
+          isCountryCode(profileForm.residence) &&
           requiredSelects([profileForm.occupation, profileForm.sourceOfFunds, profileForm.expectedMonthlyVolume])
         );
       }
@@ -1769,6 +1789,8 @@ const AccountKyc = () => {
     return {
       applicant_type: applicantType,
       legal_name: profileForm.legalName.trim(),
+      first_name: applicantType === "individual" ? profileForm.firstName.trim() : null,
+      last_name: applicantType === "individual" ? profileForm.lastName.trim() : null,
       date_of_birth: applicantType === "individual" ? normalizeDateValue(profileForm.dateOfBirth) : null,
       nationality_country_code: normalizeCountryCode(profileForm.nationality) || null,
       residence_country_code: normalizeCountryCode(profileForm.residence) || null,
@@ -1787,8 +1809,11 @@ const AccountKyc = () => {
         applicantType === "business"
           ? [
               {
+                id: representativeForm.subjectId ?? undefined,
                 relationship_type: "authorized_representative",
                 legal_name: representativeForm.legalName.trim(),
+                first_name: representativeForm.firstName.trim(),
+                last_name: representativeForm.lastName.trim(),
                 date_of_birth: normalizeDateValue(representativeForm.dateOfBirth),
                 nationality_country_code: normalizeCountryCode(representativeForm.nationality),
                 residence_country_code: normalizeCountryCode(representativeForm.residence),
@@ -1799,6 +1824,7 @@ const AccountKyc = () => {
                 country_code: normalizeCountryCode(representativeForm.countryCode),
                 metadata: {
                   role: representativeForm.role.trim(),
+                  passport_name_fields_version: 1,
                   positions: [representativeForm.role.trim().toLowerCase().replace(/[ -]+/g, "_")],
                   phone: e164Phone(representativeForm.phoneCallingCode, representativeForm.phoneNumber),
                 },
@@ -1810,8 +1836,11 @@ const AccountKyc = () => {
                 ),
               },
               ...beneficialOwnerForms.map((beneficialOwnerForm) => ({
+                id: beneficialOwnerForm.subjectId ?? undefined,
                 relationship_type: "beneficial_owner",
                 legal_name: beneficialOwnerForm.legalName.trim(),
+                first_name: beneficialOwnerForm.firstName.trim(),
+                last_name: beneficialOwnerForm.lastName.trim(),
                 date_of_birth: normalizeDateValue(beneficialOwnerForm.dateOfBirth),
                 nationality_country_code: normalizeCountryCode(beneficialOwnerForm.nationality),
                 residence_country_code: normalizeCountryCode(beneficialOwnerForm.residence),
@@ -1821,7 +1850,7 @@ const AccountKyc = () => {
                 state: beneficialOwnerForm.state.trim() || null,
                 postal_code: beneficialOwnerForm.postalCode.trim() || null,
                 country_code: normalizeCountryCode(beneficialOwnerForm.countryCode),
-                metadata: { role: "beneficial_owner" },
+                metadata: { role: "beneficial_owner", passport_name_fields_version: 1 },
                 documents: buildPersonDocuments(beneficialOwnerForm, "beneficial_owner", documentEvidence(`beneficial_owner:${beneficialOwnerForm.clientId}`), true),
               })),
             ]
@@ -1831,7 +1860,10 @@ const AccountKyc = () => {
           ? companyDirectorForms
               .filter((directorForm) => directorForm.legalName.trim())
               .map((directorForm) => ({
+                id: directorForm.subjectId ?? undefined,
                 legal_name: directorForm.legalName.trim(),
+                first_name: directorForm.firstName.trim(),
+                last_name: directorForm.lastName.trim(),
                 date_of_birth: normalizeDateValue(directorForm.dateOfBirth),
                 nationality_country_code: normalizeCountryCode(directorForm.nationality) || null,
                 residence_country_code: normalizeCountryCode(directorForm.residence) || null,
@@ -1843,6 +1875,7 @@ const AccountKyc = () => {
                 country_code: normalizeCountryCode(directorForm.countryCode) || null,
                 metadata: {
                   source: "origin_wallet_onboarding",
+                  passport_name_fields_version: 1,
                 },
                 documents: buildInternalCompanyDirectorDocuments(
                   directorForm,
@@ -1851,6 +1884,7 @@ const AccountKyc = () => {
               }))
           : [],
       metadata: {
+        passport_name_fields_version: 1,
         source: "origin_wallet_platform",
         verification_consent: verificationConsent,
         verification_consent_at: consentAt,
@@ -1957,6 +1991,8 @@ const AccountKyc = () => {
     return {
       relationship_type: relationshipType || (isBeneficialOwner ? "beneficial_owner" : "authorized_representative"),
       legal_name: form.legalName.trim(),
+      first_name: form.firstName.trim(),
+      last_name: form.lastName.trim(),
       date_of_birth: normalizeDateValue(form.dateOfBirth),
       nationality_country_code: normalizeCountryCode(form.nationality),
       residence_country_code: normalizeCountryCode(form.residence),
@@ -1967,6 +2003,7 @@ const AccountKyc = () => {
       postal_code: form.postalCode.trim() || null,
       country_code: normalizeCountryCode(form.countryCode),
       metadata: {
+        passport_name_fields_version: 1,
         role: isBeneficialOwner
           ? relationshipType || "beneficial_owner"
           : form.role.trim() || relationshipType || "authorized_representative",
@@ -2174,7 +2211,18 @@ const AccountKyc = () => {
                     </p>
                   </div>
                 ) : null}
-                <Field label={applicantType === "business" ? "Company legal name" : "Legal name"} value={profileForm.legalName} onChange={applicantType === "business" ? updateCompanyLegalName : (value) => updateProfile("legalName", value)} />
+                {applicantType === "business" ? (
+                  <Field label="Company legal name" value={profileForm.legalName} onChange={updateCompanyLegalName} />
+                ) : (
+                  <div className="space-y-4">
+                    <Field label="Full legal name" value={profileForm.legalName} onChange={(value) => updateProfile("legalName", value)} helperText="Enter the complete legal name exactly in the order shown on the identity document." />
+                    <PassportNameGuide />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="First Name (Given Names)" value={profileForm.firstName} onChange={(value) => updateProfile("firstName", value)} helperText="Enter all given names exactly as shown on the passport." />
+                      <Field label="Last Name (Surname / Family Name)" value={profileForm.lastName} onChange={(value) => updateProfile("lastName", value)} helperText="Enter the surname exactly as shown on the passport." />
+                    </div>
+                  </div>
+                )}
                 {applicantType === "individual" ? (
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -3628,8 +3676,13 @@ const PersonDetails = ({
 }) => (
   <div className="rounded-2xl border border-gray-200 p-4">
     <h3 className="font-semibold text-gray-900">{title}</h3>
+    <div className="mt-4">
+      <PassportNameGuide />
+    </div>
     <div className="mt-4 grid gap-4 md:grid-cols-3">
-      <Field label="Legal name" value={form.legalName} onChange={(value) => onChange("legalName", value)} />
+      <Field label="Full legal name" value={form.legalName} onChange={(value) => onChange("legalName", value)} helperText="Enter the complete legal name exactly in the order shown on the identity document." />
+      <Field label="First Name (Given Names)" value={form.firstName} onChange={(value) => onChange("firstName", value)} helperText="Include every given name and middle name shown on the passport." />
+      <Field label="Last Name (Surname / Family Name)" value={form.lastName} onChange={(value) => onChange("lastName", value)} helperText="Use the passport surname without reordering it." />
       <Field label="Date of birth" value={form.dateOfBirth} onChange={(value) => onChange("dateOfBirth", value)} type="date" max={todayInputValue} />
       {includeOwnership ? (
         <div><Field label="Ownership %" value={form.ownershipPercentage} onChange={(value) => onChange("ownershipPercentage", value)} onBlur={onOwnershipBlur} type="number" min="0" max="100" />{ownershipError ? <p className="text-xs text-red-600">{ownershipError}</p> : null}</div>
@@ -3667,6 +3720,15 @@ const PersonDetails = ({
         <p className="text-xs text-gray-500">Submitted as {e164Phone(form.phoneCallingCode, form.phoneNumber) || "an E.164 phone number"}.</p>
       </div>
     ) : null}
+  </div>
+);
+
+const PassportNameGuide = () => (
+  <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+    <p className="font-medium">Copy each passport field exactly. Do not derive the full legal name or reorder names based on nationality.</p>
+    <p className="mt-1 text-xs leading-5 text-sky-800">
+      Passport: Surname <strong>NGUYEN</strong>, Given Names <strong>THANH PHUONG</strong>. Enter First Name: <strong>THANH PHUONG</strong>, Last Name: <strong>NGUYEN</strong>.
+    </p>
   </div>
 );
 

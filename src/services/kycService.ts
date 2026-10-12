@@ -18,8 +18,11 @@ export interface KycDocumentPayload {
 }
 
 export interface KycRelatedPersonPayload {
+  id?: number;
   relationship_type: string;
   legal_name: string;
+  first_name: string;
+  last_name: string;
   date_of_birth?: string | null;
   nationality_country_code?: string | null;
   residence_country_code?: string | null;
@@ -78,6 +81,8 @@ export interface HkCorporateFullFields {
 export interface KycCompanyDirectorPayload {
   id?: number;
   legal_name: string;
+  first_name: string;
+  last_name: string;
   date_of_birth?: string | null;
   nationality_country_code?: string | null;
   residence_country_code?: string | null;
@@ -102,6 +107,8 @@ export interface HkCorporateUsagePayload {
 export interface KycSubmissionPayload {
   applicant_type: "individual" | "business";
   legal_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   date_of_birth?: string | null;
   nationality_country_code?: string | null;
   residence_country_code?: string | null;
