@@ -179,6 +179,12 @@ export interface KycApplicantCorrectionValues {
   date_of_birth: string;
 }
 
+export interface KycApplicantPassportMetadata {
+  document_number: string;
+  issuing_country_code: string;
+  expires_at: string;
+}
+
 export interface KycApplicantCorrection {
   id: number;
   correction_version: number;

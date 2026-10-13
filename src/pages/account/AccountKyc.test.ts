@@ -59,7 +59,9 @@ describe("applicant KYC correction", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /request applicant correction/i }));
     fireEvent.change(screen.getByDisplayValue("THANH PHUONG"), { target: { value: "THANH PHUONG AN" } });
-    fireEvent.click(screen.getByRole("button", { name: /submit correction for review/i }));
+    const submit = screen.getByRole("button", { name: /submit correction for review/i });
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
       ...current,
@@ -133,10 +135,19 @@ describe("applicant KYC correction", () => {
     expect(screen.getByDisplayValue("THANH PHUONG")).not.toBeDisabled();
     const file = new File(["passport"], "passport.pdf", { type: "application/pdf" });
     fireEvent.change(screen.getByLabelText("Passport document"), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText("Passport Number"), { target: { value: "P1234567" } });
+    fireEvent.change(screen.getByLabelText("Issuing Country"), { target: { value: "HK" } });
+    fireEvent.change(screen.getByLabelText("Passport Expiry Date"), { target: { value: "2099-12-31" } });
     fireEvent.change(screen.getByDisplayValue("THANH PHUONG"), { target: { value: "THANH PHUONG AN" } });
-    fireEvent.click(screen.getByRole("button", { name: /submit correction for review/i }));
+    const submit = screen.getByRole("button", { name: /submit correction for review/i });
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ ...current, first_name: "THANH PHUONG AN" }, file));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
+      { ...current, first_name: "THANH PHUONG AN" },
+      file,
+      { document_number: "P1234567", issuing_country_code: "HK", expires_at: "2099-12-31" },
+    ));
   });
 
   it("submits a passport-only request without full-form field validation", async () => {
@@ -157,9 +168,40 @@ describe("applicant KYC correction", () => {
     fireEvent.click(screen.getByRole("button", { name: /update requested kyc information/i }));
     const file = new File(["passport"], "passport.pdf", { type: "application/pdf" });
     fireEvent.change(screen.getByLabelText("Passport document"), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText("Passport Number"), { target: { value: "P7654321" } });
+    fireEvent.change(screen.getByLabelText("Issuing Country"), { target: { value: "SG" } });
+    fireEvent.change(screen.getByLabelText("Passport Expiry Date"), { target: { value: "2099-12-31" } });
     fireEvent.click(screen.getByRole("button", { name: /submit correction for review/i }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(incompleteCurrent, file));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
+      incompleteCurrent,
+      file,
+      { document_number: "P7654321", issuing_country_code: "SG", expires_at: "2099-12-31" },
+    ));
+  });
+
+  it("does not submit a requested passport correction without complete passport metadata", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(createElement(ApplicantCorrectionCard, {
+      state: {
+        eligible: false, current_values: current, correction_version: 1, source_fingerprint: "a".repeat(64),
+        correction: {
+          id: 13, correction_version: 1, status: "requested", before_values: current, proposed_values: current,
+          requested_fields: [], requested_document_types: ["passport"], request_instruction: "Upload passport.",
+        },
+      },
+      onSubmit,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /update requested kyc information/i }));
+    fireEvent.change(screen.getByLabelText("Passport document"), {
+      target: { files: [new File(["passport"], "passport.pdf", { type: "application/pdf" })] },
+    });
+    const submit = screen.getByRole("button", { name: /submit correction for review/i });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(onSubmit).not.toHaveBeenCalled());
   });
 });
 

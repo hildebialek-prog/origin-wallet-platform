@@ -24,6 +24,7 @@ import {
   type IdentityVerificationSubject,
   type KycDocumentPayload,
   type KycApplicantCorrectionState,
+  type KycApplicantPassportMetadata,
   type KycApplicantCorrectionValues,
   type KycDocumentSubjectType,
   type KycProfile,
@@ -2211,10 +2212,20 @@ const AccountKyc = () => {
               <ApplicantCorrectionCard
                 state={correctionQuery.data}
                 isPending={correctionQuery.isFetching}
-                onSubmit={async (values, passportFile) => {
+                onSubmit={async (values, passportFile, passportMetadata) => {
                   if (!user?.id || !token || !correctionQuery.data?.correction_version || !correctionQuery.data.source_fingerprint) return;
                   const requested = correctionQuery.data.correction?.status === "requested" ? correctionQuery.data.correction : null;
-                  const documents = passportFile ? [(await uploadKycDocument({ token, userId: user.id, type: "passport", file: passportFile, subjectType: "applicant", metadata: { correction_id: requested?.id } })).document] : undefined;
+                  const documents = passportFile ? [(await uploadKycDocument({
+                    token,
+                    userId: user.id,
+                    type: "passport",
+                    file: passportFile,
+                    subjectType: "applicant",
+                    documentNumber: passportMetadata?.document_number,
+                    issuingCountryCode: passportMetadata?.issuing_country_code,
+                    expiresAt: passportMetadata?.expires_at,
+                    metadata: { correction_id: requested?.id },
+                  })).document] : undefined;
                   const response = await submitKycApplicantCorrection({
                     userId: user.id,
                     token,
@@ -2847,7 +2858,11 @@ export const ApplicantCorrectionCard = ({
 }: {
   state: KycApplicantCorrectionState;
   isPending?: boolean;
-  onSubmit: (values: KycApplicantCorrectionValues, passportFile?: File | null) => Promise<void>;
+  onSubmit: (
+    values: KycApplicantCorrectionValues,
+    passportFile?: File | null,
+    passportMetadata?: KycApplicantPassportMetadata,
+  ) => Promise<void>;
   onError?: (error: unknown) => void;
 }) => {
   const initial = state.current_values ?? state.correction?.proposed_values;
@@ -2860,12 +2875,22 @@ export const ApplicantCorrectionCard = ({
   });
   const [submitting, setSubmitting] = useState(false);
   const [passportFile, setPassportFile] = useState<File | null>(null);
+  const [passportMetadata, setPassportMetadata] = useState<KycApplicantPassportMetadata>({
+    document_number: "",
+    issuing_country_code: "",
+    expires_at: "",
+  });
 
   useEffect(() => {
     const next = state.current_values ?? state.correction?.proposed_values;
     if (next) setValues(next);
     if (state.correction?.status !== "requested") setEditing(false);
   }, [state]);
+
+  useEffect(() => {
+    setPassportFile(null);
+    setPassportMetadata({ document_number: "", issuing_country_code: "", expires_at: "" });
+  }, [state.correction?.id, state.correction?.correction_version]);
 
   if (state.correction && state.correction.status !== "requested") {
     return (
@@ -2886,6 +2911,13 @@ export const ApplicantCorrectionCard = ({
   }
 
   const adminRequest = state.correction?.status === "requested" ? state.correction : null;
+  const passportRequested = adminRequest?.requested_document_types?.includes("passport") ?? false;
+  const passportMetadataComplete = !passportRequested || (
+    passportFile !== null
+    && /^[A-Za-z0-9]{1,30}$/.test(passportMetadata.document_number.trim())
+    && /^[A-Z]{2}$/.test(passportMetadata.issuing_country_code.trim().toUpperCase())
+    && passportMetadata.expires_at > todayInputValue
+  );
   if ((!state.eligible && !adminRequest) || !initial) return null;
 
   if (adminRequest && !editing) {
@@ -2922,14 +2954,22 @@ export const ApplicantCorrectionCard = ({
     if (requiredFields.some((field) => !String(values[field] ?? "").trim())) return;
     setSubmitting(true);
     try {
-      if (adminRequest?.requested_document_types?.includes("passport") && !passportFile) return;
+      if (!passportMetadataComplete) return;
       const submittedValues = {
         legal_name: values.legal_name.trim(),
         first_name: values.first_name.trim(),
         last_name: values.last_name.trim(),
         date_of_birth: values.date_of_birth,
       };
-      if (adminRequest) await onSubmit(submittedValues, passportFile);
+      if (adminRequest) await onSubmit(
+        submittedValues,
+        passportFile,
+        passportRequested ? {
+          document_number: passportMetadata.document_number.trim(),
+          issuing_country_code: passportMetadata.issuing_country_code.trim().toUpperCase(),
+          expires_at: passportMetadata.expires_at,
+        } : undefined,
+      );
       else await onSubmit(submittedValues);
     } catch (error) {
       onError?.(error);
@@ -2951,10 +2991,18 @@ export const ApplicantCorrectionCard = ({
         <Field label="Last Name (Surname / Family Name)" value={values.last_name} disabled={!!adminRequest && !adminRequest.requested_fields?.includes("last_name")} onChange={(value) => update("last_name", value)} />
       </div>
       <Field label="Date of birth" type="date" value={values.date_of_birth} disabled={!!adminRequest && !adminRequest.requested_fields?.includes("date_of_birth")} onChange={(value) => update("date_of_birth", value)} />
-      {adminRequest?.requested_document_types?.includes("passport") ? <label className="block text-sm font-medium">Passport document<input aria-label="Passport document" className="mt-2 block w-full" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setPassportFile(event.target.files?.[0] ?? null)} /></label> : null}
+      {adminRequest?.requested_document_types?.includes("passport") ? (
+        <div className="space-y-4 rounded-xl border border-cyan-200 bg-white/70 p-4">
+          <Field label="Passport Number" value={passportMetadata.document_number} onChange={(value) => setPassportMetadata((current) => ({ ...current, document_number: value }))} />
+          <SelectField label="Issuing Country" value={passportMetadata.issuing_country_code} onChange={(value) => setPassportMetadata((current) => ({ ...current, issuing_country_code: value }))} options={countryOptions} placeholder="Select issuing country" />
+          <Field label="Passport Expiry Date" type="date" min={tomorrowInputValue} value={passportMetadata.expires_at} onChange={(value) => setPassportMetadata((current) => ({ ...current, expires_at: value }))} />
+          <label className="block text-sm font-medium">Passport document<input aria-label="Passport document" className="mt-2 block w-full" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setPassportFile(event.target.files?.[0] ?? null)} /></label>
+          <p className="text-xs text-cyan-800">Passport number, issuing country, future expiry date, and document are all required.</p>
+        </div>
+      ) : null}
       <div className="flex gap-3">
         <Button type="button" variant="outline" disabled={submitting || isPending} onClick={() => setEditing(false)}>Cancel</Button>
-        <Button type="button" disabled={submitting || isPending} onClick={() => void submit()}>
+        <Button type="button" disabled={submitting || isPending || !passportMetadataComplete} onClick={() => void submit()}>
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Submit correction for review
         </Button>
@@ -3546,6 +3594,7 @@ const Field = ({
   <div className="space-y-2">
     <Label>{label}</Label>
     <Input
+      aria-label={label}
       value={value}
       max={max}
       maxLength={maxLength}
@@ -3682,6 +3731,7 @@ const SelectField = <TValue extends string>({
   <div className="space-y-2" data-kyc-field={fieldId}>
     <Label>{label}</Label>
     <select
+      aria-label={label}
       className="h-12 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm"
       value={value}
       translate="no"
