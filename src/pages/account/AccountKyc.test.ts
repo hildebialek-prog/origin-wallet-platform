@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCorporateSubdivisionOptions } from "@/services/kycService";
-import { AddressFields, assertFilingDocumentEvidence, BiometricKycCard, buildFilingDocumentPayload, isValidWebsite, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
+import { AddressFields, ApplicantCorrectionCard, assertFilingDocumentEvidence, BiometricKycCard, buildFilingDocumentPayload, isValidWebsite, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
 
 vi.mock("@/services/kycService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/kycService")>()),
@@ -25,6 +25,141 @@ describe("biometric KYC action", () => {
 
     expect(screen.queryByRole("link", { name: /continue kyc/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Biometric verification")).not.toBeInTheDocument();
+  });
+});
+
+describe("applicant KYC correction", () => {
+  const current = {
+    legal_name: "NGUYEN THANH PHUONG",
+    first_name: "THANH PHUONG",
+    last_name: "NGUYEN",
+    date_of_birth: "1990-01-01",
+  };
+
+  it("only shows the correction action when backend confirms eligibility", () => {
+    const { rerender } = render(createElement(ApplicantCorrectionCard, {
+      state: { eligible: false, reason: "Not eligible" },
+      onSubmit: vi.fn(),
+    }));
+    expect(screen.queryByRole("button", { name: /request applicant correction/i })).not.toBeInTheDocument();
+
+    rerender(createElement(ApplicantCorrectionCard, {
+      state: { eligible: true, current_values: current, correction_version: 1, source_fingerprint: "a".repeat(64) },
+      onSubmit: vi.fn(),
+    }));
+    expect(screen.getByRole("button", { name: /request applicant correction/i })).toBeVisible();
+  });
+
+  it("submits only the four allowed applicant fields", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(createElement(ApplicantCorrectionCard, {
+      state: { eligible: true, current_values: current, correction_version: 1, source_fingerprint: "a".repeat(64) },
+      onSubmit,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /request applicant correction/i }));
+    fireEvent.change(screen.getByDisplayValue("THANH PHUONG"), { target: { value: "THANH PHUONG AN" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit correction for review/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
+      ...current,
+      first_name: "THANH PHUONG AN",
+    }));
+  });
+
+  it("shows proposed values as read-only while review is pending", () => {
+    render(createElement(ApplicantCorrectionCard, {
+      state: {
+        eligible: false,
+        correction: {
+          id: 10,
+          correction_version: 1,
+          status: "submitted",
+          before_values: current,
+          proposed_values: { ...current, last_name: "NGUYEN VAN" },
+          provider_update: { allowed: false, reason: "Nium Customer Update is disabled; this correction cannot be approved yet." },
+        },
+      },
+      onSubmit: vi.fn(),
+    }));
+
+    expect(screen.getByText(/awaiting review/i)).toBeVisible();
+    expect(screen.getByText(/waiting for provider support: nium customer update is disabled/i)).toBeVisible();
+    expect(screen.getByText("NGUYEN VAN")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /request applicant correction/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the previous review reason while allowing the next correction version", () => {
+    render(createElement(ApplicantCorrectionCard, {
+      state: {
+        eligible: true,
+        current_values: current,
+        correction_version: 2,
+        source_fingerprint: "b".repeat(64),
+        latest_resolved_correction: {
+          id: 10,
+          correction_version: 1,
+          status: "needs_more_info",
+          before_values: current,
+          proposed_values: { ...current, last_name: "NGUYEN VAN" },
+          review_note: "Surname does not match the passport.",
+        },
+      },
+      onSubmit: vi.fn(),
+    }));
+
+    expect(screen.getByText("Surname does not match the passport.")).toBeVisible();
+    expect(screen.getByText(/correction version 1/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /request applicant correction/i })).toBeVisible();
+  });
+
+  it("enforces an admin-scoped field and passport request in the correction form", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(createElement(ApplicantCorrectionCard, {
+      state: {
+        eligible: false, current_values: current, correction_version: 1, source_fingerprint: "a".repeat(64),
+        correction: {
+          id: 11, correction_version: 1, status: "requested", before_values: current, proposed_values: current,
+          requested_fields: ["first_name"], requested_document_types: ["passport"],
+          request_instruction: "Correct given names and upload passport.", request_origin: "admin",
+        },
+      },
+      onSubmit,
+    }));
+
+    expect(screen.getByText("Correct given names and upload passport.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /update requested kyc information/i }));
+    expect(screen.getByDisplayValue("NGUYEN THANH PHUONG")).toBeDisabled();
+    expect(screen.getByDisplayValue("THANH PHUONG")).not.toBeDisabled();
+    const file = new File(["passport"], "passport.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText("Passport document"), { target: { files: [file] } });
+    fireEvent.change(screen.getByDisplayValue("THANH PHUONG"), { target: { value: "THANH PHUONG AN" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit correction for review/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ ...current, first_name: "THANH PHUONG AN" }, file));
+  });
+
+  it("submits a passport-only request without full-form field validation", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const incompleteCurrent = { ...current, first_name: "", last_name: "" };
+    render(createElement(ApplicantCorrectionCard, {
+      state: {
+        eligible: false, current_values: incompleteCurrent, correction_version: 1, source_fingerprint: "a".repeat(64),
+        correction: {
+          id: 12, correction_version: 1, status: "requested", before_values: incompleteCurrent, proposed_values: incompleteCurrent,
+          requested_fields: [], requested_document_types: ["passport"],
+          request_instruction: "Upload a new passport.", request_origin: "admin",
+        },
+      },
+      onSubmit,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /update requested kyc information/i }));
+    const file = new File(["passport"], "passport.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText("Passport document"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: /submit correction for review/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(incompleteCurrent, file));
   });
 });
 

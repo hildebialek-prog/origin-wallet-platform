@@ -8,12 +8,14 @@ import {
 } from "@/services/hkCorporateKyc";
 import {
   completeIdentityVerificationSession,
+  getKycApplicantCorrection,
   getKycProfile,
   getCorporateSubdivisionOptions,
   getCorporateConstantOptions,
   resubmitKycRequirement,
   startIdentityVerificationSession,
   submitKycProfile,
+  submitKycApplicantCorrection,
   uploadKycDocument,
   uploadIdentityVerificationFile,
   type IdentityCaptureType,
@@ -21,6 +23,8 @@ import {
   type IdentityVerificationSession,
   type IdentityVerificationSubject,
   type KycDocumentPayload,
+  type KycApplicantCorrectionState,
+  type KycApplicantCorrectionValues,
   type KycDocumentSubjectType,
   type KycProfile,
   type KycRequirement,
@@ -826,6 +830,11 @@ const AccountKyc = () => {
     queryKey: ["kyc-profile", user?.id, token],
     enabled: !!user?.id && !!token,
     queryFn: async () => getKycProfile({ userId: user?.id as string, token: token as string }),
+  });
+  const correctionQuery = useQuery({
+    queryKey: ["kyc-applicant-correction", user?.id, token],
+    enabled: !!user?.id && !!token && !!kycQuery.data?.kyc_profile,
+    queryFn: () => getKycApplicantCorrection({ userId: user?.id as string, token: token as string }),
   });
   const constantsQuery = useQuery({
     queryKey: ["nium-corporate-constants", user?.id, token, "HK"],
@@ -2198,6 +2207,31 @@ const AccountKyc = () => {
               />
             ) : null}
 
+            {lockedProfile && correctionQuery.data ? (
+              <ApplicantCorrectionCard
+                state={correctionQuery.data}
+                isPending={correctionQuery.isFetching}
+                onSubmit={async (values, passportFile) => {
+                  if (!user?.id || !token || !correctionQuery.data?.correction_version || !correctionQuery.data.source_fingerprint) return;
+                  const requested = correctionQuery.data.correction?.status === "requested" ? correctionQuery.data.correction : null;
+                  const documents = passportFile ? [(await uploadKycDocument({ token, userId: user.id, type: "passport", file: passportFile, subjectType: "applicant", metadata: { correction_id: requested?.id } })).document] : undefined;
+                  const response = await submitKycApplicantCorrection({
+                    userId: user.id,
+                    token,
+                    correctionVersion: correctionQuery.data.correction_version,
+                    sourceFingerprint: correctionQuery.data.source_fingerprint,
+                    values,
+                    correctionId: requested?.id,
+                    documents,
+                  });
+                  setMessage(response.message);
+                  setFormError("");
+                  await correctionQuery.refetch();
+                }}
+                onError={(error) => setFormError(error instanceof Error ? error.message : "Unable to submit the KYC correction.")}
+              />
+            ) : null}
+
             {lockedStatusOnly ? <LockedKycStatusOnlySummary status={profile?.status ?? user?.kycStatus} /> : null}
 
             {!isKycReadOnly && step === 1 ? (
@@ -2805,6 +2839,130 @@ const AccountKyc = () => {
   );
 };
 
+export const ApplicantCorrectionCard = ({
+  state,
+  isPending = false,
+  onSubmit,
+  onError,
+}: {
+  state: KycApplicantCorrectionState;
+  isPending?: boolean;
+  onSubmit: (values: KycApplicantCorrectionValues, passportFile?: File | null) => Promise<void>;
+  onError?: (error: unknown) => void;
+}) => {
+  const initial = state.current_values ?? state.correction?.proposed_values;
+  const [editing, setEditing] = useState(false);
+  const [values, setValues] = useState<KycApplicantCorrectionValues>(() => initial ?? {
+    legal_name: "",
+    first_name: "",
+    last_name: "",
+    date_of_birth: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [passportFile, setPassportFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    const next = state.current_values ?? state.correction?.proposed_values;
+    if (next) setValues(next);
+    if (state.correction?.status !== "requested") setEditing(false);
+  }, [state]);
+
+  if (state.correction && state.correction.status !== "requested") {
+    return (
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+        <div className="font-semibold">Applicant correction awaiting review</div>
+        <p className="mt-1 text-sm">Your approved KYC record remains unchanged until an administrator reviews this request.</p>
+        {state.correction.provider_update?.allowed === false ? (
+          <p className="mt-1 text-sm">Waiting for provider support: {state.correction.provider_update.reason}</p>
+        ) : null}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <SummaryRow label="Proposed legal name" value={state.correction.proposed_values.legal_name} />
+          <SummaryRow label="Proposed date of birth" value={state.correction.proposed_values.date_of_birth} />
+          <SummaryRow label="First Name (Given Names)" value={state.correction.proposed_values.first_name} />
+          <SummaryRow label="Last Name (Surname / Family Name)" value={state.correction.proposed_values.last_name} />
+        </div>
+      </section>
+    );
+  }
+
+  const adminRequest = state.correction?.status === "requested" ? state.correction : null;
+  if ((!state.eligible && !adminRequest) || !initial) return null;
+
+  if (adminRequest && !editing) {
+    return <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950"><div className="font-semibold">KYC update requested</div><p className="mt-1 text-sm">{adminRequest.request_instruction}</p><div className="mt-2 text-xs">Only the requested applicant fields and passport document can be submitted.</div><Button type="button" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Update requested KYC information</Button></section>;
+  }
+
+  if (!editing) {
+    const returnedCorrection = state.latest_resolved_correction?.status === "needs_more_info"
+      ? state.latest_resolved_correction
+      : null;
+    return (
+      <div className="space-y-3">
+        {returnedCorrection ? (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+            <div className="font-semibold">Previous correction needs more information</div>
+            <p className="mt-1 text-sm">{returnedCorrection.review_note || "Please review the passport details and submit a new correction version."}</p>
+            <div className="mt-2 text-xs">Correction version {returnedCorrection.correction_version} remains in history.</div>
+          </section>
+        ) : null}
+        <section className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5 text-cyan-950">
+          <div className="font-semibold">Incorrect applicant passport details?</div>
+          <p className="mt-1 text-sm">Submit a correction for review. Saving here does not update Nium or change your approved KYC record.</p>
+          <Button type="button" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Request applicant correction</Button>
+        </section>
+      </div>
+    );
+  }
+
+  const update = (field: keyof KycApplicantCorrectionValues, value: string) => setValues((current) => ({ ...current, [field]: value }));
+  const submit = async () => {
+    const requiredFields: (keyof KycApplicantCorrectionValues)[] = adminRequest
+      ? (adminRequest.requested_fields ?? [])
+      : ["legal_name", "first_name", "last_name", "date_of_birth"];
+    if (requiredFields.some((field) => !String(values[field] ?? "").trim())) return;
+    setSubmitting(true);
+    try {
+      if (adminRequest?.requested_document_types?.includes("passport") && !passportFile) return;
+      const submittedValues = {
+        legal_name: values.legal_name.trim(),
+        first_name: values.first_name.trim(),
+        last_name: values.last_name.trim(),
+        date_of_birth: values.date_of_birth,
+      };
+      if (adminRequest) await onSubmit(submittedValues, passportFile);
+      else await onSubmit(submittedValues);
+    } catch (error) {
+      onError?.(error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="space-y-4 rounded-2xl border border-cyan-200 bg-cyan-50 p-5 text-cyan-950">
+      <div>
+        <div className="font-semibold">Correct applicant passport details</div>
+        <p className="mt-1 text-sm">Enter Given Names and Surname exactly as shown on the passport. Do not reorder names based on nationality.</p>
+      </div>
+      <Field label="Full legal name" value={values.legal_name} disabled={!!adminRequest && !adminRequest.requested_fields?.includes("legal_name")} onChange={(value) => update("legal_name", value)} />
+      <PassportNameGuide />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="First Name (Given Names)" value={values.first_name} disabled={!!adminRequest && !adminRequest.requested_fields?.includes("first_name")} onChange={(value) => update("first_name", value)} />
+        <Field label="Last Name (Surname / Family Name)" value={values.last_name} disabled={!!adminRequest && !adminRequest.requested_fields?.includes("last_name")} onChange={(value) => update("last_name", value)} />
+      </div>
+      <Field label="Date of birth" type="date" value={values.date_of_birth} disabled={!!adminRequest && !adminRequest.requested_fields?.includes("date_of_birth")} onChange={(value) => update("date_of_birth", value)} />
+      {adminRequest?.requested_document_types?.includes("passport") ? <label className="block text-sm font-medium">Passport document<input aria-label="Passport document" className="mt-2 block w-full" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setPassportFile(event.target.files?.[0] ?? null)} /></label> : null}
+      <div className="flex gap-3">
+        <Button type="button" variant="outline" disabled={submitting || isPending} onClick={() => setEditing(false)}>Cancel</Button>
+        <Button type="button" disabled={submitting || isPending} onClick={() => void submit()}>
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Submit correction for review
+        </Button>
+      </div>
+    </section>
+  );
+};
+
 const LockedKycStatusOnlySummary = ({ status }: { status?: string | null }) => (
   <section className="space-y-5">
     <div className={`rounded-2xl border p-5 ${statusTone(status)}`}>
@@ -3371,6 +3529,7 @@ const Field = ({
   placeholder,
   type = "text",
   value,
+  disabled = false,
 }: {
   helperText?: string;
   label: string;
@@ -3382,6 +3541,7 @@ const Field = ({
   placeholder?: string;
   type?: HTMLInputTypeAttribute;
   value: string;
+  disabled?: boolean;
 }) => (
   <div className="space-y-2">
     <Label>{label}</Label>
@@ -3394,6 +3554,7 @@ const Field = ({
       onBlur={onBlur}
       placeholder={placeholder}
       type={type}
+      disabled={disabled}
       className="h-12 rounded-xl border-gray-200"
     />
     {helperText ? <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{helperText}</p> : null}

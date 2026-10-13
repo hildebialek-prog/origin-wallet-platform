@@ -172,6 +172,40 @@ export interface BiometricKycAction {
   reference_id: string | null;
 }
 
+export interface KycApplicantCorrectionValues {
+  legal_name: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+}
+
+export interface KycApplicantCorrection {
+  id: number;
+  correction_version: number;
+  status: string;
+  before_values: KycApplicantCorrectionValues;
+  proposed_values: KycApplicantCorrectionValues;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  requested_fields?: Array<keyof KycApplicantCorrectionValues>;
+  requested_document_types?: string[];
+  proposed_documents?: KycDocumentPayload[];
+  request_instruction?: string | null;
+  request_origin?: string;
+  provider_update?: { allowed: boolean; reason: string | null };
+}
+
+export interface KycApplicantCorrectionState {
+  eligible: boolean;
+  reason?: string | null;
+  current_values?: KycApplicantCorrectionValues;
+  source_fingerprint?: string;
+  correction_version?: number;
+  correction?: KycApplicantCorrection | null;
+  latest_resolved_correction?: KycApplicantCorrection | null;
+}
+
 export type KycDocumentSubjectType =
   | "applicant"
   | "business"
@@ -292,6 +326,34 @@ export const resubmitKycRequirement = (params: {
     token: params.token,
     body: params.payload as unknown as Record<string, unknown>,
   });
+
+export const getKycApplicantCorrection = (params: { token: string; userId: string | number }) =>
+  requestApi<KycApplicantCorrectionState>(`/user/users/${params.userId}/kyc-profile/applicant-correction`, {
+    token: params.token,
+  });
+
+export const submitKycApplicantCorrection = (params: {
+  token: string;
+  userId: string | number;
+  correctionVersion: number;
+  sourceFingerprint: string;
+  values: KycApplicantCorrectionValues;
+  correctionId?: number;
+  documents?: KycDocumentPayload[];
+}) => requestApi<{ message: string; correction: KycApplicantCorrection }>(
+  `/user/users/${params.userId}/kyc-profile/applicant-correction`,
+  {
+    method: "POST",
+    token: params.token,
+    body: {
+      correction_version: params.correctionVersion,
+      source_fingerprint: params.sourceFingerprint,
+      ...(params.correctionId ? { correction_id: params.correctionId } : {}),
+      ...(params.documents ? { documents: params.documents } : {}),
+      ...params.values,
+    },
+  },
+);
 
 export const uploadKycDocument = async (params: {
   token: string;
