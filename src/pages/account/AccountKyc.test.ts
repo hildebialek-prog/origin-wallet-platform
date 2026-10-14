@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCorporateSubdivisionOptions } from "@/services/kycService";
-import { AddressFields, ApplicantCorrectionCard, assertFilingDocumentEvidence, BiometricKycCard, buildFilingDocumentPayload, isValidWebsite, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
+import { AddressFields, ApplicantCorrectionCard, assertFilingDocumentEvidence, BiometricKycCard, buildFilingDocumentPayload, isValidWebsite, ProofOfAddressRequestCard, readPersistedAddress, validBeneficialOwnerOwnership } from "./AccountKyc";
 
 vi.mock("@/services/kycService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/kycService")>()),
@@ -202,6 +202,30 @@ describe("applicant KYC correction", () => {
     fireEvent.click(submit);
 
     await waitFor(() => expect(onSubmit).not.toHaveBeenCalled());
+  });
+});
+
+describe("customer Proof of Address request", () => {
+  it("shows Admin feedback and uploads only against the requested correction", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    render(createElement(ProofOfAddressRequestCard, {
+      state: {
+        eligible: false,
+        correction: {
+          id: 71, correction_version: 2, status: "manual_kyc_evidence_approved",
+          before_values: { legal_name: "A", first_name: "A", last_name: "B", date_of_birth: "1990-01-01" },
+          proposed_values: { legal_name: "A", first_name: "A", last_name: "B", date_of_birth: "1990-01-01" },
+          requested_document_types: ["proof_of_address"], request_instruction: "Upload a bank statement.",
+          proof_of_address_documents: [{ id: 90, type: "proof_of_address", status: "changes_requested", file_url: "/private", review_feedback: "Address is not readable." }],
+        },
+      },
+      onUpload,
+    }));
+    expect(screen.getByText(/address is not readable/i)).toBeVisible();
+    const file = new File(["address"], "address.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText(/PDF, JPEG or PNG/i), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: /upload for review/i }));
+    await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file, undefined, expect.any(Object)));
   });
 });
 

@@ -17,6 +17,7 @@ import {
   submitKycProfile,
   submitKycApplicantCorrection,
   uploadKycDocument,
+  uploadCorrectionProofOfAddress,
   uploadIdentityVerificationFile,
   type IdentityCaptureType,
   type IdentityVerificationArtifact,
@@ -2209,6 +2210,18 @@ const AccountKyc = () => {
             ) : null}
 
             {lockedProfile && correctionQuery.data ? (
+              <>
+              <ProofOfAddressRequestCard
+                state={correctionQuery.data}
+                isPending={correctionQuery.isFetching}
+                onUpload={async (file, issuedAt, address) => {
+                  const correction = correctionQuery.data?.correction;
+                  if (!user?.id || !token || !correction) return;
+                  await uploadCorrectionProofOfAddress({ token, userId: user.id, correctionId: correction.id, correctionVersion: correction.correction_version, file, issuedAt, address });
+                  await correctionQuery.refetch();
+                }}
+                onError={(error) => setFormError(error instanceof Error ? error.message : "Unable to upload Proof of Address.")}
+              />
               <ApplicantCorrectionCard
                 state={correctionQuery.data}
                 isPending={correctionQuery.isFetching}
@@ -2241,6 +2254,7 @@ const AccountKyc = () => {
                 }}
                 onError={(error) => setFormError(error instanceof Error ? error.message : "Unable to submit the KYC correction.")}
               />
+              </>
             ) : null}
 
             {lockedStatusOnly ? <LockedKycStatusOnlySummary status={profile?.status ?? user?.kycStatus} /> : null}
@@ -2848,6 +2862,40 @@ const AccountKyc = () => {
       </div>
     </div>
   );
+};
+
+export const ProofOfAddressRequestCard = ({ state, isPending = false, onUpload, onError }: {
+  state: KycApplicantCorrectionState;
+  isPending?: boolean;
+  onUpload: (file: File, issuedAt: string | undefined, address: Record<string, string>) => Promise<void>;
+  onError?: (error: unknown) => void;
+}) => {
+  const correction = state.correction;
+  const requested = correction?.status === "manual_kyc_evidence_approved" && correction.requested_document_types?.includes("proof_of_address");
+  const documents = correction?.proof_of_address_documents ?? [];
+  const current = [...documents].reverse().find((document) => ["pending_admin_review", "approved"].includes(document.status));
+  const feedback = [...documents].reverse().find((document) => document.status === "changes_requested");
+  const [file, setFile] = useState<File | null>(null);
+  const [issuedAt, setIssuedAt] = useState("");
+  const [address, setAddress] = useState({ address_line1: "", city: "", state: "", postal_code: "", country_code: "" });
+  const [submitting, setSubmitting] = useState(false);
+  if (!requested) return null;
+  if (current) return <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950"><div className="font-semibold">Proof of Address: {current.status === "approved" ? "approved" : "awaiting Admin review"}</div><p className="mt-1 text-sm">{current.original_name || "Your document"} is stored privately and bound to this KYC request.</p></section>;
+  const submit = async () => {
+    if (!file) return;
+    setSubmitting(true);
+    try { await onUpload(file, issuedAt || undefined, address); } catch (error) { onError?.(error); } finally { setSubmitting(false); }
+  };
+  return <section className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+    <div><div className="font-semibold">Proof of Address requested</div><p className="mt-1 text-sm">{correction?.request_instruction || "Upload a recent document showing your residential address."}</p></div>
+    {feedback?.review_feedback ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">Admin feedback: {feedback.review_feedback}</div> : null}
+    <label className="block text-sm font-medium">PDF, JPEG or PNG (maximum 20 MB)<Input className="mt-2" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
+    <Field label="Document issue date (if shown)" type="date" value={issuedAt} onChange={setIssuedAt} />
+    <Field label="Residential address" value={address.address_line1} onChange={(value) => setAddress((current) => ({ ...current, address_line1: value }))} />
+    <div className="grid gap-4 md:grid-cols-2"><Field label="City" value={address.city} onChange={(value) => setAddress((current) => ({ ...current, city: value }))} /><Field label="State / province" value={address.state} onChange={(value) => setAddress((current) => ({ ...current, state: value }))} /><Field label="Postal code" value={address.postal_code} onChange={(value) => setAddress((current) => ({ ...current, postal_code: value }))} /><Field label="Country code" value={address.country_code} onChange={(value) => setAddress((current) => ({ ...current, country_code: value.toUpperCase().slice(0, 2) }))} /></div>
+    <p className="text-xs">These details are customer-provided and are not treated as verified until Admin review.</p>
+    <Button type="button" disabled={!file || submitting || isPending} onClick={() => void submit()}>{submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Upload for review</Button>
+  </section>;
 };
 
 export const ApplicantCorrectionCard = ({

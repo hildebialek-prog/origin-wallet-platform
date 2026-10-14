@@ -199,7 +199,22 @@ export interface KycApplicantCorrection {
   proposed_documents?: KycDocumentPayload[];
   request_instruction?: string | null;
   request_origin?: string;
+  proof_of_address_documents?: KycProofOfAddressEvidence[];
   provider_update?: { allowed: boolean; reason: string | null };
+}
+
+export interface KycProofOfAddressEvidence {
+  id: number;
+  type: "proof_of_address";
+  status: string;
+  file_url: string;
+  original_name?: string | null;
+  mime_type?: string | null;
+  file_size?: number | null;
+  issued_at?: string | null;
+  customer_provided_residence_address?: Record<string, string> | null;
+  review_feedback?: string | null;
+  upload_origin?: "customer_uploaded" | "admin_uploaded" | string | null;
 }
 
 export interface KycApplicantCorrectionState {
@@ -396,6 +411,28 @@ export const uploadKycDocument = async (params: {
     token: params.token,
     body: formData,
   });
+};
+
+export const uploadCorrectionProofOfAddress = async (params: {
+  token: string;
+  userId: string | number;
+  correctionId: number;
+  correctionVersion: number;
+  file: File;
+  issuedAt?: string;
+  address: Record<string, string>;
+}) => {
+  const form = new FormData();
+  form.append("file", params.file);
+  form.append("correction_version", String(params.correctionVersion));
+  if (params.issuedAt) form.append("issued_at", params.issuedAt);
+  Object.entries(params.address).forEach(([key, value]) => {
+    if (value.trim()) form.append(key, value.trim());
+  });
+  return requestApi<{ message: string; document: KycProofOfAddressEvidence }>(
+    `/user/users/${params.userId}/kyc-profile/applicant-correction/${params.correctionId}/proof-of-address`,
+    { method: "POST", token: params.token, body: form },
+  );
 };
 
 export const verifyBusinessRegistry = (params: {
