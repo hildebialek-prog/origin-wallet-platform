@@ -20,6 +20,7 @@ import {
   User,
   ArrowUpDown,
   ShieldCheck,
+  MessagesSquare,
   SendHorizonal,
   Menu,
   X,
@@ -46,6 +47,7 @@ export const accountNavItems = [
   { to: "/account/integrations", label: "Integrations", icon: Plug },
   { to: "/account/fx-orders", label: "FX Orders", icon: ClipboardList },
   { to: "/account/kyc", label: "KYC/KYB", icon: ShieldCheck },
+  { to: "/account/information-requests", label: "Information requests", icon: MessagesSquare },
 ];
 
 export const MobileAccountNavigation = ({ onNavigate }: { onNavigate?: () => void }) => (

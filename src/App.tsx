@@ -45,6 +45,7 @@ import AccountSettings from "./pages/account/AccountSettings";
 import AccountVirtualAccountRequest from "./pages/account/AccountVirtualAccountRequest";
 import AccountProfile from "./pages/account/AccountProfile";
 import AccountPassword from "./pages/account/AccountPassword";
+import AccountRfi from "./pages/account/AccountRfi";
 
 
 const queryClient = new QueryClient();
@@ -96,6 +97,7 @@ const App = () => (
                   <Route path="integrations" element={<AccountIntegrations />} />
                   <Route path="fx-orders" element={<AccountFxOrders />} />
                   <Route path="kyc" element={<AccountKyc />} />
+                  <Route path="information-requests" element={<AccountRfi />} />
                   <Route path="settings">
                     <Route index element={<AccountSettings />} />
                     <Route path="general" element={<AccountSettings />} />
