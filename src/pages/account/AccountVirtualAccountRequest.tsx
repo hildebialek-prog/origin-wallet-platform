@@ -16,7 +16,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
-import { VirtualAccountOperationTracker } from "@/lib/virtualAccountOperation";
+import {
+  VirtualAccountOperationTracker,
+  type VirtualAccountRequestSnapshot,
+} from "@/lib/virtualAccountOperation";
 import {
   getProviderReference,
   requestVirtualAccount,
@@ -54,23 +57,43 @@ const virtualAccountCurrencies = [
 const AccountVirtualAccountRequest = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const [providerCode, setProviderCode] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [accountCategory, setAccountCategory] = useState<VirtualAccountCategory>("SELF_FUNDING_ACCOUNT");
-  const [accountType, setAccountType] = useState<VirtualAccountType>("LOCAL");
-  const [alias, setAlias] = useState("");
-  const [storeLink, setStoreLink] = useState("");
-  const [note, setNote] = useState("");
-  const [formError, setFormError] = useState("");
   const operationTracker = useMemo(
     () =>
       new VirtualAccountOperationTracker(
         undefined,
         typeof window !== "undefined" ? window.sessionStorage : undefined,
         `origin-wallet:virtual-account-operation:${user?.id ?? "anonymous"}`,
-      ),
+    ),
     [user?.id],
   );
+  const restoredOperation = useMemo(() => operationTracker.current(), [operationTracker]);
+  const [providerCode, setProviderCode] = useState(restoredOperation?.request.providerCode ?? "");
+  const [currency, setCurrency] = useState(restoredOperation?.request.currency ?? "USD");
+  const [accountCategory, setAccountCategory] = useState<VirtualAccountCategory>(
+    (restoredOperation?.request.accountCategory as VirtualAccountCategory | undefined) ?? "SELF_FUNDING_ACCOUNT",
+  );
+  const [accountType, setAccountType] = useState<VirtualAccountType>(
+    (restoredOperation?.request.accountType as VirtualAccountType | undefined) ?? "LOCAL",
+  );
+  const [alias, setAlias] = useState("");
+  const [storeLink, setStoreLink] = useState("");
+  const [note, setNote] = useState("");
+  const [formError, setFormError] = useState("");
+  const [pendingOperation, setPendingOperation] = useState(restoredOperation);
+  const [hasLegacyOperation, setHasLegacyOperation] = useState(operationTracker.hasUnrestorableOperation());
+
+  useEffect(() => {
+    const restored = operationTracker.current();
+    setPendingOperation(restored);
+    setHasLegacyOperation(operationTracker.hasUnrestorableOperation());
+
+    if (restored) {
+      setProviderCode(restored.request.providerCode);
+      setCurrency(restored.request.currency);
+      setAccountCategory(restored.request.accountCategory as VirtualAccountCategory);
+      setAccountType(restored.request.accountType as VirtualAccountType);
+    }
+  }, [operationTracker]);
 
   const providersQuery = useQuery({
     queryKey: ["provider-reference", token],
@@ -80,6 +103,13 @@ const AccountVirtualAccountRequest = () => {
 
   const providers = useMemo(() => (providersQuery.data ?? []).filter((provider) => provider.status === "active"), [providersQuery.data]);
   const selectedProvider = providers.find((provider) => provider.code === providerCode);
+  const requestSnapshot: VirtualAccountRequestSnapshot = {
+    providerCode,
+    currency,
+    accountCategory,
+    accountType,
+  };
+  const hasChangedPendingRequest = pendingOperation !== null && !operationTracker.matches(requestSnapshot);
 
   useEffect(() => {
     if (!providerCode && providers.length > 0) {
@@ -88,24 +118,30 @@ const AccountVirtualAccountRequest = () => {
   }, [providerCode, providers]);
 
   const requestMutation = useMutation({
-    mutationFn: async () => {
-      if (!providerCode) {
+    mutationFn: async (requestedSnapshot: VirtualAccountRequestSnapshot) => {
+      if (!requestedSnapshot.providerCode) {
         throw new Error("Account setup is required.");
       }
+
+      const operation = operationTracker.getOrCreate(requestedSnapshot);
+      setPendingOperation(operation);
+      setHasLegacyOperation(false);
 
       return requestVirtualAccount({
         userId: user?.id as string,
         token: token as string,
-        providerCode,
-        currency,
-        accountCategory,
-        accountType,
-        operationId: operationTracker.getOrCreate(),
+        providerCode: operation.request.providerCode,
+        currency: operation.request.currency,
+        accountCategory: operation.request.accountCategory as VirtualAccountCategory,
+        accountType: operation.request.accountType as VirtualAccountType,
+        operationId: operation.operationId,
       });
     },
     retry: false,
     onSuccess: (payload) => {
       operationTracker.reset();
+      setPendingOperation(null);
+      setHasLegacyOperation(false);
       setFormError("");
       toast({
         title: "Request submitted",
@@ -248,16 +284,86 @@ const AccountVirtualAccountRequest = () => {
           {formError ? (
             <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               <p>{formError}</p>
+              <p className="font-normal leading-6">
+                The original request remains saved for a safe retry. Starting a separate request may create another real
+                virtual account, including another USD virtual account.
+              </p>
               <button
                 type="button"
                 className="underline underline-offset-4"
                 onClick={() => {
                   operationTracker.reset();
+                  setPendingOperation(null);
+                  setHasLegacyOperation(false);
                   setFormError("");
                 }}
               >
-                Start a separate request with a new operation ID
+                Start a separate VA request
               </button>
+            </div>
+          ) : null}
+
+          {hasLegacyOperation ? (
+            <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-4 text-sm text-[#0f2442] dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+              <p className="font-semibold">A previous unresolved request needs your decision</p>
+              <p className="leading-6 text-[#53627a] dark:text-amber-50/80">
+                Its original account parameters were not saved by the earlier page version, so it cannot be retried safely.
+                Starting a separate request may create another real virtual account, including another USD virtual account.
+              </p>
+              <button
+                type="button"
+                className="font-semibold underline underline-offset-4"
+                disabled={requestMutation.isPending}
+                onClick={() => {
+                  operationTracker.reset();
+                  setHasLegacyOperation(false);
+                  setFormError("");
+                }}
+              >
+                Start a separate VA request
+              </button>
+            </div>
+          ) : null}
+
+          {hasChangedPendingRequest && pendingOperation ? (
+            <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-4 text-sm text-[#0f2442] dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+              <p className="font-semibold">These details differ from your unresolved request</p>
+              <p className="leading-6 text-[#53627a] dark:text-amber-50/80">
+                Resume the original {pendingOperation.request.currency} request with its saved operation ID, or deliberately
+                start a separate request. A separate request may create another real virtual account, including another USD
+                virtual account.
+              </p>
+              <div className="flex flex-wrap gap-4 font-semibold">
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  disabled={requestMutation.isPending}
+                  onClick={() => {
+                    const original = pendingOperation.request;
+                    setProviderCode(original.providerCode);
+                    setCurrency(original.currency);
+                    setAccountCategory(original.accountCategory as VirtualAccountCategory);
+                    setAccountType(original.accountType as VirtualAccountType);
+                    setFormError("");
+                    requestMutation.mutate(original);
+                  }}
+                >
+                  Resume original request
+                </button>
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  disabled={requestMutation.isPending}
+                  onClick={() => {
+                    operationTracker.reset();
+                    setPendingOperation(null);
+                    setHasLegacyOperation(false);
+                    setFormError("");
+                  }}
+                >
+                  Start a separate VA request
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -270,8 +376,8 @@ const AccountVirtualAccountRequest = () => {
               <Link to="/account/virtual-accounts">Cancel</Link>
             </Button>
             <Button
-              disabled={requestMutation.isPending}
-              onClick={() => requestMutation.mutate()}
+              disabled={requestMutation.isPending || hasChangedPendingRequest || hasLegacyOperation}
+              onClick={() => requestMutation.mutate(requestSnapshot)}
               className="rounded-full bg-[#16a34a] px-7 text-[1rem] font-semibold text-white hover:bg-[#15803d]"
             >
               {requestMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
