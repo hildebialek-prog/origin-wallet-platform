@@ -21,6 +21,7 @@ import {
   type VirtualAccountRequestSnapshot,
 } from "@/lib/virtualAccountOperation";
 import {
+  getProviderIntegrations,
   getProviderReference,
   requestVirtualAccount,
   type VirtualAccountCategory,
@@ -99,10 +100,32 @@ const AccountVirtualAccountRequest = () => {
     queryKey: ["provider-reference", token],
     enabled: !!token,
     queryFn: async () => getProviderReference({ token: token as string }),
+    retry: false,
+  });
+  const integrationsQuery = useQuery({
+    queryKey: ["provider-integrations", user?.id, token],
+    enabled: !!user?.id && !!token,
+    queryFn: async () => getProviderIntegrations({ userId: user?.id as string, token: token as string }),
+    retry: false,
   });
 
   const providers = useMemo(() => (providersQuery.data ?? []).filter((provider) => provider.status === "active"), [providersQuery.data]);
-  const selectedProvider = providers.find((provider) => provider.code === providerCode);
+  const selectedProvider = providers.find((provider) => provider.code.toLowerCase() === providerCode.toLowerCase());
+  const selectedIntegration = (integrationsQuery.data ?? []).find(
+    (integration) => integration.provider.code.toLowerCase() === providerCode.toLowerCase(),
+  );
+  const eligibilityLoading = providersQuery.isLoading || integrationsQuery.isLoading;
+  const eligibilityUnavailable = providersQuery.isError || integrationsQuery.isError || !selectedProvider || !selectedIntegration;
+  const canRequestVirtualAccount = !eligibilityLoading
+    && !eligibilityUnavailable
+    && selectedIntegration.can_request_virtual_account === true;
+  const eligibilityMessage = eligibilityLoading
+    ? "Checking virtual account eligibility..."
+    : canRequestVirtualAccount
+      ? "Account ready for virtual account requests."
+      : selectedIntegration?.virtual_account_eligibility_reason === "kyb_approval_pending"
+        ? "KYB approval pending. Virtual account requests will be available after approval."
+        : "Account setup or verification incomplete. Virtual account requests are unavailable for now.";
   const requestSnapshot: VirtualAccountRequestSnapshot = {
     providerCode,
     currency,
@@ -121,6 +144,13 @@ const AccountVirtualAccountRequest = () => {
     mutationFn: async (requestedSnapshot: VirtualAccountRequestSnapshot) => {
       if (!requestedSnapshot.providerCode) {
         throw new Error("Account setup is required.");
+      }
+
+      const requestedIntegration = (integrationsQuery.data ?? []).find(
+        (integration) => integration.provider.code.toLowerCase() === requestedSnapshot.providerCode.toLowerCase(),
+      );
+      if (!requestedIntegration?.can_request_virtual_account) {
+        throw new Error("This provider account is not eligible for virtual account requests yet.");
       }
 
       const operation = operationTracker.getOrCreate(requestedSnapshot);
@@ -172,7 +202,8 @@ const AccountVirtualAccountRequest = () => {
           Request virtual account
         </h1>
         <p className="mb-10 max-w-2xl text-[1.05rem] leading-7 text-[#62708a] dark:text-gray-400">
-          Submit the required receiving account setup details. Operations can complete this manually now and map it to virtual account APIs once the official integration is enabled.
+          Choose the receiving account details for your provider-approved account. Each confirmed request may create a new
+          virtual account, including another account in the same currency.
         </p>
 
         <div className="max-w-[36rem] space-y-6">
@@ -194,6 +225,15 @@ const AccountVirtualAccountRequest = () => {
             </p>
             <p className="mt-1 text-[1rem] font-semibold text-[#0f2442] dark:text-white">
               {selectedProvider ? getProviderDisplayName(selectedProvider) : PRIMARY_PROVIDER_NAME}
+            </p>
+            <p
+              className={`mt-2 text-sm leading-6 ${
+                canRequestVirtualAccount
+                  ? "text-[#15803d] dark:text-emerald-300"
+                  : "text-[#62708a] dark:text-gray-400"
+              }`}
+            >
+              {eligibilityMessage}
             </p>
           </div>
 
@@ -337,7 +377,7 @@ const AccountVirtualAccountRequest = () => {
                 <button
                   type="button"
                   className="underline underline-offset-4"
-                  disabled={requestMutation.isPending}
+                  disabled={requestMutation.isPending || !canRequestVirtualAccount}
                   onClick={() => {
                     const original = pendingOperation.request;
                     setProviderCode(original.providerCode);
@@ -376,7 +416,12 @@ const AccountVirtualAccountRequest = () => {
               <Link to="/account/virtual-accounts">Cancel</Link>
             </Button>
             <Button
-              disabled={requestMutation.isPending || hasChangedPendingRequest || hasLegacyOperation}
+              disabled={
+                requestMutation.isPending
+                || hasChangedPendingRequest
+                || hasLegacyOperation
+                || !canRequestVirtualAccount
+              }
               onClick={() => requestMutation.mutate(requestSnapshot)}
               className="rounded-full bg-[#16a34a] px-7 text-[1rem] font-semibold text-white hover:bg-[#15803d]"
             >

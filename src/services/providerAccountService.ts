@@ -48,6 +48,13 @@ export interface ProviderIntegrationItem {
   can_connect: boolean;
   can_request_connect: boolean;
   request_pending: boolean;
+  can_request_virtual_account: boolean;
+  virtual_account_eligibility_reason?:
+    | "account_missing"
+    | "kyb_approval_pending"
+    | "account_verification_incomplete"
+    | "unsupported_provider"
+    | null;
 }
 
 export interface LinkResponse {
