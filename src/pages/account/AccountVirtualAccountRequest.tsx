@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { VirtualAccountOperationTracker } from "@/lib/virtualAccountOperation";
 import {
   getProviderReference,
   requestVirtualAccount,
@@ -61,6 +62,15 @@ const AccountVirtualAccountRequest = () => {
   const [storeLink, setStoreLink] = useState("");
   const [note, setNote] = useState("");
   const [formError, setFormError] = useState("");
+  const operationTracker = useMemo(
+    () =>
+      new VirtualAccountOperationTracker(
+        undefined,
+        typeof window !== "undefined" ? window.sessionStorage : undefined,
+        `origin-wallet:virtual-account-operation:${user?.id ?? "anonymous"}`,
+      ),
+    [user?.id],
+  );
 
   const providersQuery = useQuery({
     queryKey: ["provider-reference", token],
@@ -79,8 +89,8 @@ const AccountVirtualAccountRequest = () => {
 
   const requestMutation = useMutation({
     mutationFn: async () => {
-      if (!providerCode || !alias.trim()) {
-        throw new Error("Account setup and account alias are required.");
+      if (!providerCode) {
+        throw new Error("Account setup is required.");
       }
 
       return requestVirtualAccount({
@@ -90,9 +100,12 @@ const AccountVirtualAccountRequest = () => {
         currency,
         accountCategory,
         accountType,
+        operationId: operationTracker.getOrCreate(),
       });
     },
+    retry: false,
     onSuccess: (payload) => {
+      operationTracker.reset();
       setFormError("");
       toast({
         title: "Request submitted",
@@ -200,7 +213,7 @@ const AccountVirtualAccountRequest = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Account alias</Label>
+            <Label>Account alias (local reference only)</Label>
             <Input
               value={alias}
               onChange={(event) => setAlias(event.target.value)}
@@ -210,7 +223,7 @@ const AccountVirtualAccountRequest = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Store link</Label>
+            <Label>Store link (local reference only)</Label>
             <Input
               value={storeLink}
               onChange={(event) => setStoreLink(event.target.value)}
@@ -220,18 +233,31 @@ const AccountVirtualAccountRequest = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Additional note</Label>
+            <Label>Additional note (local reference only)</Label>
             <Textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               rows={4}
               className="rounded-2xl border-[#d7d7d2] bg-white text-[1rem] dark:border-white/10 dark:bg-[#151b24] dark:text-white"
             />
+            <p className="text-sm leading-6 text-[#62708a] dark:text-gray-400">
+              Account alias, store link, and note are not currently sent to or persisted by the virtual account API.
+            </p>
           </div>
 
           {formError ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {formError}
+            <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <p>{formError}</p>
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => {
+                  operationTracker.reset();
+                  setFormError("");
+                }}
+              >
+                Start a separate request with a new operation ID
+              </button>
             </div>
           ) : null}
 

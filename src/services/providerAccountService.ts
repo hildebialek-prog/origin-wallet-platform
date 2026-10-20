@@ -82,6 +82,7 @@ export interface VirtualAccount {
 
 export interface RequestVirtualAccountResponse {
   message?: string;
+  operation_id: string;
   virtual_account: VirtualAccount;
 }
 
@@ -139,12 +140,16 @@ export const requestVirtualAccount = (params: AuthenticatedParams & {
   currency: string;
   accountCategory: VirtualAccountCategory;
   accountType: VirtualAccountType;
+  operationId: string;
 }) =>
   requestApi<RequestVirtualAccountResponse>(
     `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/virtual-account`,
     {
       method: "POST",
       token: params.token,
+      headers: {
+        "Idempotency-Key": params.operationId,
+      },
       body: {
         currency: params.currency,
         account_category: params.accountCategory,
