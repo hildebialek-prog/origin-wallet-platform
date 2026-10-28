@@ -22,6 +22,7 @@ export const eligibleIntegration = (eligible = true) => ({
   integration_link: null, integration_request: null, link_available: true, can_connect: false,
   can_request_connect: false, request_pending: false, can_request_virtual_account: eligible,
   virtual_account_eligibility_reason: eligible ? null : "kyb_approval_pending",
+  virtual_account_allocation_reason: null,
 });
 
 // Test double for the browser's exclusive scheduling; production uses native Web Locks.

@@ -70,6 +70,7 @@ export const integration = {
   provider, provider_account: providerAccount, integration_link: null, integration_request: null,
   link_available: true, can_connect: false, can_request_connect: false, request_pending: false,
   can_request_virtual_account: true, virtual_account_eligibility_reason: null,
+  virtual_account_allocation_reason: null,
 };
 export const session = {
   user: { id: USER_ID, name: "VA Browser User", email: "va-browser@example.test", picture: null, providerId: null, kycStatus: "verified" },
@@ -100,7 +101,7 @@ export const virtualAccount = (status = "assigned", enrichment: EnrichmentStatus
   id: VA_ID, user_provider_account_id: ACCOUNT_ID,
   provider_payment_id: status === "assigned" ? "TEST-VA-0001" : null,
   virtual_account_reference: "test-reference-0001", currency: "USD", account_category: "SELF_FUNDING_ACCOUNT",
-  account_type: "LOCAL", status, detail: null,
+  account_type: "WIRES", status, detail: null,
   enrichment: { status: enrichment, next_attempt_at: enrichment === "pending" ? "2026-10-28T00:01:00Z" : null,
     updated_at: "2026-10-28T00:00:00Z" },
 });

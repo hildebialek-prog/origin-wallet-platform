@@ -41,10 +41,48 @@ describe("VA request page", () => {
     const button = screen.getByRole("button", { name: "Confirm and request" });
     fireEvent.click(button); fireEvent.click(button);
     await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
-    expect(mocks.submit).toHaveBeenCalledWith({ providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "LOCAL" }, 7);
+    expect(mocks.submit).toHaveBeenCalledWith({ providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "WIRES" }, 7);
     await screen.findByRole("button", { name: "Prepare another VA request" });
     expect(button).toBeDisabled();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Virtual account assigned" }));
+  });
+
+  it("defaults new requests to the confirmed USD self-funding Wires corridor", async () => {
+    renderPage();
+    await screen.findByText(/Account ready for virtual account requests/);
+    expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("USD");
+    expect(screen.getByRole("combobox", { name: "Account category" })).toHaveTextContent("Self-funding account");
+    expect(screen.getByRole("combobox", { name: "Account type" })).toHaveTextContent("Wires");
+    expect(screen.getByText(/USD self-funding requests use JPM_SG with Wires intent/)).toBeVisible();
+  });
+
+  it.each([
+    ["allocation_paused", /New virtual account requests are paused/],
+    ["allocation_testing_only", /awaiting Production approval/],
+    ["allocation_production_disabled", /awaiting Production approval/],
+    ["allocation_cutover_required", /awaiting operational readiness/],
+    ["allocation_unavailable", /currently unavailable/],
+    [undefined, /currently unavailable/],
+  ] as const)("shows allocation reason %s while keeping saved status checks available", async (reason, message) => {
+    mocks.getProviderIntegrations.mockResolvedValue([{ ...eligibleIntegration(), virtual_account_allocation_reason: reason }]);
+    renderPage();
+    await screen.findByText(message);
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Check status" }));
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["account_restricted", /provider account is restricted/],
+    ["account_security_review", /provider account requires a security review/],
+    ["account_verification_incomplete", /Customer or wallet verification is incomplete/],
+  ] as const)("shows the disabled account reason %s", async (reason, message) => {
+    mocks.getProviderIntegrations.mockResolvedValue([{ ...eligibleIntegration(false), virtual_account_eligibility_reason: reason }]);
+    renderPage();
+    await screen.findByText(message);
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+    expect(mocks.submit).not.toHaveBeenCalled();
   });
 
   it.each(["pending", "unknown", "manual_review", "failed"] as const)("retains %s and exposes GET status checking without a retry/reset action", async (status) => {
@@ -130,6 +168,7 @@ describe("VA request page", () => {
     expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("EUR");
     expect(screen.getByRole("combobox", { name: "Account category" })).toHaveTextContent("Collection account");
     expect(screen.getByRole("combobox", { name: "Account type" })).toHaveTextContent("Wires");
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
     expect(mocks.submit).not.toHaveBeenCalled();
   });
 

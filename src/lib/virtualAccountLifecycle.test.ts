@@ -44,6 +44,30 @@ describe("VA create, discovery and recovery", () => {
     expect((await makeStore().read(operationContext)).operations).toHaveLength(1);
   });
 
+  it.each(["allocation_paused", "allocation_testing_only", "allocation_production_disabled", "allocation_cutover_required", undefined])(
+    "blocks new allocation for %s before reserving a key and still permits GET refresh", async (reason) => {
+      api.getProviderIntegrations.mockResolvedValue([{ ...eligibleIntegration(), virtual_account_allocation_reason: reason }]);
+      const engine = lifecycle();
+      await expect(engine.submit(vaRequest, 7)).rejects.toThrow(/New virtual account requests/);
+      expect((await makeStore().read(operationContext)).operations).toEqual([]);
+      expect(api.requestVirtualAccount).not.toHaveBeenCalled();
+      await engine.refresh();
+      expect(api.getProviderAccountOperations).toHaveBeenCalled();
+      expect(api.getVirtualAccounts).toHaveBeenCalled();
+    },
+  );
+
+  it("returns retained pending state through GET recovery while allocation is paused", async () => {
+    operations = [serverOperation()];
+    api.getProviderIntegrations.mockResolvedValue([{ ...eligibleIntegration(), virtual_account_allocation_reason: "allocation_paused" }]);
+    const engine = lifecycle();
+    const saved = await engine.submit(vaRequest, 7);
+    expect(saved.operationId).toBe("operation-one");
+    expect(saved.server.status).toBe("pending");
+    expect(api.requestVirtualAccount).not.toHaveBeenCalled();
+    expect(engine.state.scope.operations).toHaveLength(1);
+  });
+
   it("does not treat a legacy 201 pending VA as assigned", async () => {
     respond("pending", true);
     const engine = lifecycle();

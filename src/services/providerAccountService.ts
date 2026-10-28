@@ -53,9 +53,29 @@ export interface ProviderIntegrationItem {
     | "account_missing"
     | "kyb_approval_pending"
     | "account_verification_incomplete"
+    | "account_restricted"
+    | "account_security_review"
+    | "unsupported_provider"
+    | null;
+  virtual_account_allocation_reason?:
+    | "allocation_paused"
+    | "allocation_testing_only"
+    | "allocation_production_disabled"
+    | "allocation_unavailable"
+    | "allocation_cutover_required"
     | "unsupported_provider"
     | null;
 }
+
+export const virtualAccountAllocationMessage = (reason: ProviderIntegrationItem["virtual_account_allocation_reason"]): string => {
+  switch (reason) {
+    case "allocation_paused": return "New virtual account requests are paused. Saved requests can still be checked.";
+    case "allocation_testing_only": return "New virtual account requests are awaiting Production approval. Saved requests can still be checked.";
+    case "allocation_production_disabled": return "New virtual account requests are awaiting Production approval. Saved requests can still be checked.";
+    case "allocation_cutover_required": return "New virtual account requests are awaiting operational readiness. Saved requests can still be checked.";
+    default: return "New virtual account requests are currently unavailable. Saved requests can still be checked.";
+  }
+};
 
 export interface LinkResponse {
   message?: string;

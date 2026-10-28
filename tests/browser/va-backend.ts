@@ -161,7 +161,7 @@ export class VABackend {
       }
     } else if (record.path === CREATE_PATH && record.method === "POST") {
       assert.match(record.key ?? "", /^[A-Za-z0-9._:-]{1,100}$/);
-      assert.deepEqual(record.body, { currency: "USD", account_category: "SELF_FUNDING_ACCOUNT", account_type: "LOCAL", expected_provider_account_id: ACCOUNT_ID });
+      assert.deepEqual(record.body, { currency: "USD", account_category: "SELF_FUNDING_ACCOUNT", account_type: "WIRES", expected_provider_account_id: ACCOUNT_ID });
       const saved = await Promise.all(this.context.pages().filter((page) => page.url().startsWith(TEST_ORIGIN))
         .map((page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null") as SavedScope | null, STORE_KEY)));
       assert.ok(saved.length);
@@ -173,7 +173,7 @@ export class VABackend {
         const operation = scope.operations.find((item) => item.providerAccountId === ACCOUNT_ID && item.operationId === record.key);
         assert.ok(operation, "Intent must exist in native storage before POST");
         assert.equal(operation.submission, "dispatching");
-        assert.deepEqual(operation.request, { providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "LOCAL" });
+        assert.deepEqual(operation.request, { providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "WIRES" });
         assert.ok(!JSON.stringify(scope).includes(FAKE_TOKEN));
         assert.ok(!JSON.stringify(scope).includes("provider_payment_id"));
       }

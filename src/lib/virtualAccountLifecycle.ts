@@ -1,6 +1,6 @@
 import { ApiRequestError } from "@/services/apiClient";
 import {
-  getProviderAccountOperations, getProviderIntegrations, getVirtualAccounts, requestVirtualAccount,
+  getProviderAccountOperations, getProviderIntegrations, getVirtualAccounts, requestVirtualAccount, virtualAccountAllocationMessage,
   type VirtualAccount, type VirtualAccountCategory, type VirtualAccountType,
   type VirtualAccountOperationProjection,
 } from "@/services/providerAccountService";
@@ -188,6 +188,11 @@ export class VirtualAccountLifecycle {
         throw new Error("The selected provider account changed. Refresh and review its saved requests.");
       }
       if (!integration.can_request_virtual_account) throw new Error("This provider account is not eligible for virtual account requests yet.");
+      // Check fresh server admission before reserving a new key. Missing capability
+      // data fails closed; saved-operation recovery above remains GET-only.
+      if (integration.virtual_account_allocation_reason !== null) {
+        throw new Error(virtualAccountAllocationMessage(integration.virtual_account_allocation_reason));
+      }
       if (!this.active) throw new Error("The signed-in page changed. Check saved requests before continuing.");
       // This exclusive Web Lock transaction commits the intent before the sole POST site.
       const reservation = await this.store.reserve(this.context, expectedAccountId, request, generation);

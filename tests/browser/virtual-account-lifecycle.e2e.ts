@@ -22,7 +22,7 @@ for (const mode of ["pending", "assigned"] as const) {
     for (const scope of snapshots) {
       expect(scope.operations).toHaveLength(1);
       expect(scope.operations[0]).toMatchObject({ providerAccountId: ACCOUNT_ID, operationId: key, submission: "dispatching",
-        request: { providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "LOCAL" } });
+        request: { providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "WIRES" } });
     }
     release();
     for (const tab of [page, other]) {
