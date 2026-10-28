@@ -78,6 +78,16 @@ export interface VirtualAccount {
     bank_address?: string | null;
     routing_code_type?: string | null;
     routing_code_value?: string | null;
+    routing_code_type_2?: string | null;
+    routing_code_value_2?: string | null;
+    provider_bank_name?: string | null;
+    provider_account_type?: string | null;
+    provider_account_category?: string | null;
+  } | null;
+  enrichment?: {
+    status: "pending" | "running" | "complete" | "exhausted" | null;
+    next_attempt_at: string | null;
+    updated_at: string | null;
   } | null;
   virtual_account_reference: string | null;
   currency: string;
@@ -90,7 +100,34 @@ export interface VirtualAccount {
 export interface RequestVirtualAccountResponse {
   message?: string;
   operation_id: string;
-  virtual_account: VirtualAccount;
+  virtual_account: VirtualAccount | null;
+  operation?: VirtualAccountOperationProjection;
+}
+
+export type VirtualAccountOperationStatus =
+  | "claimed" | "submitting" | "preflight_failed" | "pending"
+  | "unknown" | "manual_review" | "failed" | "assigned";
+
+export interface VirtualAccountOperationProjection {
+  operation_id: string;
+  provider_account_id: number;
+  status: VirtualAccountOperationStatus;
+  currency: string;
+  provider_payment_id: string | null;
+  virtual_account_id: number | null;
+  updated_at: string | null;
+}
+
+// The singular account GET does not expose the index's eligibility flags.
+export interface ProviderAccountOperationPage {
+  provider: IntegrationProvider;
+  provider_account: ProviderAccount | null;
+  virtual_account_operations: VirtualAccountOperationProjection[];
+  virtual_account_operations_pagination: {
+    per_page: number;
+    has_more: boolean;
+    next_before_id: number | null;
+  };
 }
 
 export type VirtualAccountCategory =
@@ -103,6 +140,25 @@ export type VirtualAccountType = "LOCAL" | "WIRES" | "LOCAL_AND_WIRES";
 type AuthenticatedParams = {
   token: string;
   userId: string | number;
+};
+
+export const getProviderAccountOperations = (params: AuthenticatedParams & {
+  providerCode: string;
+  providerAccountId?: number;
+  operationId?: string;
+  beforeId?: number;
+  unresolvedOnly?: boolean;
+}) => {
+  const query = new URLSearchParams();
+  if (params.providerAccountId !== undefined) query.set("provider_account_id", String(params.providerAccountId));
+  if (params.operationId !== undefined) query.set("operation_id", params.operationId);
+  if (params.beforeId !== undefined) query.set("operations_before_id", String(params.beforeId));
+  if (params.unresolvedOnly) query.set("operations_unresolved_only", "1");
+  const suffix = query.toString();
+  return requestApi<ProviderAccountOperationPage>(
+    `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}${suffix ? `?${suffix}` : ""}`,
+    { token: params.token },
+  );
 };
 
 export const getProviderReference = async (params: { token: string }) => {
@@ -148,6 +204,7 @@ export const requestVirtualAccount = (params: AuthenticatedParams & {
   accountCategory: VirtualAccountCategory;
   accountType: VirtualAccountType;
   operationId: string;
+  expectedProviderAccountId?: number;
 }) =>
   requestApi<RequestVirtualAccountResponse>(
     `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/virtual-account`,
@@ -161,13 +218,17 @@ export const requestVirtualAccount = (params: AuthenticatedParams & {
         currency: params.currency,
         account_category: params.accountCategory,
         account_type: params.accountType,
+        ...(params.expectedProviderAccountId !== undefined
+          ? { expected_provider_account_id: params.expectedProviderAccountId } : {}),
       },
     },
   );
 
-export const getVirtualAccounts = async (params: AuthenticatedParams & { providerCode: string }) => {
+export const getVirtualAccounts = async (params: AuthenticatedParams & { providerCode: string; providerAccountId?: number }) => {
   const payload = await requestApi<{ data: VirtualAccount[] }>(
-    `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/virtual-accounts`,
+    `/user/users/${params.userId}/provider-accounts/${encodeURIComponent(params.providerCode)}/virtual-accounts${
+      params.providerAccountId === undefined ? "" : `?provider_account_id=${params.providerAccountId}`
+    }`,
     {
       token: params.token,
     },

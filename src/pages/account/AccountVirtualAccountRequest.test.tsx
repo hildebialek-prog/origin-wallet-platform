@@ -1,184 +1,159 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LifecycleState } from "@/lib/virtualAccountLifecycle";
+import { safeProjection } from "@/lib/virtualAccountOperation";
+import { eligibleIntegration, operationContext, serverOperation, vaRequest } from "@/test/virtualAccountFixtures";
 import AccountVirtualAccountRequest from "./AccountVirtualAccountRequest";
 
 const mocks = vi.hoisted(() => ({
-  getProviderReference: vi.fn(),
-  getProviderIntegrations: vi.fn(),
-  requestVirtualAccount: vi.fn(),
-  toast: vi.fn(),
+  getProviderReference: vi.fn(), getProviderIntegrations: vi.fn(), submit: vi.fn(), refresh: vi.fn(), toast: vi.fn(),
+  state: null as LifecycleState | null, blocked: false,
 }));
-
-vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 41 }, token: "customer-test-token" }),
-}));
-
-vi.mock("@/services/providerAccountService", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/services/providerAccountService")>();
-  return {
-    ...original,
-    getProviderReference: mocks.getProviderReference,
-    getProviderIntegrations: mocks.getProviderIntegrations,
-    requestVirtualAccount: mocks.requestVirtualAccount,
-  };
-});
-
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "41" }, token: "test-token" }) }));
+vi.mock("@/hooks/useVirtualAccountOperation", () => ({ useVirtualAccountOperation: () => ({ state: mocks.state, blocked: mocks.blocked, submit: mocks.submit, refresh: mocks.refresh, pollingPaused: "" }) }));
+vi.mock("@/services/providerAccountService", async (original) => ({ ...await original<typeof import("@/services/providerAccountService")>(), getProviderReference: mocks.getProviderReference, getProviderIntegrations: mocks.getProviderIntegrations }));
 vi.mock("@/components/ui/use-toast", () => ({ toast: mocks.toast }));
 
-const storageKey = "origin-wallet:virtual-account-operation:41";
-const savedOperation = {
-  version: 1,
-  operationId: "operation-one",
-  request: {
-    providerCode: "nium",
-    currency: "USD",
-    accountCategory: "COLLECTION_ACCOUNT",
-    accountType: "WIRES",
-  },
-};
-
-const integration = (canRequest: boolean, reason: string | null = null) => ({
-  provider: { id: 1, code: "nium", name: "Nium", status: "active" },
-  provider_account: canRequest ? { id: 7, status: "active", provider_status: "clear" } : null,
-  integration_link: null,
-  integration_request: null,
-  link_available: true,
-  can_connect: false,
-  can_request_connect: false,
-  request_pending: false,
-  can_request_virtual_account: canRequest,
-  virtual_account_eligibility_reason: reason,
-});
-
 const renderPage = () => {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(
-    <MemoryRouter>
-      <QueryClientProvider client={client}>
-        <AccountVirtualAccountRequest />
-      </QueryClientProvider>
-    </MemoryRouter>,
-  );
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const page = () => <MemoryRouter><QueryClientProvider client={client}><AccountVirtualAccountRequest /></QueryClientProvider></MemoryRouter>;
+  const view = render(page());
+  return { ...view, refreshPage: () => view.rerender(page()) };
 };
 
-describe("AccountVirtualAccountRequest", () => {
-  beforeAll(() => {
-    HTMLElement.prototype.scrollIntoView = vi.fn();
-  });
-
+describe("VA request page", () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
-    Object.values(mocks).forEach((mock) => mock.mockReset());
-    mocks.getProviderReference.mockResolvedValue([{ code: "nium", name: "Nium", status: "active" }]);
-    mocks.getProviderIntegrations.mockResolvedValue([integration(true)]);
+    vi.clearAllMocks();
+    mocks.blocked = false;
+    mocks.state = { scope: { ...operationContext, version: 2, generation: 0, operations: [], legacy: [] },
+      accounts: [], providerAccountId: 7, ready: true, checking: false, submitting: false, authorizationPaused: false, error: "" };
+    mocks.getProviderReference.mockResolvedValue([{ id: 1, code: "nium", name: "Nium", status: "active" }]);
+    mocks.getProviderIntegrations.mockResolvedValue([eligibleIntegration()]);
+    mocks.submit.mockResolvedValue({ providerAccountId: 7, operationId: "operation-one", request: null,
+      submission: "acknowledged", server: safeProjection(serverOperation({ status: "assigned", virtual_account_id: 87 })), virtualAccountId: 87 });
   });
 
-  it("retries a restored operation with its original parameters and clears it only after success", async () => {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(savedOperation));
-    mocks.requestVirtualAccount.mockResolvedValue({
-      message: "Assigned",
-      operation_id: "operation-one",
-      virtual_account: {},
-    });
+  it("passes the displayed account precondition and ignores duplicate clicks", async () => {
     renderPage();
+    await screen.findByText(/Account ready for virtual account requests/);
+    const button = screen.getByRole("button", { name: "Confirm and request" });
+    fireEvent.click(button); fireEvent.click(button);
+    await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
+    expect(mocks.submit).toHaveBeenCalledWith({ providerCode: "nium", currency: "USD", accountCategory: "SELF_FUNDING_ACCOUNT", accountType: "LOCAL" }, 7);
+    await screen.findByRole("button", { name: "Prepare another VA request" });
+    expect(button).toBeDisabled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Virtual account assigned" }));
+  });
 
-    await screen.findByText(/Account ready for virtual account requests/i);
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and request" }));
+  it.each(["pending", "unknown", "manual_review", "failed"] as const)("retains %s and exposes GET status checking without a retry/reset action", async (status) => {
+    mocks.state.scope.operations = [{ providerAccountId: 7, operationId: "operation-one", request: null,
+      submission: "discovered", server: safeProjection(serverOperation({ status })), virtualAccountId: null }];
+    mocks.blocked = true;
+    renderPage();
+    await screen.findByText(/Account ready for virtual account requests/);
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Start a separate|Resume original/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Check status" }));
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    expect(mocks.submit).not.toHaveBeenCalled();
+    if (status === "failed") expect(screen.getByText(/Provider rejection is not established/)).toBeVisible();
+  });
 
+  it("preserves incomplete legacy tracking and blocks another assignment", async () => {
+    mocks.state.scope.legacy = [{ sourceKey: "old", operationId: "legacy-key", request: null }];
+    mocks.blocked = true;
+    renderPage();
+    expect(await screen.findByText(/lacks verified API and account identity/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
+  it("still blocks ineligible accounts while retained operations remain readable", async () => {
+    mocks.getProviderIntegrations.mockResolvedValue([eligibleIntegration(false)]);
+    mocks.state.scope.operations = [{ providerAccountId: 7, operationId: "operation-one", request: null,
+      submission: "discovered", server: safeProjection(serverOperation()), virtualAccountId: null }];
+    mocks.blocked = true;
+    renderPage();
+    await screen.findByText(/KYB approval pending/);
+    expect(screen.getByText(/Assignment pending/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
+  it("blocks while eligibility loads or cannot be read", async () => {
+    mocks.getProviderIntegrations.mockRejectedValue(new Error("Eligibility unavailable"));
+    renderPage();
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+    await screen.findByText(/Account setup or verification incomplete/);
+    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
+  });
+
+  it("restores delayed recovery and preserves the same request through status rerenders", async () => {
+    const scope = mocks.state.scope;
+    const request = { ...vaRequest, currency: "EUR", accountCategory: "COLLECTION_ACCOUNT", accountType: "WIRES" };
+    const retained = { providerAccountId: 7, operationId: "saved-operation", request,
+      submission: "uncertain" as const, server: null, virtualAccountId: null };
+    mocks.state = { ...mocks.state, scope: null, ready: false };
+    mocks.blocked = true;
+    const { refreshPage } = renderPage();
+    expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("USD");
+
+    mocks.state = { ...mocks.state, scope: { ...scope, generation: 1, operations: [retained] }, ready: true };
+    refreshPage();
     await waitFor(() => {
-      expect(mocks.requestVirtualAccount).toHaveBeenCalledWith({
-        userId: 41,
-        token: "customer-test-token",
-        providerCode: "nium",
-        currency: "USD",
-        accountCategory: "COLLECTION_ACCOUNT",
-        accountType: "WIRES",
-        operationId: "operation-one",
-      });
-      expect(window.sessionStorage.getItem(storageKey)).toBeNull();
+      expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("EUR");
+      expect(screen.getByRole("combobox", { name: "Account category" })).toHaveTextContent("Collection account");
+      expect(screen.getByRole("combobox", { name: "Account type" })).toHaveTextContent("Wires");
     });
-  });
+    fireEvent.change(screen.getByLabelText("Account alias (local reference only)"), { target: { value: "Local alias" } });
 
-  it("keeps an unresolved operation after an API error", async () => {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(savedOperation));
-    mocks.requestVirtualAccount.mockRejectedValue(new Error("Provider outcome unknown"));
-    renderPage();
-
-    await screen.findByText(/Account ready for virtual account requests/i);
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and request" }));
-
-    expect(await screen.findByText("Provider outcome unknown")).toBeVisible();
-    expect(JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null")).toEqual(savedOperation);
-  });
-
-  it("fails closed for pending KYB and never submits", async () => {
-    mocks.getProviderIntegrations.mockResolvedValue([integration(false, "kyb_approval_pending")]);
-    renderPage();
-
-    expect(await screen.findByText(/KYB approval pending/i)).toBeVisible();
-    const submit = screen.getByRole("button", { name: "Confirm and request" });
-    expect(submit).toBeDisabled();
-    fireEvent.click(submit);
-    expect(mocks.requestVirtualAccount).not.toHaveBeenCalled();
-  });
-
-  it("fails closed when account verification is incomplete", async () => {
-    mocks.getProviderIntegrations.mockResolvedValue([integration(false, "account_verification_incomplete")]);
-    renderPage();
-
-    expect(await screen.findByText(/Account setup or verification incomplete/i)).toBeVisible();
+    mocks.state = { ...mocks.state, scope: { ...mocks.state.scope, operations: [{ ...retained, request: { ...request },
+      server: safeProjection(serverOperation({ operation_id: "saved-operation", currency: "EUR", status: "unknown" })) }] } };
+    refreshPage();
+    expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("EUR");
+    expect(screen.getByRole("combobox", { name: "Account category" })).toHaveTextContent("Collection account");
+    expect(screen.getByRole("combobox", { name: "Account type" })).toHaveTextContent("Wires");
+    expect(screen.getByLabelText("Account alias (local reference only)")).toHaveValue("Local alias");
+    expect(screen.getByText(/saved-operation · Account 7/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
-    expect(mocks.requestVirtualAccount).not.toHaveBeenCalled();
+    expect(mocks.state.scope.operations).toHaveLength(1);
+    expect(mocks.state.scope.operations[0].request).toEqual(request);
+    expect(mocks.submit).not.toHaveBeenCalled();
+
+    // Once reconciliation resolves the operation, keep the displayed parameters for review.
+    mocks.state = { ...mocks.state, scope: { ...mocks.state.scope, operations: [{ ...retained,
+      server: safeProjection(serverOperation({ operation_id: "saved-operation", currency: "EUR", status: "assigned", virtual_account_id: 87 })), virtualAccountId: 87 }] } };
+    mocks.blocked = false;
+    refreshPage();
+    expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("EUR");
+    expect(screen.getByRole("combobox", { name: "Account category" })).toHaveTextContent("Collection account");
+    expect(screen.getByRole("combobox", { name: "Account type" })).toHaveTextContent("Wires");
+    expect(mocks.submit).not.toHaveBeenCalled();
   });
 
-  it("fails closed while eligibility is loading and after an eligibility error", async () => {
-    let rejectEligibility: (error: Error) => void = () => undefined;
-    mocks.getProviderIntegrations.mockReturnValue(new Promise((_, reject) => {
-      rejectEligibility = reject;
-    }));
-    renderPage();
+  it("restores the retained parameters and identity on remount without submitting again", async () => {
+    const retained = { providerAccountId: 7, operationId: "saved-operation", request: { ...vaRequest, currency: "EUR", accountType: "WIRES" },
+      submission: "uncertain" as const, server: null, virtualAccountId: null };
+    mocks.state.scope.operations = [retained];
+    mocks.state.scope.generation = 1;
+    mocks.blocked = true;
+    const first = renderPage();
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("EUR"));
+    first.unmount();
 
-    expect(await screen.findByText(/Checking virtual account eligibility/i)).toBeVisible();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Currency" })).toHaveTextContent("EUR");
+      expect(screen.getByRole("combobox", { name: "Account type" })).toHaveTextContent("Wires");
+    });
+    expect(screen.getByText(/saved-operation · Account 7/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
-
-    rejectEligibility(new Error("Eligibility unavailable"));
-    expect(await screen.findByText(/Account setup or verification incomplete/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeDisabled();
-    expect(mocks.requestVirtualAccount).not.toHaveBeenCalled();
-  });
-
-  it("preserves a restored operation while ineligible and enables the same operation after eligibility changes", async () => {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(savedOperation));
-    mocks.getProviderIntegrations.mockResolvedValueOnce([integration(false, "kyb_approval_pending")]);
-    const firstRender = renderPage();
-
-    expect(await screen.findByText(/KYB approval pending/i)).toBeVisible();
-    expect(JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null")).toEqual(savedOperation);
-    firstRender.unmount();
-
-    mocks.getProviderIntegrations.mockResolvedValueOnce([integration(true)]);
-    renderPage();
-    expect(await screen.findByText(/Account ready for virtual account requests/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Confirm and request" })).toBeEnabled();
-    expect(JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null")).toEqual(savedOperation);
-  });
-
-  it("does not let resume-original bypass failed eligibility", async () => {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(savedOperation));
-    mocks.getProviderIntegrations.mockResolvedValue([integration(false, "kyb_approval_pending")]);
-    renderPage();
-    await screen.findByText(/KYB approval pending/i);
-
-    const currencySelect = screen.getAllByRole("combobox")[0];
-    fireEvent.keyDown(currencySelect, { key: "ArrowDown" });
-    fireEvent.click(await screen.findByRole("option", { name: "EUR" }));
-
-    const resume = await screen.findByRole("button", { name: "Resume original request" });
-    expect(resume).toBeDisabled();
-    fireEvent.click(resume);
-    expect(mocks.requestVirtualAccount).not.toHaveBeenCalled();
-    expect(JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null")).toEqual(savedOperation);
+    fireEvent.click(screen.getByRole("button", { name: "Check status" }));
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    expect(mocks.state.scope.operations).toEqual([retained]);
+    expect(mocks.state.scope.generation).toBe(1);
+    expect(mocks.submit).not.toHaveBeenCalled();
   });
 });

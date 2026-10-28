@@ -7,16 +7,29 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { VirtualAccountLifecycleStatus } from "@/components/account/VirtualAccountLifecycleStatus";
+import { useVirtualAccountOperation } from "@/hooks/useVirtualAccountOperation";
 import { getProviders } from "@/services/fxOrderService";
-import { getVirtualAccounts } from "@/services/providerAccountService";
+import type { VirtualAccount } from "@/services/providerAccountService";
 import { statusBadgeClassName } from "@/lib/money";
 import { normalizeStatus } from "@/lib/status";
 import { getProviderDisplayName, isPrimaryProvider, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
-const AccountVirtualAccounts = () => {
-  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+const enrichmentDescription = (account: VirtualAccount) => {
+  switch (account.enrichment?.status) {
+    case "pending": return "Banking details pending.";
+    case "running": return "Banking details are updating.";
+    case "complete": return "Banking details complete.";
+    case "exhausted": return "Banking details could not be completed automatically. Contact support about these details; a new VA assignment is not needed.";
+    default: return "Enrichment tracking unavailable. Existing banking details remain available.";
+  }
+};
 
-  const { user, token } = useAuth();
+const AccountVirtualAccounts = () => {
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const lifecycle = useVirtualAccountOperation();
+
+  const { token } = useAuth();
   const location = useLocation();
   const activeTab = new URLSearchParams(location.search).get("tab") || "approved";
 
@@ -27,6 +40,7 @@ const AccountVirtualAccounts = () => {
       const payload = await getProviders();
       return payload.data.filter((provider) => provider.status === "active");
     },
+    retry: false,
   });
 
   const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
@@ -34,17 +48,8 @@ const AccountVirtualAccounts = () => {
     () => providers.find((provider) => isPrimaryProvider(provider)),
     [providers],
   );
-  const accountsQuery = useQuery({
-    queryKey: ["nium-virtual-accounts", user?.id, primaryProvider?.code, token],
-    enabled: !!user?.id && !!token && !!primaryProvider?.code,
-    queryFn: async () =>
-      getVirtualAccounts({
-        userId: user?.id as string,
-        token: token as string,
-        providerCode: primaryProvider?.code as string,
-      }),
-  });
-  const accounts = accountsQuery.data ?? [];
+  const accounts = lifecycle.state?.accounts ?? [];
+  const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
 
   const visibleAccounts = accounts.filter((account) => {
     const normalized = normalizeStatus(account.status);
@@ -83,6 +88,7 @@ const AccountVirtualAccounts = () => {
           </div>
         </div>
 
+        <VirtualAccountLifecycleStatus lifecycle={lifecycle} />
         <div className="mb-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-8 text-[1.05rem] font-semibold">
             <Link
@@ -108,11 +114,11 @@ const AccountVirtualAccounts = () => {
           </div>
           <Button
             variant="outline"
-            onClick={() => accountsQuery.refetch()}
-            disabled={accountsQuery.isFetching}
+            onClick={() => { void lifecycle.refresh(); }}
+            disabled={lifecycle.state?.checking || lifecycle.state?.submitting}
             className="h-10 rounded-full border-[#d7d7d2] bg-white px-4 text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#151b24] dark:text-white"
           >
-            <RefreshCcw className={`mr-2 h-4 w-4 ${accountsQuery.isFetching ? "animate-spin" : ""}`} />
+            <RefreshCcw className={`mr-2 h-4 w-4 ${lifecycle.state?.checking ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
@@ -171,9 +177,11 @@ const AccountVirtualAccounts = () => {
                         <Badge className={statusBadgeClassName(normalizeStatus(account.status) === "assigned" ? "approved" : account.status)}>
                           {account.status}
                         </Badge>
+                        <p className="mt-1 text-xs text-[#62708a] dark:text-gray-400">{enrichmentDescription(account)}</p>
                       </div>
                       <button
-                        onClick={() => setSelectedAccount(account)}
+                        aria-label={`View banking details for ${account.currency} account ${account.id}`}
+                        onClick={() => setSelectedAccountId(account.id)}
                         className="flex h-9 w-9 items-center justify-center rounded-full text-[#62708a] transition hover:bg-[#f3fdf9] dark:text-gray-400 dark:hover:bg-white/10"
                       >
                         <MoreHorizontal className="h-5 w-5" />
@@ -184,10 +192,10 @@ const AccountVirtualAccounts = () => {
                 {visibleAccounts.length === 0 && (
                   <div className="px-5 py-14 text-center">
                     <p className="text-[1.05rem] font-medium text-[#0f2442] dark:text-white">
-                      {accountsQuery.isLoading ? "Loading virtual accounts..." : "No virtual account data available"}
+                      {lifecycle.state?.error ? "Virtual accounts could not be refreshed" : !lifecycle.state?.ready ? "Loading virtual accounts..." : "No virtual accounts in this view"}
                     </p>
                     <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-                      Account details will appear here after onboarding or data sync is completed.
+                      {lifecycle.state?.error ? "Check status to try reading the existing accounts again." : "Saved requests may remain pending before a virtual account appears here."}
                     </p>
                     <Button asChild className="mt-5 rounded-full bg-[#16a34a] px-5 font-semibold text-white hover:bg-[#15803d]">
                       <Link to="/account/integrations">Manage integrations</Link>
@@ -202,14 +210,15 @@ const AccountVirtualAccounts = () => {
 
       {selectedAccount && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-[#151b24]">
+          <div role="dialog" aria-modal="true" aria-label="Receiving account details" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-[#151b24]">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold text-[#0f2442] dark:text-white">
                 Receiving account details
               </h2>
 
               <button
-                onClick={() => setSelectedAccount(null)}
+                aria-label="Close banking details"
+                onClick={() => setSelectedAccountId(null)}
                 className="text-[#62708a] hover:text-black dark:hover:text-white"
               >
                 ✕
@@ -217,6 +226,8 @@ const AccountVirtualAccounts = () => {
             </div>
 
             <div className="space-y-4 text-sm">
+              <p role="status">{enrichmentDescription(selectedAccount)}</p>
+              {selectedAccount.enrichment?.next_attempt_at && <p>Next details attempt: {new Date(selectedAccount.enrichment.next_attempt_at).toLocaleString()}</p>}
               <div>
                 <p className="text-[#62708a]">Virtual Account Number</p>
                 <p className="font-semibold text-[#0f2442] dark:text-white">
@@ -241,7 +252,7 @@ const AccountVirtualAccounts = () => {
               <div>
                 <p className="text-[#62708a]">Bank Name</p>
                 <p className="font-semibold text-[#0f2442] dark:text-white">
-                  {selectedAccount.detail?.bank_name || "-"}
+                  {selectedAccount.detail?.bank_name || selectedAccount.detail?.provider_bank_name || "-"}
                 </p>
               </div>
 
@@ -253,12 +264,25 @@ const AccountVirtualAccounts = () => {
               </div>
 
               <div>
-                <p className="text-[#62708a]">Routing Code</p>
+                <p className="text-[#62708a]">Routing code 1</p>
                 <p className="font-semibold text-[#0f2442] dark:text-white">
                   {selectedAccount.detail?.routing_code_type || "-"}{" "}
                   {selectedAccount.detail?.routing_code_value || ""}
                 </p>
               </div>
+              <div>
+                <p className="text-[#62708a]">Routing code 2</p>
+                <p className="font-semibold text-[#0f2442] dark:text-white">{selectedAccount.detail?.routing_code_type_2 || "-"}{" "}{selectedAccount.detail?.routing_code_value_2 || ""}</p>
+              </div>
+              {[
+                ["Provider account ID", selectedAccount.user_provider_account_id],
+                ["Virtual account ID", selectedAccount.id],
+                ["Account reference", selectedAccount.virtual_account_reference],
+                ["Requested account category", selectedAccount.account_category],
+                ["Requested account type", selectedAccount.account_type],
+                ["Provider account category", selectedAccount.detail?.provider_account_category],
+                ["Provider account type", selectedAccount.detail?.provider_account_type],
+              ].map(([label, value]) => <div key={label}><p className="text-[#62708a]">{label}</p><p className="font-semibold text-[#0f2442] dark:text-white">{value ?? "-"}</p></div>)}
             </div>
           </div>
         </div>
