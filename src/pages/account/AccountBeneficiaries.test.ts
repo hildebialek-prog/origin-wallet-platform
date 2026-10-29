@@ -57,17 +57,16 @@ describe("beneficiary form contract", () => {
     });
   });
 
-  it("validates LOCAL and SWIFT according to the corridor", () => {
-    expect(validateBankForm(form({ payoutMethod: "LOCAL" }))).toContain("supported payout method");
+  it("leaves corridor restrictions to the provider metadata instead of country rules", () => {
+    expect(validateBankForm(form({ payoutMethod: "LOCAL" }))).toBe("");
     expect(validateBankForm(form({ countryCode: "VN", currency: "VND", payoutMethod: "LOCAL", swiftBic: "" }))).toBe("");
-    expect(validateBankForm(form({ countryCode: "VN", currency: "USD", payoutMethod: "SWIFT", swiftBic: "" }))).toContain("SWIFT / BIC");
   });
 
   it("preserves an explicitly selected currency when country changes", () => {
     expect(applyCountryChange(form({ countryCode: "VN", currency: "USD", payoutMethod: "LOCAL" }), "HK")).toMatchObject({
       countryCode: "HK",
       currency: "USD",
-      payoutMethod: "SWIFT",
+      payoutMethod: "LOCAL",
     });
   });
 

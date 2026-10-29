@@ -295,3 +295,29 @@ export const syncProviderTransactions = (params: AuthenticatedParams & { provide
 
 export const getProviderName = (providers: ProviderSummary[], providerId?: number | null) =>
   providerId ? getProviderDisplayName(providers.find((provider) => provider.id === providerId)) : "-";
+
+export interface BeneficiaryRequirementField {
+  name: string;
+  required: boolean;
+  type?: string;
+  pattern?: string;
+  min_length?: number;
+  max_length?: number;
+  allowed_values?: unknown[];
+}
+
+export interface NiumBeneficiaryRequirements {
+  dimensions: Record<string, string>;
+  routing_code_types: string[];
+  fields: BeneficiaryRequirementField[];
+}
+
+export const getBeneficiaryRequirements = (params: AuthenticatedParams & {
+  providerId: string; beneficiaryType: string; countryCode: string; currency: string; payoutMethod: string;
+}) => {
+  const query = new URLSearchParams({
+    provider_id: params.providerId, beneficiary_type: params.beneficiaryType,
+    country_code: params.countryCode, currency: params.currency, payout_method: params.payoutMethod,
+  });
+  return requestApi<NiumBeneficiaryRequirements>(`/user/users/${params.userId}/beneficiaries/requirements?${query}`, { token: params.token });
+};

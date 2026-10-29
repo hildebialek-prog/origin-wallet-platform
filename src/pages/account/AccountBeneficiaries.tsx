@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -42,10 +42,14 @@ import {
   createBeneficiary,
   deleteBeneficiary,
   getBeneficiaries,
+  getBeneficiaryRequirements,
+  type NiumBeneficiaryRequirements,
   updateBeneficiary,
   type Beneficiary,
   type BeneficiaryPayload,
 } from "@/services/moneyMovementService";
+import { ApiRequestError } from "@/services/apiClient";
+import { applyNiumRequirements, extraSchemaFields, fieldLabel, routingEntries, schemaErrors, schemaFormFields } from "./beneficiaryRequirements";
 import { countryOptions, currencyOptions, formatDateTime, statusBadgeClassName } from "@/lib/money";
 import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
@@ -63,6 +67,11 @@ export type BeneficiaryForm = {
   currency: string;
   bankName: string;
   bankCode: string;
+  routingType: string;
+  routingValue: string;
+  secondaryRoutingType: string;
+  secondaryRoutingValue: string;
+  schemaValues: Record<string, string>;
   branchCode: string;
   accountNumber: string;
   confirmAccountNumber: string;
@@ -93,6 +102,11 @@ export const emptyForm: BeneficiaryForm = {
   currency: "USD",
   bankName: "",
   bankCode: "",
+  routingType: "",
+  routingValue: "",
+  secondaryRoutingType: "",
+  secondaryRoutingValue: "",
+  schemaValues: {},
   branchCode: "",
   accountNumber: "",
   confirmAccountNumber: "",
@@ -127,7 +141,16 @@ export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
   const nium = (rawData.nium ?? {}) as Record<string, unknown>;
   const origin = (rawData.origin ?? {}) as Record<string, unknown>;
 
+  const routing = (nium.routingInfo as { type: string; value: string }[] | undefined) ?? [
+    ...(beneficiary.swift_bic ? [{ type: "SWIFT", value: beneficiary.swift_bic }] : []),
+    ...(beneficiary.bank_code ? [{ type: String(nium.bankCodeType ?? ""), value: beneficiary.bank_code }] : []),
+    ...(beneficiary.branch_code ? [{ type: String(nium.branchCodeType ?? ""), value: beneficiary.branch_code }] : []),
+  ];
+
   return {
+    routingType: routing[0]?.type ?? "", routingValue: routing[0]?.value ?? "",
+    secondaryRoutingType: routing[1]?.type ?? "", secondaryRoutingValue: routing[1]?.value ?? "",
+    schemaValues: (nium.additionalFields as Record<string, string>) ?? {},
     providerId: String(beneficiary.provider_id),
     beneficiaryType: beneficiary.beneficiary_type || "business",
     fullName: beneficiary.full_name || "",
@@ -149,8 +172,8 @@ export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
     city: beneficiary.city || "",
     state: beneficiary.state || "",
     postalCode: beneficiary.postal_code || "",
-    payoutMethod: String(nium.payoutMethod ?? "SWIFT"),
-    bankAccountType: String(nium.bankAccountType ?? "CURRENT"),
+    payoutMethod: String(beneficiary.payout_method ?? nium.payoutMethod ?? "SWIFT"),
+    bankAccountType: String(nium.beneficiaryBankAccountType ?? nium.bankAccountType ?? "CURRENT"),
     verifyBeforeCreate: String(Boolean(nium.verify_before_create ?? false)),
     vendorType: String(origin.vendor_type ?? nium.remitterBeneficiaryRelationship ?? "supplier"),
     transactionDocumentName: String(origin.transaction_document_name ?? ""),
@@ -158,11 +181,11 @@ export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
   };
 };
 
-export const buildPayload = (form: BeneficiaryForm, supportsAccountVerification = false): BeneficiaryPayload => {
+export const buildPayload = (form: BeneficiaryForm, supportsAccountVerification = false, requirements?: NiumBeneficiaryRequirements): BeneficiaryPayload => {
   const accountNumber = form.accountNumber.trim();
   const phone = form.phone.trim();
 
-  return {
+  const payload: BeneficiaryPayload = {
     provider_id: Number(form.providerId),
     beneficiary_type: form.beneficiaryType,
     full_name: form.fullName.trim(),
@@ -185,18 +208,19 @@ export const buildPayload = (form: BeneficiaryForm, supportsAccountVerification 
     raw_data: {
       origin: {
         account_route: form.accountRoute,
-        vendor_type: form.vendorType,
-        ...(phone ? { phone_country_code: form.phoneCountryCode } : {}),
+        vendor_type: form.vendorType.trim(),
+        ...(phone ? { phone_country_code: form.phoneCountryCode.trim() } : {}),
       },
       nium: {
         payoutMethod: form.payoutMethod,
         bankAccountType: form.bankAccountType,
-        ...(phone ? { beneficiaryContactCountryCode: form.phoneCountryCode } : {}),
-        remitterBeneficiaryRelationship: form.vendorType,
+        ...(phone ? { beneficiaryContactCountryCode: form.phoneCountryCode.trim() } : {}),
+        remitterBeneficiaryRelationship: form.vendorType.trim(),
         ...(supportsAccountVerification ? { verify_before_create: form.verifyBeforeCreate === "true" } : {}),
       },
     },
   };
+  return requirements ? applyNiumRequirements(payload, form, requirements) : payload;
 };
 
 const beneficiaryTypeLabels: Record<string, string> = {
@@ -249,33 +273,16 @@ const phoneCountryOptions = [
   { code: "+1", label: "US/CA +1" },
 ];
 
-export const payoutMethodsFor = (countryCode: string, currency: string) =>
-  countryCode === "HK" && currency === "USD" ? ["SWIFT"] : ["LOCAL", "SWIFT"];
+export const payoutMethodsFor = () => ["LOCAL", "SWIFT"];
 
-export const applyCountryChange = (form: BeneficiaryForm, countryCode: string): BeneficiaryForm => ({
-  ...form,
-  countryCode,
-  payoutMethod: countryCode === "HK" && form.currency === "USD" ? "SWIFT" : form.payoutMethod,
-});
+export const applyCountryChange = (form: BeneficiaryForm, countryCode: string): BeneficiaryForm => ({ ...form, countryCode });
 
 export const validateBankForm = (form: BeneficiaryForm) => {
   if (form.accountRoute !== "bank") return "Wallet account recipients will be enabled after account-recipient APIs are confirmed.";
   if (!form.currency) return "Currency is required.";
-  if (!payoutMethodsFor(form.countryCode, form.currency).includes(form.payoutMethod)) {
-    return `${form.countryCode}/${form.currency} requires a supported payout method.`;
-  }
-  if (!form.bankName.trim()) return "Bank name is required.";
   if (!form.accountNumber.trim() && !form.iban.trim()) return "Enter either account number or IBAN before saving the beneficiary.";
   if (form.accountNumber.trim() && !form.confirmAccountNumber.trim()) return "Confirm the account number before saving the beneficiary.";
-  if (form.accountNumber.trim() && form.accountNumber.trim() !== form.confirmAccountNumber.trim()) {
-    return "Account number and confirmation do not match.";
-  }
-  if (form.payoutMethod === "SWIFT" && !form.swiftBic.trim()) return "SWIFT / BIC is required for SWIFT payouts.";
-  if (form.countryCode === "HK" && form.currency === "USD" && form.payoutMethod === "SWIFT") {
-    if (!form.addressLine1.trim()) return "Address line 1 is required for HK/USD SWIFT payouts.";
-    if (!form.city.trim()) return "City is required for HK/USD SWIFT payouts.";
-    if (!form.postalCode.trim()) return "Postcode is required for HK/USD SWIFT payouts.";
-  }
+  if (form.accountNumber.trim() && form.accountNumber.trim() !== form.confirmAccountNumber.trim()) return "Account number and confirmation do not match.";
   return "";
 };
 
@@ -288,6 +295,7 @@ const AccountBeneficiaries = () => {
   const [form, setForm] = useState<BeneficiaryForm>(emptyForm);
   const [step, setStep] = useState<BeneficiaryStep>("basic");
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const beneficiariesQuery = useQuery({
     queryKey: ["money-beneficiaries", user?.id, token],
@@ -309,6 +317,24 @@ const AccountBeneficiaries = () => {
   const beneficiaries = beneficiariesQuery.data ?? [];
   const selectedProvider = beneficiaryProviders.find((provider) => String(provider.id) === form.providerId);
   const selectedCountry = countryOptions.find((country) => country.code === form.countryCode);
+  const isNium = selectedProvider?.code === "nium";
+  const requirementsQuery = useQuery({
+    queryKey: ["beneficiary-requirements", user?.id, token, form.providerId, form.beneficiaryType, form.countryCode, form.currency, form.payoutMethod],
+    enabled: dialogOpen && isNium && !!token && !!user?.id,
+    retry: false,
+    queryFn: () => getBeneficiaryRequirements({
+      userId: user!.id, token: token!, providerId: form.providerId, beneficiaryType: form.beneficiaryType,
+      countryCode: form.countryCode, currency: form.currency, payoutMethod: form.payoutMethod,
+    }),
+  });
+  const requirements = isNium && !requirementsQuery.isFetching && !requirementsQuery.isError ? requirementsQuery.data : undefined;
+  const submittedPayload = buildPayload(form, selectedProvider?.supports_account_verification === true, requirements);
+  const changeForm = (next: BeneficiaryForm) => {
+    const changedCorridor = ["providerId", "beneficiaryType", "countryCode", "currency", "payoutMethod"].some((key) => next[key] !== form[key]);
+    setForm(changedCorridor ? { ...next, routingType: "", routingValue: "", secondaryRoutingType: "", secondaryRoutingValue: "" } : next);
+    setFieldErrors({});
+    setFormError("");
+  };
 
   const providerById = useMemo(() => {
     const map = new Map<number, ProviderSummary>();
@@ -349,7 +375,16 @@ const AccountBeneficiaries = () => {
     return "";
   };
 
-  const validateBank = () => validateBankForm(form);
+  const validateBank = () => {
+    if (isNium && !requirements) return "Load the supported beneficiary requirements before continuing.";
+    const errors = isNium && requirements ? schemaErrors(form, submittedPayload, requirements) : {};
+    if (form.accountNumber.trim() && form.accountNumber.trim() !== form.confirmAccountNumber.trim()) {
+      errors.confirmAccountNumber = form.confirmAccountNumber.trim() ? "Account number and confirmation do not match." : "Confirm the account number before continuing.";
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) return "Check the highlighted fields before continuing.";
+    return validateBankForm(form);
+  };
 
   const goNext = () => {
     const validation =
@@ -384,7 +419,7 @@ const AccountBeneficiaries = () => {
       const bankValidation = validateBank();
       if (bankValidation) throw new Error(bankValidation);
 
-      const payload = buildPayload(form, selectedProvider?.supports_account_verification === true);
+      const payload = submittedPayload;
 
       if (editing) {
         return updateBeneficiary({
@@ -408,6 +443,10 @@ const AccountBeneficiaries = () => {
     onError: (error) => {
       const message = error instanceof Error ? error.message : "Unable to save beneficiary.";
       setFormError(message);
+      if (error instanceof ApiRequestError && error.errors) {
+        setFieldErrors(Object.fromEntries(Object.entries(error.errors).map(([key, messages]) => [key.replace(/^raw_data\.nium\.additionalFields\./, ""), messages.join(" ")])));
+        setStep("bank");
+      }
       if (editing) {
         toast({ variant: "destructive", title: "Beneficiary update failed", description: message });
       }
@@ -424,12 +463,14 @@ const AccountBeneficiaries = () => {
     setDialogOpen(false);
     setEditing(null);
     setForm(emptyForm);
+    setFieldErrors({});
     setStep("basic");
     setFormError("");
   };
 
   const openCreate = () => {
     setEditing(null);
+    setFieldErrors({});
     setForm({
       ...emptyForm,
       providerId: beneficiaryProviders[0] ? String(beneficiaryProviders[0].id) : "",
@@ -441,13 +482,14 @@ const AccountBeneficiaries = () => {
 
   const openEdit = (beneficiary: Beneficiary) => {
     setEditing(beneficiary);
+    setFieldErrors({});
     setForm(toForm(beneficiary));
     setStep("basic");
     setFormError("");
     setDialogOpen(true);
   };
 
-  const handleCountryChange = (countryCode: string) => setForm(applyCountryChange(form, countryCode));
+  const handleCountryChange = (countryCode: string) => changeForm(applyCountryChange(form, countryCode));
 
   return (
     <div className="bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
@@ -618,6 +660,18 @@ const AccountBeneficiaries = () => {
               </div>
             ) : null}
 
+            {isNium && (step === "bank" || step === "review") && !requirements && (
+              <div role="status" className="mt-6 space-y-3 rounded-xl border p-4">
+                <p>{requirementsQuery.isFetching ? "Loading supported beneficiary requirements…" : "Beneficiary requirements are unavailable. Check the payment details and retry before continuing."}</p>
+                <Button variant="outline" disabled={requirementsQuery.isFetching} onClick={() => requirementsQuery.refetch()}>Retry requirements</Button>
+              </div>
+            )}
+            {Object.keys(fieldErrors).length > 0 && (
+              <ul role="alert" className="mt-4 space-y-1 text-sm text-red-700">
+                {Object.entries(fieldErrors).map(([key, message]) => <li key={key}>{fieldLabel(key)}: {message}</li>)}
+              </ul>
+            )}
+
             <div className="mt-8">
               {step === "basic" && (
                 <BasicVendorStep
@@ -625,7 +679,7 @@ const AccountBeneficiaries = () => {
                   selectedProvider={selectedProvider}
                   selectedCountry={selectedCountry}
                   onCountryChange={handleCountryChange}
-                  onChange={setForm}
+                  onChange={changeForm}
                   onContinue={goNext}
                 />
               )}
@@ -645,18 +699,22 @@ const AccountBeneficiaries = () => {
                   selectedCountry={selectedCountry}
                   onCountryChange={handleCountryChange}
                   onBack={goBack}
-                  onChange={setForm}
+                  onChange={changeForm}
                   onContinue={goNext}
                   supportsAccountVerification={selectedProvider?.supports_account_verification === true}
+                  isNium={isNium}
+                  requirements={requirements}
+                  fieldErrors={fieldErrors}
                 />
               )}
 
               {step === "review" && (
                 <ReviewBeneficiaryStep
-                  form={form}
                   provider={selectedProvider}
                   country={selectedCountry}
-                  saving={saveMutation.isPending}
+                  saving={saveMutation.isPending || (isNium && !requirements)}
+                  payload={submittedPayload}
+                  requirements={requirements}
                   editing={Boolean(editing)}
                   onBack={goBack}
                   onSave={() => saveMutation.mutate()}
@@ -783,7 +841,7 @@ const BasicVendorStep = ({
         <FormSelect
           label="Vendor relationship type"
           value={form.vendorType}
-          selectedLabel={vendorRelationshipLabels[form.vendorType]}
+          selectedLabel={(vendorRelationshipLabels[form.vendorType] ?? form.vendorType)}
           onChange={(value) => onChange({ ...form, vendorType: value })}
         >
           {Object.entries(vendorRelationshipLabels).map(([value, label]) => (
@@ -895,6 +953,7 @@ const BankAccountStep = ({
   onChange,
   onContinue,
   supportsAccountVerification,
+  isNium, requirements, fieldErrors,
 }: {
   form: BeneficiaryForm;
   selectedCountry?: { code: string; name: string };
@@ -903,6 +962,9 @@ const BankAccountStep = ({
   onChange: (form: BeneficiaryForm) => void;
   onContinue: () => void;
   supportsAccountVerification: boolean;
+  isNium: boolean;
+  requirements?: NiumBeneficiaryRequirements;
+  fieldErrors: Record<string, string>;
 }) => (
   <div className="space-y-7">
     <BackButton onClick={onBack} />
@@ -950,7 +1012,7 @@ const BankAccountStep = ({
           onChange({
             ...form,
             currency: value,
-            payoutMethod: form.countryCode === "HK" && value === "USD" ? "SWIFT" : form.payoutMethod,
+            payoutMethod: form.payoutMethod,
           })
         }
       >
@@ -961,11 +1023,12 @@ const BankAccountStep = ({
 
       <FormInput
         label="Account holder name"
-        value={form.companyName || form.fullName}
-        onChange={(value) => onChange({ ...form, companyName: value })}
+        error={fieldErrors.beneficiaryName}
+        value={form.beneficiaryType === "business" ? form.companyName || form.fullName : form.fullName}
+        onChange={(value) => onChange({ ...form, ...(form.beneficiaryType === "business" ? { companyName: value } : { fullName: value }) })}
       />
 
-      <div className="flex flex-wrap gap-5 text-sm text-[#0f2442] dark:text-white">
+      {!isNium && (<div className="flex flex-wrap gap-5 text-sm text-[#0f2442] dark:text-white">
         {Object.entries(bankAccountTypeLabels).map(([value, label]) => (
           <label key={value} className="flex items-center gap-2">
             <input
@@ -978,21 +1041,39 @@ const BankAccountStep = ({
             {label} Account
           </label>
         ))}
-      </div>
+      </div>)}
+      {isNium && requirements?.fields.some((f) => f.name === "beneficiaryBankAccountType") && (
+        <SchemaInput field={requirements.fields.find((f) => f.name === "beneficiaryBankAccountType")!}
+          value={form.bankAccountType} error={fieldErrors.beneficiaryBankAccountType}
+          onChange={(value) => onChange({ ...form, bankAccountType: value })} />
+      )}
+      {isNium && requirements && <NiumRoutingFields form={form} requirements={requirements} errors={fieldErrors} onChange={onChange} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormInput label="SWIFT / BIC" value={form.swiftBic} placeholder="e.g. ABCDINBBXXX" onChange={(value) => onChange({ ...form, swiftBic: value })} />
-        <FormInput label="Bank name" value={form.bankName} onChange={(value) => onChange({ ...form, bankName: value })} />
-        <FormInput label={routingLabel(form.countryCode)} value={form.bankCode} onChange={(value) => onChange({ ...form, bankCode: value })} />
-        <FormInput label="Branch code" value={form.branchCode} onChange={(value) => onChange({ ...form, branchCode: value })} />
-        <FormInput label="Account number" value={form.accountNumber} onChange={(value) => onChange({ ...form, accountNumber: value })} />
+        {!isNium && <FormInput label="SWIFT / BIC" value={form.swiftBic} placeholder="e.g. ABCDINBBXXX" onChange={(value) => onChange({ ...form, swiftBic: value })} />}
+        <FormInput label="Bank name" required={requirements?.fields.some((f) => f.name === "beneficiaryBankName" && f.required)} error={fieldErrors.beneficiaryBankName} value={form.bankName} onChange={(value) => onChange({ ...form, bankName: value })} />
+        {!isNium && <FormInput label="Bank code" value={form.bankCode} onChange={(value) => onChange({ ...form, bankCode: value })} />}
+        {!isNium && <FormInput label="Branch code" value={form.branchCode} onChange={(value) => onChange({ ...form, branchCode: value })} />}
+        <FormInput label="Account number" required={requirements?.fields.some((f) => f.name === "beneficiaryAccountNumber" && f.required) && !form.iban.trim()} error={fieldErrors.beneficiaryAccountNumber} value={form.accountNumber} onChange={(value) => onChange({ ...form, accountNumber: value })} />
         <FormInput
           label="Confirm account number"
+          error={fieldErrors.confirmAccountNumber}
           value={form.confirmAccountNumber}
           onChange={(value) => onChange({ ...form, confirmAccountNumber: value })}
         />
         <FormInput label="IBAN" value={form.iban} onChange={(value) => onChange({ ...form, iban: value })} />
       </div>
+
+      {isNium && requirements && <div className="grid gap-4 sm:grid-cols-2">
+        {requirements.fields.filter((field) => {
+          const key = schemaFormFields[field.name];
+          return key && !["fullName", "accountNumber", "bankName", "bankAccountType"].includes(key);
+        }).map((field) => <SchemaInput key={field.name} field={field} value={String(form[schemaFormFields[field.name]])}
+          error={fieldErrors[field.name]} onChange={(value) => onChange({ ...form, [schemaFormFields[field.name]]: value })} />)}
+        {extraSchemaFields(requirements).map((field) => <SchemaInput key={field.name} field={field}
+          value={form.schemaValues[field.name] ?? ""} error={fieldErrors[field.name]}
+          onChange={(value) => onChange({ ...form, schemaValues: { ...form.schemaValues, [field.name]: value } })} />)}
+      </div>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FormSelect
@@ -1001,7 +1082,7 @@ const BankAccountStep = ({
           selectedLabel={payoutMethodLabels[form.payoutMethod]}
           onChange={(value) => onChange({ ...form, payoutMethod: value })}
         >
-          {payoutMethodsFor(form.countryCode, form.currency).map((method) => (
+          {payoutMethodsFor().map((method) => (
             <SelectItem key={method} value={method}>{payoutMethodLabels[method]}</SelectItem>
           ))}
         </FormSelect>
@@ -1020,14 +1101,14 @@ const BankAccountStep = ({
       </div>
     </div>
 
-    <Button className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]" onClick={onContinue}>
+    <Button className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]" onClick={onContinue} disabled={isNium && !requirements}>
       Continue to review
     </Button>
   </div>
 );
 
-const ReviewBeneficiaryStep = ({
-  form,
+export const ReviewBeneficiaryStep = ({
+  payload, requirements,
   provider,
   country,
   saving,
@@ -1035,65 +1116,79 @@ const ReviewBeneficiaryStep = ({
   onBack,
   onSave,
 }: {
-  form: BeneficiaryForm;
+  payload: BeneficiaryPayload;
+  requirements?: NiumBeneficiaryRequirements;
   provider?: ProviderSummary;
   country?: { code: string; name: string };
   saving: boolean;
   editing: boolean;
   onBack: () => void;
   onSave: () => void;
-}) => (
-  <div className="space-y-7">
-    <BackButton onClick={onBack} />
-    <div className="text-center">
-      <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#0f2442] dark:text-white">Review vendor details</h2>
-      <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        Confirm these details before Origin Wallet sends the beneficiary request.
-      </p>
-    </div>
-
-    <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 dark:border-white/10 dark:bg-[#10141b]">
-      <SectionTitle icon={<Building2 className="h-5 w-5" />} title="Basic information" />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ReviewItem label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
-        <ReviewItem label="Vendor name" value={form.fullName || "-"} />
-        <ReviewItem label="Legal type" value={beneficiaryTypeLabels[form.beneficiaryType]} />
-        <ReviewItem label="Relationship" value={vendorRelationshipLabels[form.vendorType]} />
-        <ReviewItem label="Email" value={form.email || "-"} />
-        <ReviewItem label="Phone" value={form.phone ? `${form.phoneCountryCode}${form.phone}` : "-"} />
-        <ReviewItem label="Country" value={country ? `${country.code} - ${country.name}` : form.countryCode} />
-        <ReviewItem label="Address" value={fullAddress(form) || "-"} />
+}) => {
+  const form = toForm({ ...payload, id: 0, user_id: 0, status: "pending" });
+  const routing = ((payload.raw_data?.nium as { routingInfo?: { type: string; value: string }[] })?.routingInfo ?? []);
+  return (
+    <div className="space-y-7">
+      <BackButton onClick={onBack} />
+      <div className="text-center">
+        <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#0f2442] dark:text-white">Review vendor details</h2>
+        <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
+          Confirm these details before Origin Wallet sends the beneficiary request.
+        </p>
       </div>
-    </div>
 
-    <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 dark:border-white/10 dark:bg-[#10141b]">
-      <SectionTitle icon={<Banknote className="h-5 w-5" />} title="Bank account information" />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ReviewItem label="Account route" value={form.accountRoute === "bank" ? "Bank account" : "Wallet account"} />
-        <ReviewItem label="Currency" value={<span translate="no">{form.currency}</span>} />
-        <ReviewItem label="Account holder" value={form.companyName || form.fullName || "-"} />
-        <ReviewItem label="Account type" value={bankAccountTypeLabels[form.bankAccountType]} />
-        <ReviewItem label="Bank name" value={form.bankName || "-"} />
-        <ReviewItem label="SWIFT / BIC" value={form.swiftBic || "-"} />
-        <ReviewItem label={routingLabel(form.countryCode)} value={form.bankCode || "-"} />
-        <ReviewItem label="Account / IBAN" value={form.accountNumber || form.iban || "No account number"} />
-        <ReviewItem label="Payout method" value={payoutMethodLabels[form.payoutMethod]} />
-        {provider?.supports_account_verification ? (
-          <ReviewItem label="Verify before create" value={verifyLabels[form.verifyBeforeCreate]} />
-        ) : null}
+      <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 dark:border-white/10 dark:bg-[#10141b]">
+        <SectionTitle icon={<Building2 className="h-5 w-5" />} title="Basic information" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <ReviewItem label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
+          <ReviewItem label="Vendor name" value={form.fullName || "-"} />
+          <ReviewItem label="Legal type" value={beneficiaryTypeLabels[form.beneficiaryType]} />
+          <ReviewItem label="Relationship" value={(vendorRelationshipLabels[form.vendorType] ?? form.vendorType)} />
+          <ReviewItem label="Email" value={form.email || "-"} />
+          <ReviewItem label="Phone" value={form.phone ? `${form.phoneCountryCode}${form.phone}` : "-"} />
+          <ReviewItem label="Country" value={country ? `${country.code} - ${country.name}` : form.countryCode} />
+          <ReviewItem label="Address" value={fullAddress(form) || "-"} />
+        </div>
       </div>
-    </div>
 
-    <Button
-      className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]"
-      disabled={saving}
-      onClick={onSave}
-    >
-      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-      {editing ? "Save changes" : "Create beneficiary"}
-    </Button>
-  </div>
-);
+      <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 dark:border-white/10 dark:bg-[#10141b]">
+        <SectionTitle icon={<Banknote className="h-5 w-5" />} title="Bank account information" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <ReviewItem label="Account route" value={form.accountRoute === "bank" ? "Bank account" : "Wallet account"} />
+          <ReviewItem label="Currency" value={<span translate="no">{form.currency}</span>} />
+          <ReviewItem label="Account holder" value={form.companyName || form.fullName || "-"} />
+          {(!requirements || requirements.fields.some((f) => f.name === "beneficiaryBankAccountType")) &&
+            <ReviewItem label="Account type" value={form.bankAccountType} /> }
+          <ReviewItem label="Bank name" value={form.bankName || "-"} />
+          {requirements ? routing.map((entry, index) => (
+            <ReviewItem key={index} label={entry.type === "SWIFT" ? "SWIFT / BIC" : `${entry.type} code`} value={entry.value} />
+          )) : <>
+            <ReviewItem label="SWIFT / BIC" value={form.swiftBic || "-"} />
+            <ReviewItem label="Bank code" value={form.bankCode || "-"} />
+            <ReviewItem label="Branch code" value={form.branchCode || "-"} />
+          </>}
+          <ReviewItem label="Account number" value={payload.account_number || "-"} />
+          <ReviewItem label="IBAN" value={payload.iban || "-"} />
+          {requirements && extraSchemaFields(requirements).filter((f) => form.schemaValues[f.name]).map((field) =>
+            <ReviewItem key={field.name} label={fieldLabel(field.name)} value={form.schemaValues[field.name]} />)}
+          <ReviewItem label="Payout method" value={payoutMethodLabels[form.payoutMethod]} />
+          {provider?.supports_account_verification ? (
+            <ReviewItem label="Verify before create" value={verifyLabels[form.verifyBeforeCreate]} />
+          ) : null}
+        </div>
+      </div>
+
+      <Button
+        className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]"
+        disabled={saving}
+        onClick={onSave}
+      >
+        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        {editing ? "Save changes" : "Create beneficiary"}
+      </Button>
+    </div>
+  );
+};
 
 const BeneficiaryStepper = ({ currentStep }: { currentStep: BeneficiaryStep }) => {
   const currentIndex = beneficiarySteps.findIndex((item) => item.key === currentStep);
@@ -1155,30 +1250,53 @@ const InfoLine = ({ icon, value }: { icon: ReactNode; value: string }) => (
   </div>
 );
 
-const FormInput = ({
-  label,
-  value,
-  type = "text",
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  type?: string;
-  placeholder?: string;
-  onChange: (value: string) => void;
-}) => (
-  <div className="space-y-2">
-    <Label>{label}</Label>
-    <Input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(event) => onChange(event.target.value)}
-      className="h-11 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]"
-    />
-  </div>
-);
+const FormInput = ({ label, value, type = "text", placeholder, onChange, error, required }: {
+  label: string; value: string; type?: string; placeholder?: string; onChange: (value: string) => void; error?: string; required?: boolean;
+}) => {
+  const id = useId();
+  return <div className="space-y-2">
+    <Label htmlFor={id}>{label}{required ? " (Required)" : required === false ? " (Optional)" : ""}</Label>
+    <Input id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} required={required}
+      type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)}
+      className="h-11 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]" />
+    {error && <p id={`${id}-error`} className="text-sm text-red-700">{error}</p>}
+  </div>;
+};
+
+export const NiumRoutingFields = ({ form, requirements, errors, onChange }: {
+  form: BeneficiaryForm; requirements: NiumBeneficiaryRequirements; errors: Record<string, string>; onChange: (form: BeneficiaryForm) => void;
+}) => <div className="grid gap-4 sm:grid-cols-2">
+  {routingEntries(form, requirements).map((entry) => <div key={entry.slot} className="space-y-3">
+    {(entry.types.length > 1 || !entry.required || !entry.types.includes(entry.type)) && <SchemaInput
+      field={{ name: `routingCodeType${entry.slot}`, required: entry.required, allowed_values: entry.types }}
+      label={entry.slot === 1 ? "Routing type" : "Additional routing type"}
+      value={entry.type} error={errors[`routingCodeType${entry.slot}`]}
+      onChange={(value) => onChange({ ...form, ...(entry.slot === 1 ? { routingType: value, routingValue: "" } : { secondaryRoutingType: value, secondaryRoutingValue: "" }) })} />}
+    {(entry.required || entry.type || entry.types.length === 1) && <FormInput
+      label={entry.type === "SWIFT" || (entry.types.length === 1 && entry.types[0] === "SWIFT") ? "SWIFT / BIC" : `${entry.type || "Routing"} code`}
+      value={entry.value} required={entry.required}
+      error={errors[`routingCodeValue${entry.slot}`] || errors[`routingCodeType${entry.slot}`]}
+      onChange={(value) => onChange({ ...form, ...(entry.slot === 1 ? { routingValue: value } : { secondaryRoutingValue: value }) })} />}
+  </div>)}
+</div>;
+
+const SchemaInput = ({ field, label = fieldLabel(field.name), value, error, onChange }: {
+  field: import("@/services/moneyMovementService").BeneficiaryRequirementField;
+  label?: string; value: string; error?: string; onChange: (value: string) => void;
+}) => {
+  const id = useId();
+  const options = field.allowed_values ?? (field.type === "boolean" ? [true, false] : undefined);
+  if (!options) return <FormInput label={label} value={value} required={field.required} error={error} onChange={onChange} />;
+  return <div className="space-y-2">
+    <Label htmlFor={id}>{label}{field.required ? " (Required)" : " (Optional)"}</Label>
+    <select id={id} className="h-11 w-full rounded-xl border bg-background px-3" value={value} required={field.required}
+      aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Select {label.toLowerCase()}</option>
+      {options.map((option) => <option key={String(option)} value={String(option)}>{String(option)}</option>)}
+    </select>
+    {error && <p id={`${id}-error`} className="text-sm text-red-700">{error}</p>}
+  </div>;
+};
 
 const FormSelect = ({
   label,
@@ -1225,14 +1343,6 @@ const ReviewItem = ({ label, value }: { label: string; value?: ReactNode }) => (
     <p className="mt-1 break-words font-semibold text-[#0f2442] dark:text-white">{value || "-"}</p>
   </div>
 );
-
-const routingLabel = (countryCode: string) => {
-  if (countryCode === "AU") return "Routing / BSB code";
-  if (countryCode === "GB") return "Sort code";
-  if (countryCode === "US") return "Routing / ABA number";
-  if (countryCode === "IN") return "IFSC code";
-  return "Bank code";
-};
 
 const fullAddress = (form: BeneficiaryForm) =>
   [form.addressLine1, form.addressLine2, form.city, form.state, form.postalCode, form.countryCode].filter(Boolean).join(", ");

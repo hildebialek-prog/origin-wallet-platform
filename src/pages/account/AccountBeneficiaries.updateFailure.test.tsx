@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { swiftRequirements } from "@/test/beneficiaryFixtures";
 import AccountBeneficiaries from "./AccountBeneficiaries";
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ vi.mock("@/services/fxOrderService", () => ({
 }));
 
 vi.mock("@/services/moneyMovementService", () => ({
+  getBeneficiaryRequirements: vi.fn().mockResolvedValue(swiftRequirements),
   getBeneficiaries: vi.fn().mockResolvedValue([{
     id: 42,
     user_id: 9,
@@ -66,10 +68,11 @@ describe("beneficiary edit failure", () => {
     await screen.findAllByText("Original Vendor");
     fireEvent.click(container.querySelector("svg.lucide-pencil")?.closest("button") as HTMLButtonElement);
 
-    const vendorName = (await screen.findByText("Vendor's name")).parentElement?.querySelector("input") as HTMLInputElement;
+    const vendorName = (await screen.findByLabelText(/Vendor's name/)) as HTMLInputElement;
     fireEvent.change(vendorName, { target: { value: "Edited Vendor" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue to add accounts" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue to review" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Continue to review" }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
