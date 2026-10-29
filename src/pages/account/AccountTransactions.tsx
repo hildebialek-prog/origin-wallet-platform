@@ -1,7 +1,8 @@
+import { CurrencyDisplay } from "@/components/shared/CurrencyDisplay";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Download, Loader2, RefreshCcw, Search } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Minus, ChevronLeft, ChevronRight, Download, Loader2, RefreshCcw, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProviderLogo } from "@/components/account/ProviderLogo";
 import { Badge } from "@/components/ui/badge";
@@ -111,7 +112,7 @@ const AccountTransactions = () => {
   const syncableProviders = providers.filter((provider) => provider.supports_data_sync);
 
   return (
-    <div className="bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
+    <div className="wallet-ui bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -185,8 +186,9 @@ const AccountTransactions = () => {
           </Select>
 
           <div className="relative w-full flex-1 lg:min-w-[22rem]">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7a879c] dark:text-gray-500" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#62708a] dark:text-gray-400" />
             <Input
+              aria-label="Search transactions"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               className="h-11 rounded-full border-[#d7d7d2] bg-white pl-11 text-[1rem] dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:placeholder:text-gray-500"
@@ -195,10 +197,10 @@ const AccountTransactions = () => {
           </div>
         </div>
 
-        <Card className="overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
-          <div className="overflow-x-auto">
+        <Card className="wallet-card overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+          <div className="wallet-table-scroll" role="region" aria-label="Transactions" tabIndex={0}>
             <div className="min-w-[980px]">
-              <div className="grid grid-cols-[160px_1fr_1fr_130px_130px_44px] border-b border-[#d7d7d2] px-5 py-4 text-sm font-semibold text-[#0f2442] dark:border-white/10 dark:text-gray-200">
+              <div className="grid gap-4 grid-cols-[140px_minmax(180px,1fr)_minmax(120px,0.8fr)_120px_minmax(180px,1fr)_44px] border-b border-[#d7d7d2] px-5 py-4 text-sm font-semibold text-[#0f2442] dark:border-white/10 dark:text-gray-200">
                 <div>Date</div>
                 <div>Description</div>
                 <div>Infrastructure</div>
@@ -213,14 +215,14 @@ const AccountTransactions = () => {
                   return (
                     <div
                       key={transaction.id}
-                      className="grid grid-cols-[160px_1fr_1fr_130px_130px_44px] items-center border-b border-[#e8edf5] px-5 py-5 text-sm last:border-b-0 dark:border-white/5"
+                      className="grid gap-4 grid-cols-[140px_minmax(180px,1fr)_minmax(120px,0.8fr)_120px_minmax(180px,1fr)_44px] items-center border-b border-[#e8edf5] px-5 py-5 text-sm last:border-b-0 dark:border-white/5"
                     >
                       <div className="text-[#53627a] dark:text-gray-300">{formatDateTime(transaction.booked_at || transaction.created_at)}</div>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-[#0f2442] dark:text-white">
+                        <p className="break-words font-semibold leading-5 text-[#0f2442] dark:text-white">
                           {transaction.description || transaction.transaction_type}
                         </p>
-                        <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
+                        <p className="wallet-reference mt-1 text-[#62708a] dark:text-gray-400">
                           {transaction.external_transaction_id || transaction.reference_text || `Transaction #${transaction.id}`}
                         </p>
                       </div>
@@ -229,7 +231,7 @@ const AccountTransactions = () => {
                           provider={provider}
                           className="h-8 w-8 rounded-lg"
                           imageClassName="p-0.5"
-                          fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
+                          fallbackClassName="bg-[#ecfdf3] text-[#15803d] dark:bg-[#15803d]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
                           {provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}
@@ -238,21 +240,25 @@ const AccountTransactions = () => {
                       <div>
                         <Badge className={statusBadgeClassName(transaction.status)}>{transaction.status}</Badge>
                       </div>
-                      <div className={`text-right font-semibold ${directionClassName(transaction.direction)}`}>
-                        {transactionAmount(transaction)}
+                      <div className={`min-w-0 text-right tabular-nums font-semibold ${directionClassName(transaction.direction)}`}>
+                        <CurrencyDisplay currency={transaction.currency}>{transactionAmount(transaction)}</CurrencyDisplay>
+                        <p className="mt-1 flex items-center justify-end gap-1 text-xs font-medium">
+                          {['credit', 'inbound'].includes(String(transaction.direction).toLowerCase()) ? <ArrowDownLeft aria-hidden="true" className="h-3.5 w-3.5" /> : ['debit', 'outbound'].includes(String(transaction.direction).toLowerCase()) ? <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" /> : <Minus aria-hidden="true" className="h-3.5 w-3.5" />}
+                          {transaction.direction || "Direction unavailable"}
+                        </p>
                         {transaction.wallet_context?.virtual_account_reference ||
                         transaction.wallet_context?.provider_payment_id ? (
-                          <p className="mt-1 text-xs font-normal text-[#62708a] dark:text-gray-400">
+                          <p className="mt-1 break-words text-xs font-normal text-[#62708a] dark:text-gray-400">
                             VA • {transaction.wallet_context.virtual_account_reference ||
                               transaction.wallet_context.provider_payment_id}
                           </p>
                         ) : transaction.wallet_context ? (
-                          <p className="mt-1 text-xs font-normal text-[#62708a] dark:text-gray-400">
+                          <p className="mt-1 break-words text-xs font-normal text-[#62708a] dark:text-gray-400">
                             {transaction.currency} Wallet
                           </p>
                         ) : null}
                         {transaction.fee_amount ? (
-                          <p className="mt-1 text-xs font-normal text-[#62708a] dark:text-gray-400">
+                          <p className="mt-1 break-words text-xs font-normal text-[#62708a] dark:text-gray-400">
                             Fee {formatAmount(transaction.fee_amount, transaction.currency)}
                           </p>
                         ) : null}
@@ -276,7 +282,7 @@ const AccountTransactions = () => {
                     <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
                       Sync wallet data or submit a transfer to populate wallet activity.
                     </p>
-                    <Button asChild className="mt-5 rounded-full bg-[#16a34a] px-5 font-semibold text-white hover:bg-[#15803d]">
+                    <Button asChild className="mt-5 rounded-full bg-[#15803d] px-5 font-semibold text-white hover:bg-[#166534]">
                       <Link to="/account/transfers">Move funds</Link>
                     </Button>
                   </div>
@@ -411,7 +417,7 @@ const AccountTransactions = () => {
                       />
                     </div>
 
-                    <p className="mt-3 text-xs text-[#7a879c] dark:text-gray-500">
+                    <p className="mt-3 text-xs text-[#62708a] dark:text-gray-400">
                       Balance recorded immediately after this transaction event.
                     </p>
                   </>
@@ -425,7 +431,7 @@ const AccountTransactions = () => {
           </div>
         ) : null}
 
-        <div className="mt-10 flex items-center justify-center gap-5 text-[#bdbdb6] dark:text-gray-500">
+        <div className="mt-10 flex items-center justify-center gap-5 text-[#bdbdb6] dark:text-gray-400">
           <button
             type="button"
             disabled
@@ -451,7 +457,7 @@ const AccountTransactions = () => {
 
 const TransactionDetail = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-xl bg-[#f8f8f6] px-4 py-3 dark:bg-white/5">
-    <p className="text-xs font-medium uppercase tracking-wide text-[#7a879c] dark:text-gray-500">
+    <p className="text-xs font-medium uppercase tracking-wide text-[#62708a] dark:text-gray-400">
       {label}
     </p>
     <p className="mt-1 break-words font-medium text-[#0f2442] dark:text-white">

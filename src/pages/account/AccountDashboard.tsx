@@ -1,3 +1,4 @@
+import { CurrencyAvatar, CurrencyBadge, CurrencyDisplay } from "@/components/shared/CurrencyDisplay";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,14 +37,14 @@ const QUICK_ACTIONS = [
     label: "Send money",
     desc: "Send to a beneficiary",
     href: "/account/transfers",
-    color: "bg-[#16a34a]",
+    color: "bg-[#15803d]",
   },
   {
     icon: ArrowDownLeft,
     label: "Receive money",
     desc: "Get your account details",
     href: "/account/virtual-accounts",
-    color: "bg-[#16a34a]",
+    color: "bg-[#15803d]",
   },
   {
     icon: Wallet,
@@ -200,16 +201,16 @@ const AccountDashboard = () => {
   const recentActivity = transactions.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
-      <div className="mx-auto max-w-7xl p-6">
+    <div className="wallet-ui min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
+      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            <div className="pb-1">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#16a34a] dark:text-[#86efac]">
+            <div className="wallet-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 dark:border-white/10 dark:bg-[#1b2027]">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#15803d] dark:text-[#86efac]">
                 Account overview
               </p>
 
-              <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[#0f2442] dark:text-white">
+              <h1 className="break-words text-2xl font-semibold tracking-[-0.02em] text-[#0f2442] dark:text-white">
                 {displayName}
               </h1>
 
@@ -219,7 +220,7 @@ const AccountDashboard = () => {
                 </p>
 
                 <p className="mt-1 text-[2.6rem] font-bold leading-none tracking-[-0.045em] text-[#0f2442] dark:text-white">
-                  {balanceHeadline}
+                  {singleCurrency ? <CurrencyDisplay currency={singleCurrency} size="regular">{balanceHeadline}</CurrencyDisplay> : balanceHeadline}
                 </p>
 
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -232,7 +233,7 @@ const AccountDashboard = () => {
               </div>
             </div>
 
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold dark:text-white">Quick actions</CardTitle>
               </CardHeader>
@@ -242,13 +243,13 @@ const AccountDashboard = () => {
                     <Link
                       key={action.label}
                       to={action.href}
-                      className="group flex flex-col items-center gap-2 rounded-lg border border-gray-100 p-4 transition-all hover:border-[#bbf7d0] hover:bg-[#ecfdf3]/40 dark:border-white/5 dark:hover:bg-white/5"
+                      className="group flex min-w-0 flex-col items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 border border-gray-100 p-4 transition-all hover:border-[#bbf7d0] hover:bg-[#ecfdf3]/40 dark:border-white/5 dark:hover:bg-white/5"
                     >
                       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${action.color}`}>
                         <action.icon className="h-5 w-5 text-white" />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-[#16a34a] dark:text-white dark:group-hover:text-[#86efac]">
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-[#15803d] dark:text-white dark:group-hover:text-[#86efac]">
                           {action.label}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{action.desc}</p>
@@ -259,24 +260,24 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-semibold dark:text-white">Top balances</CardTitle>
-                <Link to="/account/balances" className="text-sm font-medium text-[#16a34a] hover:underline dark:text-[#86efac]">
+                <Link to="/account/balances" className="text-sm font-medium text-[#15803d] hover:underline dark:text-[#86efac]">
                   View all
                 </Link>
               </CardHeader>
               <CardContent>
                 {topBalances.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3">
                     {topBalances.map((balance) => (
                       <div
                         key={balance.id}
-                        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-white/10 dark:bg-white/5"
+                        className="flex min-w-0 flex-col items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-white/10 dark:bg-white/5"
                       >
-                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-300">{balance.currency}</span>
+                        <CurrencyBadge currency={balance.currency} size="compact" />
                         <div>
-                          <p className="font-semibold text-gray-900 dark:text-white">
+                          <p className="break-words font-semibold tabular-nums text-gray-900 [overflow-wrap:anywhere] dark:text-white">
                             {formatAmount(balance.available_balance, balance.currency)}
                           </p>
                         </div>
@@ -291,7 +292,7 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="overflow-hidden border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card overflow-hidden border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>
                   <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">
@@ -303,7 +304,7 @@ const AccountDashboard = () => {
                 </div>
                 <Link
                   to="/account/virtual-accounts"
-                  className="text-sm font-semibold text-[#16a34a] hover:underline dark:text-[#86efac]"
+                  className="text-sm font-semibold text-[#15803d] hover:underline dark:text-[#86efac]"
                 >
                   View all
                 </Link>
@@ -329,12 +330,10 @@ const AccountDashboard = () => {
                         <Link
                           key={account.id}
                           to={`/account/virtual-accounts?tab=${normalizedStatus === "pending" ? "pending" : "approved"}`}
-                          className="group flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/60 p-4 transition-all hover:border-[#bbf7d0] hover:bg-[#f0fdf4] dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-[#16a34a]/30 dark:hover:bg-[#16a34a]/5"
+                          className="group flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/60 p-4 transition-all hover:border-[#bbf7d0] hover:bg-[#f0fdf4] dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-[#16a34a]/30 dark:hover:bg-[#166534]/5"
                         >
                           <div className="flex min-w-0 items-center gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ecfdf3] text-sm font-bold text-[#15803d] dark:bg-[#16a34a]/10 dark:text-[#86efac]">
-                              {account.currency}
-                            </div>
+                            <CurrencyBadge currency={account.currency} />
 
                             <div className="min-w-0">
                               <p className="truncate font-semibold text-gray-900 dark:text-white">
@@ -349,7 +348,7 @@ const AccountDashboard = () => {
 
                               {account.virtual_account_reference &&
                               account.virtual_account_reference !== account.provider_payment_id ? (
-                                <p className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">
+                                <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
                                   Ref: {account.virtual_account_reference}
                                 </p>
                               ) : null}
@@ -365,14 +364,14 @@ const AccountDashboard = () => {
                               >
                                 {formatStatusLabel(account.status)}
                               </Badge>
-                              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 {primaryProvider
                                   ? getProviderDisplayName(primaryProvider)
                                   : PRIMARY_PROVIDER_NAME}
                               </p>
                             </div>
 
-                            <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-[#16a34a]" />
+                            <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-[#15803d]" />
                           </div>
                         </Link>
                       );
@@ -402,7 +401,7 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
                 <CardTitle className="text-base font-semibold dark:text-white">Recent activity</CardTitle>
               </CardHeader>
@@ -410,16 +409,17 @@ const AccountDashboard = () => {
                 {recentActivity.length > 0 ? (
                   <ul className="divide-y divide-gray-100 dark:divide-white/5">
                     {recentActivity.map((item) => (
-                      <li key={item.id} className="group flex cursor-pointer items-start justify-between gap-4 py-4">
+                      <li key={item.id} className="group flex items-start justify-between gap-4 py-4">
+                        <CurrencyAvatar currency={item.currency} size="compact" />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {formatDateTime(item.booked_at || item.created_at)}
                           </p>
-                          <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">
+                          <p className="mt-0.5 break-words text-sm font-medium text-gray-900 dark:text-white">
                             {item.description || item.transaction_type} - {formatAmount(item.amount, item.currency)}
                           </p>
                         </div>
-                        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300" />
+
                       </li>
                     ))}
                   </ul>
@@ -433,10 +433,10 @@ const AccountDashboard = () => {
           </div>
 
           <div className="space-y-6">
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold dark:text-white">
-                  <ShieldCheck className="h-5 w-5 text-[#16a34a]" />
+                  <ShieldCheck className="h-5 w-5 text-[#15803d]" />
                   Account status
                 </CardTitle>
               </CardHeader>
@@ -457,7 +457,7 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
                 <CardTitle className="text-base font-semibold dark:text-white">KYC/KYB steps</CardTitle>
               </CardHeader>
@@ -466,14 +466,14 @@ const AccountDashboard = () => {
                   {setupSteps.map((step, index) => (
                     <li key={index} className="flex items-center gap-3">
                       {step.done ? (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-[#16a34a]" />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-[#15803d]" />
                       ) : (
                         <Circle className="h-5 w-5 shrink-0 text-gray-300 dark:text-gray-600" />
                       )}
                       {step.href && !step.disabled ? (
                         <Link
                           to={step.href}
-                          className="group flex flex-1 items-center gap-1 text-sm font-medium text-gray-900 hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]"
+                          className="group flex flex-1 items-center gap-1 text-sm font-medium text-gray-900 hover:text-[#15803d] dark:text-white dark:hover:text-[#86efac]"
                         >
                           {step.label}
                           <ChevronRight className="h-4 w-4" />
@@ -482,7 +482,7 @@ const AccountDashboard = () => {
                         <span
                           className={
                             step.disabled
-                              ? "text-sm text-gray-400 dark:text-gray-500"
+                              ? "text-sm text-gray-500 dark:text-gray-400"
                               : "text-sm font-medium text-gray-900 dark:text-white"
                           }
                         >
@@ -494,7 +494,7 @@ const AccountDashboard = () => {
                 </ul>
                 <Button
                   asChild
-                  className="mt-5 w-full rounded-full bg-[#16a34a] text-white hover:bg-[#15803d]"
+                  className="mt-5 w-full rounded-full bg-[#15803d] text-white hover:bg-[#166534]"
                 >
                   <Link to="/account/kyc">
                     {kycProfile ? "Review KYC/KYB profile" : "Start KYC/KYB"}
@@ -503,7 +503,7 @@ const AccountDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
+            <Card className="wallet-card border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#1b2027]">
               <CardHeader>
                 <CardTitle className="text-base font-semibold dark:text-white">
                   {beneficiaries.length ? `${beneficiaries.length} beneficiaries` : "No beneficiaries yet"}
@@ -518,7 +518,7 @@ const AccountDashboard = () => {
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full gap-2 border-[#16a34a] text-[#16a34a] hover:bg-[#ecfdf3] hover:text-[#15803d] dark:border-[#16a34a]/60 dark:text-[#86efac] dark:hover:bg-[#16a34a]/10 dark:hover:text-[#bbf7d0]"
+                  className="w-full gap-2 border-[#16a34a] text-[#15803d] hover:bg-[#ecfdf3] hover:text-[#15803d] dark:border-[#16a34a]/60 dark:text-[#86efac] dark:hover:bg-[#166534]/10 dark:hover:text-[#bbf7d0]"
                 >
                   <Link to="/account/beneficiaries">
                     <Plus className="h-4 w-4" />

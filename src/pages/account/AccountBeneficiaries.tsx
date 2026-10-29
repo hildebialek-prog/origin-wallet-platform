@@ -1,3 +1,4 @@
+import { CurrencyBadge } from "@/components/shared/CurrencyDisplay";
 /* eslint-disable react-refresh/only-export-components */
 import { useMemo, useState, useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -500,7 +501,7 @@ const AccountBeneficiaries = () => {
   const handleCountryChange = (countryCode: string) => changeForm(applyCountryChange(form, countryCode));
 
   return (
-    <div className="bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
+    <div className="wallet-ui bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -511,7 +512,7 @@ const AccountBeneficiaries = () => {
               Add vendor identity and destination account details before creating live transfers.
             </p>
           </div>
-          <Button onClick={openCreate} className="h-11 rounded-full bg-[#16a34a] px-6 text-[1rem] font-semibold text-white hover:bg-[#15803d]">
+          <Button onClick={openCreate} className="h-11 rounded-full bg-[#15803d] px-6 text-[1rem] font-semibold text-white hover:bg-[#166534]">
             <Plus className="mr-2 h-4 w-4" />
             Add beneficiary
           </Button>
@@ -535,8 +536,9 @@ const AccountBeneficiaries = () => {
         )}
 
         <div className="relative max-w-[32rem]">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7a879c]" />
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#62708a]" />
           <Input
+            aria-label="Search beneficiaries"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="h-12 rounded-full border-[#d7d7d2] bg-white pl-11 text-[1rem] dark:border-white/10 dark:bg-[#151b24] dark:text-white dark:placeholder:text-gray-500"
@@ -544,10 +546,10 @@ const AccountBeneficiaries = () => {
           />
         </div>
 
-        <Card className="overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
-          <div className="overflow-x-auto">
+        <Card className="wallet-card overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+          <div className="wallet-table-scroll" role="region" aria-label="Beneficiaries" tabIndex={0}>
             <div className="min-w-[980px]">
-              <div className="grid grid-cols-[1.25fr_1fr_1.1fr_0.8fr_0.8fr_120px] border-b border-[#d7d7d2] px-5 py-4 text-sm font-semibold text-[#0f2442] dark:border-white/10 dark:text-gray-200">
+              <div className="grid gap-4 grid-cols-[1.25fr_1fr_1.1fr_0.8fr_0.8fr_120px] border-b border-[#d7d7d2] px-5 py-4 text-sm font-semibold text-[#0f2442] dark:border-white/10 dark:text-gray-200">
                 <div>Beneficiary</div>
                 <div>Infrastructure</div>
                 <div>Bank details</div>
@@ -562,10 +564,10 @@ const AccountBeneficiaries = () => {
                   return (
                     <div
                       key={beneficiary.id}
-                      className="grid grid-cols-[1.25fr_1fr_1.1fr_0.8fr_0.8fr_120px] items-center border-b border-[#e8edf5] px-5 py-5 text-sm last:border-b-0 dark:border-white/5"
+                      className="grid gap-4 grid-cols-[1.25fr_1fr_1.1fr_0.8fr_0.8fr_120px] items-center border-b border-[#e8edf5] px-5 py-5 text-sm last:border-b-0 dark:border-white/5"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-[#0f2442] dark:text-white">{beneficiary.full_name}</p>
+                        <p className="break-words font-semibold leading-6 text-[#0f2442] dark:text-white">{beneficiary.full_name}</p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
                           {beneficiary.company_name || beneficiary.email || beneficiary.phone || beneficiary.beneficiary_type}
                         </p>
@@ -575,14 +577,14 @@ const AccountBeneficiaries = () => {
                           provider={provider}
                           className="h-8 w-8 rounded-lg"
                           imageClassName="p-0.5"
-                          fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
+                          fallbackClassName="bg-[#ecfdf3] text-[#15803d] dark:bg-[#15803d]/10 dark:text-[#86efac]"
                         />
                         <span className="truncate font-medium text-[#0f2442] dark:text-white">
                           {provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-[#0f2442] dark:text-white">
+                        <p className="break-words font-semibold leading-5 text-[#0f2442] dark:text-white">
                           {beneficiary.bank_name || beneficiary.swift_bic || "Bank account"}
                         </p>
                         <p className="mt-1 truncate text-xs text-[#62708a] dark:text-gray-400">
@@ -592,28 +594,32 @@ const AccountBeneficiaries = () => {
                       <div>
                         <p className="font-medium text-[#0f2442] dark:text-white">{beneficiary.country_code}</p>
                         <p className="mt-1 text-xs text-[#62708a] dark:text-gray-400">
-                          <span translate="no">{beneficiary.currency}</span>
+                          <CurrencyBadge currency={beneficiary.currency} size="compact" />
                         </p>
                       </div>
                       <div>
                         <Badge className={statusBadgeClassName(beneficiary.status)}>{beneficiary.status}</Badge>
-                        <p className="mt-2 text-xs text-[#7a879c] dark:text-gray-500">{formatDateTime(beneficiary.updated_at)}</p>
+                        <p className="mt-2 text-xs text-[#62708a] dark:text-gray-400">{formatDateTime(beneficiary.updated_at)}</p>
                       </div>
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label={`Edit ${beneficiary.full_name}`}
+                          title={`Edit ${beneficiary.full_name}`}
                           onClick={() => openEdit(beneficiary)}
-                          className="h-9 w-9 rounded-full text-[#53627a] hover:bg-[#f0f4fa] dark:text-gray-300 dark:hover:bg-white/10"
+                          className="wallet-action h-10 w-10 rounded-xl text-[#53627a] hover:bg-[#f0f4fa] dark:text-gray-300 dark:hover:bg-white/10"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label={`Delete ${beneficiary.full_name}`}
+                          title={`Delete ${beneficiary.full_name}`}
                           disabled={deleteMutation.isPending}
                           onClick={() => deleteMutation.mutate(beneficiary.id)}
-                          className="h-9 w-9 rounded-full text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                          className="wallet-action h-10 w-10 rounded-xl text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -623,7 +629,7 @@ const AccountBeneficiaries = () => {
                 })}
                 {filteredBeneficiaries.length === 0 && (
                   <div className="flex min-h-[18rem] flex-col items-center justify-center gap-4 px-5 py-14 text-center">
-                    <Landmark className="h-8 w-8 text-[#16a34a]" />
+                    <Landmark className="h-8 w-8 text-[#15803d]" />
                     <div className="space-y-2">
                       <h2 className="text-[1.6rem] font-semibold text-[#0f2442] dark:text-white">
                         {beneficiariesQuery.isLoading ? "Loading beneficiaries..." : "No beneficiaries yet"}
@@ -632,7 +638,7 @@ const AccountBeneficiaries = () => {
                         Add verified vendor and recipient bank details before submitting live payouts.
                       </p>
                     </div>
-                    <Button onClick={openCreate} className="rounded-full bg-[#16a34a] px-6 font-semibold text-white hover:bg-[#15803d]">
+                    <Button onClick={openCreate} className="rounded-full bg-[#15803d] px-6 font-semibold text-white hover:bg-[#166534]">
                       <Plus className="mr-2 h-4 w-4" />
                       Add beneficiary
                     </Button>
@@ -877,12 +883,12 @@ const BasicVendorStep = ({
     </div>
 
     <div className="space-y-3 pt-2">
-      <Button className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]" onClick={onContinue}>
+      <Button className="h-12 w-full rounded-full bg-[#15803d] text-base font-semibold text-white hover:bg-[#166534]" onClick={onContinue}>
         Continue to add accounts
       </Button>
       <Button
         variant="outline"
-        className="h-12 w-full rounded-full border-[#d7d7d2] bg-white text-base font-semibold text-[#16a34a] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b]"
+        className="h-12 w-full rounded-full border-[#d7d7d2] bg-white text-base font-semibold text-[#15803d] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b]"
         onClick={onContinue}
       >
         Add account details later
@@ -920,7 +926,7 @@ const AccountTypeStep = ({
             : "border-[#d7d7d2] bg-white hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:hover:bg-white/5"
         }`}
       >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ecfdf3] text-[#16a34a]">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ecfdf3] text-[#15803d]">
           <UserRound className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
@@ -941,7 +947,7 @@ const AccountTypeStep = ({
             : "border-[#d7d7d2] bg-white hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:hover:bg-white/5"
         }`}
       >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ecfdf3] text-[#16a34a]">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ecfdf3] text-[#15803d]">
           <Banknote className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
@@ -953,7 +959,7 @@ const AccountTypeStep = ({
         <ArrowRight className="h-5 w-5 text-[#62708a]" />
       </button>
     </div>
-    <Button className="mx-auto flex h-12 w-full max-w-2xl rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]" onClick={onContinue}>
+    <Button className="mx-auto flex h-12 w-full max-w-2xl rounded-full bg-[#15803d] text-base font-semibold text-white hover:bg-[#166534]" onClick={onContinue}>
       Continue
     </Button>
   </div>
@@ -989,7 +995,7 @@ const BankAccountStep = ({
           <p className="text-sm text-[#62708a] dark:text-gray-400">Vendor's name</p>
           <p className="mt-1 font-semibold text-[#0f2442] dark:text-white">{form.fullName || "-"}</p>
         </div>
-        <button className="text-sm font-semibold text-[#16a34a] transition-colors hover:text-[#15803d] hover:underline" onClick={onBack} type="button">
+        <button className="text-sm font-semibold text-[#15803d] transition-colors hover:text-[#15803d] hover:underline" onClick={onBack} type="button">
           Edit
         </button>
       </div>
@@ -1050,7 +1056,7 @@ const BankAccountStep = ({
               name="bankAccountType"
               checked={form.bankAccountType === value}
               onChange={() => onChange({ ...form, bankAccountType: value })}
-              className="h-4 w-4 border-[#aab6c9] text-[#16a34a]"
+              className="h-4 w-4 border-[#aab6c9] text-[#15803d]"
             />
             {label} Account
           </label>
@@ -1120,7 +1126,7 @@ const BankAccountStep = ({
       </div>
     </div>
 
-    <Button className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]" onClick={onContinue} disabled={isNium && !requirements}>
+    <Button className="h-12 w-full rounded-full bg-[#15803d] text-base font-semibold text-white hover:bg-[#166534]" onClick={onContinue} disabled={isNium && !requirements}>
       Continue to review
     </Button>
   </div>
@@ -1198,7 +1204,7 @@ export const ReviewBeneficiaryStep = ({
       </div>
 
       <Button
-        className="h-12 w-full rounded-full bg-[#16a34a] text-base font-semibold text-white hover:bg-[#15803d]"
+        className="h-12 w-full rounded-full bg-[#15803d] text-base font-semibold text-white hover:bg-[#166534]"
         disabled={saving}
         onClick={onSave}
       >
@@ -1220,7 +1226,7 @@ const BeneficiaryStepper = ({ currentStep }: { currentStep: BeneficiaryStep }) =
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-[#e4e9f2] dark:bg-white/10">
         <div
-          className="h-full rounded-full bg-[#16a34a] transition-all"
+          className="h-full rounded-full bg-[#15803d] transition-all"
           style={{ width: `${((currentIndex + 1) / beneficiarySteps.length) * 100}%` }}
         />
       </div>
@@ -1240,7 +1246,7 @@ const BeneficiaryStepper = ({ currentStep }: { currentStep: BeneficiaryStep }) =
                   complete
                     ? "bg-emerald-500 text-white"
                     : active
-                      ? "bg-[#16a34a] text-white"
+                      ? "bg-[#15803d] text-white"
                       : "bg-[#eef2f8] text-[#62708a] dark:bg-white/5"
                 }`}
               >
@@ -1256,7 +1262,7 @@ const BeneficiaryStepper = ({ currentStep }: { currentStep: BeneficiaryStep }) =
 };
 
 const BackButton = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0f2442] transition-colors hover:text-[#16a34a] dark:text-white dark:hover:text-[#86efac]">
+  <button type="button" onClick={onClick} className="inline-flex items-center gap-2 text-sm font-semibold text-[#0f2442] transition-colors hover:text-[#15803d] dark:text-white dark:hover:text-[#86efac]">
     <ArrowLeft className="h-4 w-4" />
     Back
   </button>
@@ -1354,7 +1360,7 @@ const CurrencySelectItem = ({ value }: { value: string }) => (
 
 const SectionTitle = ({ icon, title }: { icon: ReactNode; title: string }) => (
   <div className="flex items-center gap-2 font-semibold text-[#0f2442] dark:text-white">
-    <span className="text-[#16a34a]">{icon}</span>
+    <span className="text-[#15803d]">{icon}</span>
     {title}
   </div>
 );

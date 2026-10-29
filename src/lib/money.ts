@@ -76,7 +76,11 @@ export const statusBadgeClassName = (status?: string | null) => {
     return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
   }
 
-  if (["pending", "processing", "submitted", "approval_required", "draft"].includes(normalized)) {
+  if (normalized === "approval_required") {
+    return "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200";
+  }
+
+  if (["pending", "processing", "submitted", "draft"].includes(normalized)) {
     return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
   }
 

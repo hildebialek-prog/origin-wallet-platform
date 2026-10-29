@@ -1,3 +1,4 @@
+import { CurrencyBadge, CurrencyDisplay } from "@/components/shared/CurrencyDisplay";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -367,7 +368,7 @@ const AccountTransfers = () => {
   });
 
   return (
-    <div className="bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
+    <div className="wallet-ui bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -417,8 +418,8 @@ const AccountTransfers = () => {
           />
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <Card className="overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <Card className="wallet-card overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
             <CardContent className="p-0">
               <div className="border-b border-[#e4e9f2] px-5 py-5 sm:px-7 dark:border-white/10">
                 <PaymentStepper currentStep={step} />
@@ -505,10 +506,10 @@ const AccountTransfers = () => {
               form={form}
             />
 
-            <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+            <Card className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-[#0f2442] dark:text-white">
-                  <Clock3 className="h-5 w-5 text-[#16a34a]" />
+                  <Clock3 className="h-5 w-5 text-[#15803d]" />
                   Transfer activity
                 </CardTitle>
               </CardHeader>
@@ -575,7 +576,7 @@ export const PayeeStep = ({
     </div>
 
     <div className="relative">
-      <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7a879c]" />
+      <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#62708a]" />
       <Input
         value={search}
         onChange={(event) => onSearchChange(event.target.value)}
@@ -585,9 +586,9 @@ export const PayeeStep = ({
     </div>
 
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-[#7a879c]">
+      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-[#62708a]">
         <span>All recipients</span>
-        <Link to="/account/beneficiaries" className="normal-case tracking-normal text-[#16a34a] transition-colors hover:text-[#15803d] hover:underline">
+        <Link to="/account/beneficiaries" className="normal-case tracking-normal text-[#15803d] transition-colors hover:text-[#15803d] hover:underline">
           Manage beneficiaries
         </Link>
       </div>
@@ -609,11 +610,11 @@ export const PayeeStep = ({
                   provider={provider}
                   className="h-11 w-11 shrink-0 rounded-xl"
                   imageClassName="p-1"
-                  fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
+                  fallbackClassName="bg-[#ecfdf3] text-[#15803d] dark:bg-[#15803d]/10 dark:text-[#86efac]"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate font-semibold text-[#0f2442] dark:text-white">{beneficiary.full_name}</p>
+                    <p className="break-words font-semibold text-[#0f2442] dark:text-white">{beneficiary.full_name}</p>
                     <Badge className={statusBadgeClassName(beneficiary.status)}>{beneficiary.status}</Badge>
                   </div>
                   <p className="mt-1 truncate text-sm text-[#62708a] dark:text-gray-400">
@@ -624,7 +625,7 @@ export const PayeeStep = ({
                   ) : null}
                 </div>
                 <Badge className="border-[#d7d7d2] bg-[#f3fdf9] text-[#0f2442] dark:border-white/10 dark:bg-white/5 dark:text-white">
-                  <span translate="no">{beneficiary.currency}</span>
+                  <CurrencyBadge currency={beneficiary.currency} size="compact" />
                 </Badge>
                 <ArrowRight className="h-5 w-5 text-[#62708a]" />
               </button>
@@ -633,14 +634,14 @@ export const PayeeStep = ({
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-[#c9d3e2] bg-[#f9fbfe] px-6 py-12 text-center dark:border-white/10 dark:bg-white/5">
-          <UserPlus className="mx-auto h-9 w-9 text-[#16a34a]" />
+          <UserPlus className="mx-auto h-9 w-9 text-[#15803d]" />
           <p className="mt-4 font-semibold text-[#0f2442] dark:text-white">
             {loading ? "Loading beneficiaries..." : "No usable beneficiary found"}
           </p>
           <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
             Only active Nium HK beneficiaries receiving USD by SWIFT are currently available for transfers.
           </p>
-          <Button asChild className="mt-5 h-11 rounded-full bg-[#16a34a] px-6 text-white hover:bg-[#15803d]">
+          <Button asChild className="mt-5 h-11 rounded-full bg-[#15803d] px-6 text-white hover:bg-[#166534]">
             <Link to="/account/beneficiaries">Add beneficiary</Link>
           </Button>
         </div>
@@ -748,7 +749,7 @@ export const DetailsStep = ({
         />
       </div>
 
-      <p className="mt-4 text-xs text-[#7a879c]">
+      <p className="mt-4 text-xs text-[#62708a]">
         Document upload, payment scheduling, and recipient notifications are unavailable for this transfer rail.
       </p>
     </div>
@@ -807,12 +808,12 @@ const ReviewStep = ({
     <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#10141b]">
       <SectionTitle icon={<WalletCards className="h-5 w-5" />} title="Payment" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ReviewItem label="Transfer amount" value={formatAmount(effectiveSourceAmount, form.sourceCurrency)} />
+        <ReviewItem label="Transfer amount" value={<CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(effectiveSourceAmount, form.sourceCurrency)}</CurrencyDisplay>} />
         <ReviewItem label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code) ?? "-"} />
         <ReviewItem label="Provider fee" value="Calculated during processing" />
         <ReviewItem label="Fee handling" value="Provider and intermediary bank fees may apply (SHA)" />
         <ReviewItem label="Funding source" value="Nium wallet balance" />
-        <ReviewItem label="Available balance" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
+        <ReviewItem label="Available balance" value={balance ? <CurrencyDisplay currency={balance.currency}>{formatAmount(balance.available_balance, balance.currency)}</CurrencyDisplay> : "No synced balance"} />
         <ReviewItem label="Purpose" value={purposeLabel} />
         <ReviewItem label="Reference" value={form.referenceText || "-"} />
       </div>
@@ -860,7 +861,7 @@ const ResultStep = ({
       <div className="rounded-2xl border border-[#d7d7d2] bg-white p-5 text-left shadow-sm dark:border-white/10 dark:bg-[#10141b]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a879c]">Transfer number</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#62708a]">Transfer number</p>
             <p className="mt-1 font-semibold text-[#0f2442] dark:text-white">{transfer.transfer_no}</p>
           </div>
           <Badge className={statusBadgeClassName(transfer.status)}>{transfer.status}</Badge>
@@ -869,7 +870,7 @@ const ResultStep = ({
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <ReviewItem label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
           <ReviewItem label="Beneficiary" value={beneficiary?.full_name ?? `Beneficiary #${transfer.beneficiary_id}`} />
-          <ReviewItem label="Transfer amount" value={formatAmount(transfer.source_amount, transfer.source_currency)} />
+          <ReviewItem label="Transfer amount" value={<CurrencyDisplay currency={transfer.source_currency}>{formatAmount(transfer.source_amount, transfer.source_currency)}</CurrencyDisplay>} />
           <ReviewItem
             label="Estimated recipient amount"
             value={recipientAmountPresentation(provider?.code) ?? formatAmount(transfer.target_amount, transfer.target_currency)}
@@ -882,7 +883,7 @@ const ResultStep = ({
         </div>
 
         {transfer.status === "approval_required" ? (
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div role="status" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {isNiumProvider(provider?.code)
               ? "Waiting for admin approval. This payment will be submitted automatically once approved."
               : "Admin approval is required before this payment can be submitted."}
@@ -900,7 +901,7 @@ const ResultStep = ({
     <div className="flex flex-col justify-center gap-3 sm:flex-row">
       {!isNiumProvider(provider?.code) ? (
       <Button
-        className="h-12 rounded-full bg-[#16a34a] px-7 text-white hover:bg-[#15803d]"
+        className="h-12 rounded-full bg-[#15803d] px-7 text-white hover:bg-[#166534]"
         disabled={!transfer || !canSubmitProvider(transfer.status) || submitting}
         onClick={onSubmitToProvider}
       >
@@ -932,7 +933,7 @@ const PaymentSummary = ({
   sourceAmount: number;
   form: TransferForm;
 }) => (
-  <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+  <Card className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
     <CardHeader>
       <CardTitle className="text-lg text-[#0f2442] dark:text-white">Payment summary</CardTitle>
     </CardHeader>
@@ -940,8 +941,8 @@ const PaymentSummary = ({
       <SummaryLine label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
       <SummaryLine label="Payee" value={beneficiary?.full_name ?? "Not selected"} />
       <SummaryLine label="Funding" value={isNiumProvider(provider?.code) ? "Nium wallet balance" : "Provider funding account"} />
-      <SummaryLine label="Available" value={balance ? formatAmount(balance.available_balance, balance.currency) : "No synced balance"} />
-      <SummaryLine label="Transfer amount" value={sourceAmount > 0 ? formatAmount(sourceAmount, form.sourceCurrency) : "-"} />
+      <SummaryLine label="Available" value={balance ? <CurrencyDisplay currency={balance.currency}>{formatAmount(balance.available_balance, balance.currency)}</CurrencyDisplay> : "No synced balance"} />
+      <SummaryLine label="Transfer amount" value={sourceAmount > 0 ? <CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(sourceAmount, form.sourceCurrency)}</CurrencyDisplay> : "-"} />
       <SummaryLine label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code) ?? "-"} />
       <SummaryLine label="Provider fee" value="Calculated during processing" />
       <SummaryLine label="Fee handling" value="Provider and intermediary bank fees may apply (SHA)" />
@@ -974,7 +975,7 @@ const TransferRow = ({
     <div className="flex flex-col gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate font-semibold text-[#0f2442] dark:text-white">{transfer.transfer_no}</p>
+          <p className="break-words font-semibold text-[#0f2442] dark:text-white">{transfer.transfer_no}</p>
           <Badge className={statusBadgeClassName(transfer.status)}>{transfer.status}</Badge>
         </div>
         <p className="mt-1 text-xs text-[#62708a] dark:text-gray-400">
@@ -988,7 +989,7 @@ const TransferRow = ({
             provider={provider}
             className="h-8 w-8 rounded-lg"
             imageClassName="p-0.5"
-            fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
+            fallbackClassName="bg-[#ecfdf3] text-[#15803d] dark:bg-[#15803d]/10 dark:text-[#86efac]"
           />
           <div className="min-w-0">
             <p className="truncate font-medium text-[#0f2442] dark:text-white">{provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME}</p>
@@ -999,7 +1000,7 @@ const TransferRow = ({
         </div>
         <div className="rounded-xl bg-[#f3fdf9] px-3 py-2 dark:bg-white/5">
           <p className="font-semibold text-[#0f2442] dark:text-white">
-            {formatAmount(transfer.source_amount, transfer.source_currency)}
+            <CurrencyDisplay currency={transfer.source_currency}>{formatAmount(transfer.source_amount, transfer.source_currency)}</CurrencyDisplay>
           </p>
           <p className="text-xs text-[#62708a] dark:text-gray-400">
             {recipientAmountPresentation(provider?.code) ?? `Receives ${formatAmount(transfer.target_amount, transfer.target_currency)}`}
@@ -1012,7 +1013,7 @@ const TransferRow = ({
           size="sm"
           disabled={!canSubmitProvider(transfer.status) || submitting}
           onClick={onSubmit}
-          className="rounded-full bg-[#16a34a] px-4 text-white hover:bg-[#15803d]"
+          className="rounded-full bg-[#15803d] px-4 text-white hover:bg-[#166534]"
         >
           {submitting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="mr-2 h-3.5 w-3.5" />}
           Submit
@@ -1051,18 +1052,18 @@ const PaymentStepper = ({ currentStep }: { currentStep: WizardStep }) => {
         <span>Single payment</span>
         <span>{Math.round(((currentIndex + 1) / wizardSteps.length) * 100)}%</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {wizardSteps.map((item, index) => {
           const active = index === currentIndex;
           const complete = index < currentIndex;
           return (
-            <div key={item.key} className="flex items-center gap-2">
+            <div key={item.key} aria-current={active ? "step" : undefined} data-complete={complete} className="wallet-step flex items-center gap-2">
               <span
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                   complete
-                    ? "bg-emerald-500 text-white"
+                    ? "bg-emerald-700 text-white"
                     : active
-                      ? "bg-[#16a34a] text-white"
+                      ? "bg-emerald-700 text-white"
                       : "bg-[#eef2f8] text-[#62708a] dark:bg-white/5"
                 }`}
               >
@@ -1077,7 +1078,7 @@ const PaymentStepper = ({ currentStep }: { currentStep: WizardStep }) => {
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-[#e4e9f2] dark:bg-white/10">
         <div
-          className="h-full rounded-full bg-[#16a34a] transition-all"
+          className="h-full rounded-full bg-[#15803d] transition-all"
           style={{ width: `${((currentIndex + 1) / wizardSteps.length) * 100}%` }}
         />
       </div>
@@ -1112,10 +1113,10 @@ const SelectedPayee = ({
         provider={provider ?? undefined}
         className="h-11 w-11 shrink-0 rounded-xl"
         imageClassName="p-1"
-        fallbackClassName="bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/10 dark:text-[#86efac]"
+        fallbackClassName="bg-[#ecfdf3] text-[#15803d] dark:bg-[#15803d]/10 dark:text-[#86efac]"
       />
       <div className="min-w-0">
-        <p className="truncate font-semibold text-[#0f2442] dark:text-white">
+        <p className="break-words font-semibold text-[#0f2442] dark:text-white">
           To: {beneficiary?.full_name ?? "No beneficiary selected"}
         </p>
         <p className="truncate text-sm text-[#62708a] dark:text-gray-400">
@@ -1125,7 +1126,7 @@ const SelectedPayee = ({
     </div>
     <Button
       variant="outline"
-      className="h-10 rounded-full border-[#d7d7d2] bg-white text-[#16a34a] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b]"
+      className="h-10 rounded-full border-[#d7d7d2] bg-white text-[#15803d] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b]"
       onClick={onChangePayee}
     >
       Change
@@ -1150,7 +1151,7 @@ export const AmountField = ({
 }) => (
   <div className="space-y-2">
     <Label>{label}</Label>
-    <div className="grid h-12 grid-cols-[minmax(0,1fr)_112px] overflow-hidden rounded-xl border border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]">
+    <div className="grid h-12 grid-cols-[minmax(0,1fr)_132px] overflow-hidden rounded-xl border border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]">
       <Input
         type="text"
         value={value}
@@ -1167,7 +1168,7 @@ export const AmountField = ({
       <Select value={currency} onValueChange={onCurrencyChange}>
         <SelectTrigger className="h-12 rounded-none border-0 border-l border-[#d7d7d2] bg-[#f3fdf9] focus:ring-0 dark:border-white/10 dark:bg-white/5">
           <SelectValue>
-            <span translate="no">{currency}</span>
+            <CurrencyBadge currency={currency} size="compact" />
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -1258,7 +1259,7 @@ const WizardActions = ({
       {backLabel}
     </Button>
     <Button
-      className="h-12 rounded-full bg-[#16a34a] px-8 text-white hover:bg-[#15803d]"
+      className="h-12 rounded-full bg-[#15803d] px-8 text-white hover:bg-[#166534]"
       onClick={onNext}
       disabled={loading}
     >
@@ -1271,7 +1272,7 @@ const WizardActions = ({
 
 const SectionTitle = ({ icon, title }: { icon: ReactNode; title: string }) => (
   <div className="flex items-center gap-2 font-semibold text-[#0f2442] dark:text-white">
-    <span className="text-[#16a34a]">{icon}</span>
+    <span className="text-[#15803d]">{icon}</span>
     {title}
   </div>
 );
@@ -1284,15 +1285,15 @@ const ReviewItem = ({ label, value }: { label: string; value?: ReactNode }) => (
 );
 
 const SummaryLine = ({ label, value }: { label: string; value: ReactNode }) => (
-  <div className="flex items-start justify-between gap-4 border-b border-[#e8edf5] pb-3 last:border-0 last:pb-0 dark:border-white/5">
+  <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-4 border-b border-[#e8edf5] pb-3 last:border-0 last:pb-0 dark:border-white/5">
     <span className="text-[#62708a] dark:text-gray-400">{label}</span>
-    <span className="max-w-[190px] text-right font-semibold text-[#0f2442] dark:text-white">{value}</span>
+    <span className="min-w-0 max-w-[190px] break-words text-right [overflow-wrap:anywhere] font-semibold text-[#0f2442] dark:text-white">{value}</span>
   </div>
 );
 
 const CurrencySelectItem = ({ value }: { value: string }) => (
   <SelectItem value={value}>
-    <span translate="no">{value}</span>
+    <CurrencyBadge currency={value} size="compact" />
   </SelectItem>
 );
 
