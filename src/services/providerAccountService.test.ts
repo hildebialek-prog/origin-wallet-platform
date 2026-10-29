@@ -7,6 +7,8 @@ vi.mock("@/services/apiClient", () => ({ requestApi }));
 import { getProviderAccountOperations, getVirtualAccounts, requestVirtualAccount } from "@/services/providerAccountService";
 import { operationPage, serverOperation, virtualAccount } from "@/test/virtualAccountFixtures";
 
+import { multiCurrencyVirtualAccounts } from "@/test/multiCurrencyVirtualAccountFixtures";
+
 describe("requestVirtualAccount", () => {
   beforeEach(() => {
     requestApi.mockReset();
@@ -74,4 +76,14 @@ describe("requestVirtualAccount", () => {
     expect(requestApi).toHaveBeenCalledWith("/user/users/42/provider-accounts/nium/virtual-accounts?provider_account_id=7", { token: "token" });
     expect(requestApi).toHaveBeenCalledTimes(1);
   });
+});
+
+
+it("reads mixed-currency VAs verbatim from the API without USD defaults or a creation request", async () => {
+  requestApi.mockReset();
+  requestApi.mockResolvedValue({ data: multiCurrencyVirtualAccounts });
+  const accounts = await getVirtualAccounts({ userId: 42, token: "test-token", providerCode: "nium" });
+  expect(accounts).toBe(multiCurrencyVirtualAccounts);
+  expect(accounts.map((account) => account.currency)).toEqual(["USD", "EUR", "CNY", "HKD", "SGD", "GBP"]);
+  expect(requestApi).toHaveBeenCalledExactlyOnceWith("/user/users/42/provider-accounts/nium/virtual-accounts", { token: "test-token" });
 });

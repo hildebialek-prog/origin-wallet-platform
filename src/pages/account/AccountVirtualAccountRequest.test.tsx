@@ -195,4 +195,24 @@ describe("VA request page", () => {
     expect(mocks.state.scope.generation).toBe(1);
     expect(mocks.submit).not.toHaveBeenCalled();
   });
+
+  it("does not offer flag-mapped or provider-advertised currencies beyond the confirmed VA intent", async () => {
+    mocks.getProviderReference.mockResolvedValue([{ id: 1, code: "nium", name: "Nium", status: "active",
+      supported_currencies: ["USD", "EUR", "CNY", "HKD", "SGD", "GBP"] }]);
+    // JSDOM does not implement the scrolling used by the real Radix selector.
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    const view = renderPage();
+    try {
+      await screen.findByText(/Account ready for virtual account requests/);
+      fireEvent.keyDown(screen.getByRole("combobox", { name: "Currency" }), { key: "Enter" });
+      const options = await screen.findAllByRole("option");
+      expect(options).toHaveLength(1);
+      expect(options[0]).toHaveTextContent("USD");
+      expect(mocks.submit).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
 });

@@ -204,7 +204,7 @@ const AccountDashboard = () => {
     <div className="wallet-ui min-h-screen bg-[#f5f5f5] dark:bg-[#161a20]">
       <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
+          <div className="min-w-0 space-y-6 lg:col-span-2">
             <div className="wallet-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 dark:border-white/10 dark:bg-[#1b2027]">
               <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#15803d] dark:text-[#86efac]">
                 Account overview

@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LifecycleState } from "@/lib/virtualAccountLifecycle";
 import { operationContext, virtualAccount } from "@/test/virtualAccountFixtures";
+import { multiCurrencyVirtualAccounts } from "@/test/multiCurrencyVirtualAccountFixtures";
 import AccountVirtualAccounts from "./AccountVirtualAccounts";
 
 const mocks = vi.hoisted(() => ({ state: null as LifecycleState | null, refresh: vi.fn(), getProviders: vi.fn() }));
@@ -93,5 +94,73 @@ describe("VA list and live banking details", () => {
     expect(screen.getByText(message)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("Multi-currency VA presentation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getProviders.mockResolvedValue({ data: [{ id: 1, code: "nium", name: "Nium", status: "active" }] });
+    mocks.state = { scope: { ...operationContext, version: 2, generation: 0, operations: [], legacy: [] },
+      accounts: multiCurrencyVirtualAccounts,
+      providerAccountId: 7, ready: true, checking: false, submitting: false, authorizationPaused: false, error: "" };
+  });
+
+  it.each([
+    ["USD", "us"], ["EUR", "eu"], ["CNY", "cn"], ["HKD", "hk"], ["SGD", "sg"], ["GBP", "gb"],
+  ])("renders the API %s currency with the %s flag in its row and detail", (currency, flag) => {
+    setup();
+    const account = multiCurrencyVirtualAccounts.find((item) => item.currency === currency)!;
+    const button = screen.getByRole("button", { name: `View banking details for ${currency} account ${account.id}` });
+    const row = within(button.parentElement!);
+    expect(row.getByText(currency)).toBeVisible();
+    expect(row.getByText(currency).closest(".currency-badge")?.querySelector("img")).toHaveAttribute("src", `/src/assets/flags/${flag}.svg`);
+    expect(row.getByText(account.provider_payment_id!)).toBeVisible();
+    fireEvent.click(button);
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText(currency).closest(".currency-badge")?.querySelector("img")).toHaveAttribute("src", `/src/assets/flags/${flag}.svg`);
+    for (const value of [account.provider_payment_id, account.virtual_account_reference, account.detail?.account_name,
+      account.detail?.bank_name, account.detail?.bank_address,
+      `${account.detail?.routing_code_type} ${account.detail?.routing_code_value}`,
+      `${account.detail?.routing_code_type_2} ${account.detail?.routing_code_value_2}`]) {
+      expect(dialog.getByText(value!)).toBeVisible();
+    }
+    for (const other of multiCurrencyVirtualAccounts.filter((item) => item.id !== account.id)) {
+      expect(dialog.queryByText(other.detail!.bank_name!)).not.toBeInTheDocument();
+      expect(dialog.queryByText(other.provider_payment_id!)).not.toBeInTheDocument();
+    }
+    expect(dialog.queryByText(/JPMorgan|Chase|JPM_SG/)).not.toBeInTheDocument();
+  });
+
+  it("keeps mixed and same-currency records separate by VA ID when switching details", () => {
+    const secondUsd = { ...multiCurrencyVirtualAccounts[0], id: 200, provider_payment_id: "SECOND-USD-ACCOUNT",
+      detail: { bank_name: "Second USD Bank" } };
+    mocks.state.accounts = [...multiCurrencyVirtualAccounts.slice(0, 3), secondUsd];
+    setup();
+    expect(screen.getAllByRole("button", { name: /View banking details for/ })).toHaveLength(4);
+    for (const account of mocks.state.accounts) {
+      fireEvent.click(screen.getByRole("button", { name: `View banking details for ${account.currency} account ${account.id}` }));
+      const dialog = within(screen.getByRole("dialog"));
+      expect(dialog.getByText(account.provider_payment_id!)).toBeVisible();
+      expect(dialog.getByText(account.detail!.bank_name!)).toBeVisible();
+      fireEvent.click(dialog.getByRole("button", { name: "Close banking details" }));
+    }
+  });
+
+  it("uses the safe unknown currency fallback and never borrows another record's bank details", () => {
+    mocks.state.accounts = [multiCurrencyVirtualAccounts[0], { ...multiCurrencyVirtualAccounts[1], id: 201, currency: "XYZ", detail: null }];
+    setup();
+    const button = screen.getByRole("button", { name: "View banking details for XYZ account 201" });
+    const row = within(button.parentElement!);
+    expect(row.getByText("XYZ")).toBeVisible();
+    expect(row.getByText("¤")).toHaveClass("currency-tone--neutral");
+    fireEvent.click(button);
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("XYZ")).toBeVisible();
+    expect(dialog.getByText("¤")).toBeVisible();
+    expect(dialog.getByText("Bank Name").parentElement).toHaveTextContent("Bank Name-");
+    expect(dialog.getByText("Bank Address").parentElement).toHaveTextContent("Bank Address-");
+    expect(dialog.queryByText(multiCurrencyVirtualAccounts[0].detail!.bank_name!)).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
-import { getProviderDisplayName } from "@/lib/primaryProvider";
 
 export type ProviderLogoSource = {
   code?: string | null;
@@ -15,24 +14,27 @@ type ProviderLogoProps = {
   fallbackClassName?: string;
 };
 
-const getInitials = (provider?: ProviderLogoSource | null) => {
-  const source = getProviderDisplayName(provider) || "OW";
-  return source.trim().slice(0, 2).toUpperCase();
-};
+// Reuse the sidebar/header asset for the existing public Origin Wallet identity.
+const originWalletLogo = "/logo/logo.jpg";
+const neutralFallback = "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400";
 
 export const ProviderLogo = ({
   provider,
   className = "h-12 w-12 rounded-2xl",
   imageClassName = "p-1.5",
-  fallbackClassName = "bg-[#ecfdf3] text-[#16a34a] dark:bg-[#16a34a]/15 dark:text-[#86efac]",
+  fallbackClassName = neutralFallback,
 }: ProviderLogoProps) => {
   const [imageFailed, setImageFailed] = useState(false);
-  const logoUrl = provider?.logo_url?.trim() || "";
-  const providerLabel = getProviderDisplayName(provider);
+  const code = provider?.code?.trim().toLowerCase();
+  const name = provider?.name?.trim();
+  const isOriginWallet = ["nium", "origin-wallet", "origin_wallet", "originwallet"].includes(code || "")
+    || ["nium", "origin wallet"].includes(name?.toLowerCase() || "");
+  const providerLabel = isOriginWallet ? "Origin Wallet" : name || provider?.code?.trim() || "Unknown provider";
+  const logoUrl = isOriginWallet ? originWalletLogo : provider?.logo_url?.trim() || "";
 
   useEffect(() => {
     setImageFailed(false);
-  }, [logoUrl, provider?.code]);
+  }, [logoUrl, code]);
 
   const baseClassName = `flex shrink-0 items-center justify-center overflow-hidden ${className}`;
 
@@ -42,7 +44,7 @@ export const ProviderLogo = ({
         <img
           src={logoUrl}
           alt={`${providerLabel} logo`}
-          className={`h-full w-full object-contain ${imageClassName}`}
+          className={`h-full w-full object-contain ${isOriginWallet ? "" : imageClassName}`}
           loading="lazy"
           onError={() => setImageFailed(true)}
         />
@@ -50,11 +52,9 @@ export const ProviderLogo = ({
     );
   }
 
-  const initials = getInitials(provider);
-
   return (
-    <div className={`${baseClassName} ${fallbackClassName}`} aria-label={`${providerLabel} logo`}>
-      {initials ? <span className="text-sm font-bold tracking-[0.08em]">{initials}</span> : <Building2 className="h-5 w-5" />}
+    <div role="img" aria-label={`${providerLabel} logo`} className={`${baseClassName} ${name || code ? fallbackClassName : neutralFallback}`}>
+      <Building2 aria-hidden="true" className="h-1/2 w-1/2" />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import { Info, MoreHorizontal, RefreshCcw } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { CurrencyBadge } from "@/components/shared/CurrencyDisplay";
 import { ProviderLogo } from "@/components/account/ProviderLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -161,9 +162,7 @@ const AccountVirtualAccounts = () => {
                         </span>
                       </div>
                       <div>
-                        <span className="rounded-md border border-[#d7d7d2] bg-[#f3fdf9] px-3 py-1 text-sm font-medium text-[#0f2442] dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
-                          {account.currency}
-                        </span>
+                        <CurrencyBadge currency={account.currency} size="compact" />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-[#0f2442] dark:text-white">
@@ -238,7 +237,7 @@ const AccountVirtualAccounts = () => {
               <div>
                 <p className="text-[#62708a]">Currency</p>
                 <p className="font-semibold text-[#0f2442] dark:text-white">
-                  {selectedAccount.currency || "-"}
+                  <CurrencyBadge currency={selectedAccount.currency} size="compact" />
                 </p>
               </div>
 
