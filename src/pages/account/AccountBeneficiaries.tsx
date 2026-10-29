@@ -49,9 +49,9 @@ import {
   type BeneficiaryPayload,
 } from "@/services/moneyMovementService";
 import { ApiRequestError } from "@/services/apiClient";
-import { applyNiumRequirements, extraSchemaFields, fieldLabel, routingEntries, schemaErrors, schemaFormFields } from "./beneficiaryRequirements";
+import { applyNiumRequirements, clearRoutingInputs, extraSchemaFields, fieldLabel, isSwiftOnlyCorridor, matchesNiumRequirements, normalizeBeneficiaryErrors, routingEntries, schemaErrors, schemaFormFields } from "./beneficiaryRequirements";
 import { countryOptions, currencyOptions, formatDateTime, statusBadgeClassName } from "@/lib/money";
-import { getProviderDisplayName, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
+import { getProviderDisplayName, isPrimaryProvider, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
 type BeneficiaryStep = "basic" | "accountType" | "bank" | "review";
 
@@ -317,21 +317,26 @@ const AccountBeneficiaries = () => {
   const beneficiaries = beneficiariesQuery.data ?? [];
   const selectedProvider = beneficiaryProviders.find((provider) => String(provider.id) === form.providerId);
   const selectedCountry = countryOptions.find((country) => country.code === form.countryCode);
-  const isNium = selectedProvider?.code === "nium";
+  const isNium = isPrimaryProvider(selectedProvider);
+  const requiresMetadata = !selectedProvider || isNium;
   const requirementsQuery = useQuery({
     queryKey: ["beneficiary-requirements", user?.id, token, form.providerId, form.beneficiaryType, form.countryCode, form.currency, form.payoutMethod],
     enabled: dialogOpen && isNium && !!token && !!user?.id,
     retry: false,
-    queryFn: () => getBeneficiaryRequirements({
-      userId: user!.id, token: token!, providerId: form.providerId, beneficiaryType: form.beneficiaryType,
-      countryCode: form.countryCode, currency: form.currency, payoutMethod: form.payoutMethod,
-    }),
+    queryFn: async () => {
+      const metadata = await getBeneficiaryRequirements({
+        userId: user!.id, token: token!, providerId: form.providerId, beneficiaryType: form.beneficiaryType,
+        countryCode: form.countryCode, currency: form.currency, payoutMethod: form.payoutMethod,
+      });
+      if (!matchesNiumRequirements(metadata, form)) throw new Error("The returned beneficiary requirements do not match the selected payment details.");
+      return metadata;
+    },
   });
   const requirements = isNium && !requirementsQuery.isFetching && !requirementsQuery.isError ? requirementsQuery.data : undefined;
   const submittedPayload = buildPayload(form, selectedProvider?.supports_account_verification === true, requirements);
   const changeForm = (next: BeneficiaryForm) => {
     const changedCorridor = ["providerId", "beneficiaryType", "countryCode", "currency", "payoutMethod"].some((key) => next[key] !== form[key]);
-    setForm(changedCorridor ? { ...next, routingType: "", routingValue: "", secondaryRoutingType: "", secondaryRoutingValue: "" } : next);
+    setForm(changedCorridor ? clearRoutingInputs(next) : next);
     setFieldErrors({});
     setFormError("");
   };
@@ -367,7 +372,7 @@ const AccountBeneficiaries = () => {
   };
 
   const validateBasic = () => {
-    if (!form.providerId) return "Beneficiary rail is not available yet.";
+    if (!selectedProvider) return "Beneficiary rail is not available yet.";
     if (!form.fullName.trim()) return "Vendor name is required.";
     if (!form.countryCode) return "Country or region is required.";
     if (!form.beneficiaryType) return "Vendor legal type is required.";
@@ -376,8 +381,11 @@ const AccountBeneficiaries = () => {
   };
 
   const validateBank = () => {
-    if (isNium && !requirements) return "Load the supported beneficiary requirements before continuing.";
+    if (requiresMetadata && !requirements) return "Load the supported beneficiary requirements before continuing.";
     const errors = isNium && requirements ? schemaErrors(form, submittedPayload, requirements) : {};
+    if (!form.accountNumber.trim() && !form.iban.trim()) {
+      errors.beneficiaryAccountNumber = "Enter an account number or IBAN before continuing.";
+    }
     if (form.accountNumber.trim() && form.accountNumber.trim() !== form.confirmAccountNumber.trim()) {
       errors.confirmAccountNumber = form.confirmAccountNumber.trim() ? "Account number and confirmation do not match." : "Confirm the account number before continuing.";
     }
@@ -444,7 +452,7 @@ const AccountBeneficiaries = () => {
       const message = error instanceof Error ? error.message : "Unable to save beneficiary.";
       setFormError(message);
       if (error instanceof ApiRequestError && error.errors) {
-        setFieldErrors(Object.fromEntries(Object.entries(error.errors).map(([key, messages]) => [key.replace(/^raw_data\.nium\.additionalFields\./, ""), messages.join(" ")])));
+        setFieldErrors(normalizeBeneficiaryErrors(error.errors, form, requirements));
         setStep("bank");
       }
       if (editing) {
@@ -660,10 +668,16 @@ const AccountBeneficiaries = () => {
               </div>
             ) : null}
 
-            {isNium && (step === "bank" || step === "review") && !requirements && (
+            {requiresMetadata && (step === "bank" || step === "review") && !requirements && (
               <div role="status" className="mt-6 space-y-3 rounded-xl border p-4">
-                <p>{requirementsQuery.isFetching ? "Loading supported beneficiary requirements…" : "Beneficiary requirements are unavailable. Check the payment details and retry before continuing."}</p>
-                <Button variant="outline" disabled={requirementsQuery.isFetching} onClick={() => requirementsQuery.refetch()}>Retry requirements</Button>
+                <p>{!selectedProvider ? "Beneficiary provider is unavailable. Reload the provider before continuing."
+                  : requirementsQuery.isFetching ? "Loading supported beneficiary requirements…"
+                    : requirementsQuery.error instanceof ApiRequestError && requirementsQuery.error.status === 422
+                      ? "This beneficiary corridor is not supported. Change the country, currency or payout method."
+                      : "Beneficiary requirements are unavailable. Check the country, currency and payout method, then retry before continuing."}</p>
+                <Button variant="outline" disabled={requirementsQuery.isFetching || providersQuery.isFetching}
+                  onClick={() => selectedProvider ? requirementsQuery.refetch() : providersQuery.refetch()}>Retry requirements</Button>
+                {step === "review" && <Button variant="outline" onClick={goBack}>Back to bank details</Button>}
               </div>
             )}
             {Object.keys(fieldErrors).length > 0 && (
@@ -702,17 +716,17 @@ const AccountBeneficiaries = () => {
                   onChange={changeForm}
                   onContinue={goNext}
                   supportsAccountVerification={selectedProvider?.supports_account_verification === true}
-                  isNium={isNium}
+                  isNium={requiresMetadata}
                   requirements={requirements}
                   fieldErrors={fieldErrors}
                 />
               )}
 
-              {step === "review" && (
+              {step === "review" && (!requiresMetadata || requirements) && (
                 <ReviewBeneficiaryStep
                   provider={selectedProvider}
                   country={selectedCountry}
-                  saving={saveMutation.isPending || (isNium && !requirements)}
+                  saving={saveMutation.isPending || (requiresMetadata && !requirements)}
                   payload={submittedPayload}
                   requirements={requirements}
                   editing={Boolean(editing)}
@@ -1047,6 +1061,11 @@ const BankAccountStep = ({
           value={form.bankAccountType} error={fieldErrors.beneficiaryBankAccountType}
           onChange={(value) => onChange({ ...form, bankAccountType: value })} />
       )}
+      {isNium && requirements && <p className="text-sm text-muted-foreground">
+        {isSwiftOnlyCorridor(requirements)
+          ? "NIUM requires the bank's SWIFT/BIC for this payment method. Bank Code and Branch Code are not supported."
+          : "Enter the routing information supported by this payment method. Where multiple types are available, select the type supplied by the bank."}
+      </p>}
       {isNium && requirements && <NiumRoutingFields form={form} requirements={requirements} errors={fieldErrors} onChange={onChange} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -1054,14 +1073,14 @@ const BankAccountStep = ({
         <FormInput label="Bank name" required={requirements?.fields.some((f) => f.name === "beneficiaryBankName" && f.required)} error={fieldErrors.beneficiaryBankName} value={form.bankName} onChange={(value) => onChange({ ...form, bankName: value })} />
         {!isNium && <FormInput label="Bank code" value={form.bankCode} onChange={(value) => onChange({ ...form, bankCode: value })} />}
         {!isNium && <FormInput label="Branch code" value={form.branchCode} onChange={(value) => onChange({ ...form, branchCode: value })} />}
-        <FormInput label="Account number" required={requirements?.fields.some((f) => f.name === "beneficiaryAccountNumber" && f.required) && !form.iban.trim()} error={fieldErrors.beneficiaryAccountNumber} value={form.accountNumber} onChange={(value) => onChange({ ...form, accountNumber: value })} />
+        <FormInput label="Account number" required={requirements?.fields.some((f) => f.name === "beneficiaryAccountNumber" && f.required) && !form.iban.trim()} error={!form.iban.trim() || form.accountNumber.trim() ? fieldErrors.beneficiaryAccountNumber : undefined} value={form.accountNumber} onChange={(value) => onChange({ ...form, accountNumber: value })} />
         <FormInput
           label="Confirm account number"
           error={fieldErrors.confirmAccountNumber}
           value={form.confirmAccountNumber}
           onChange={(value) => onChange({ ...form, confirmAccountNumber: value })}
         />
-        <FormInput label="IBAN" value={form.iban} onChange={(value) => onChange({ ...form, iban: value })} />
+        <FormInput label="IBAN" error={!form.accountNumber.trim() ? fieldErrors.beneficiaryAccountNumber : undefined} value={form.iban} onChange={(value) => onChange({ ...form, iban: value })} />
       </div>
 
       {isNium && requirements && <div className="grid gap-4 sm:grid-cols-2">
@@ -1310,19 +1329,22 @@ const FormSelect = ({
   selectedLabel?: ReactNode;
   onChange: (value: string) => void;
   children: ReactNode;
-}) => (
-  <div className="space-y-2">
-    <Label>{label}</Label>
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-11 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]">
-        <SelectValue placeholder={`Select ${label.toLowerCase()}`}>
-          {value ? selectedLabel : undefined}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>{children}</SelectContent>
-    </Select>
-  </div>
-);
+}) => {
+  const id = useId();
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} className="h-11 rounded-xl border-[#d7d7d2] bg-white dark:border-white/10 dark:bg-[#10141b]">
+          <SelectValue placeholder={`Select ${label.toLowerCase()}`}>
+            {value ? selectedLabel : undefined}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>{children}</SelectContent>
+      </Select>
+    </div>
+  );
+};
 
 const CurrencySelectItem = ({ value }: { value: string }) => (
   <SelectItem value={value}>

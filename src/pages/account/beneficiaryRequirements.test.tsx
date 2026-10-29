@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { buildPayload, emptyForm, NiumRoutingFields, ReviewBeneficiaryStep, type BeneficiaryForm } from "./AccountBeneficiaries";
-import { routingSlots, schemaErrors } from "./beneficiaryRequirements";
+import { clearRoutingInputs, matchesNiumRequirements, normalizeBeneficiaryErrors, routingSlots, schemaErrors } from "./beneficiaryRequirements";
 import { swiftRequirements } from "@/test/beneficiaryFixtures";
 import type { NiumBeneficiaryRequirements } from "@/services/moneyMovementService";
 
@@ -84,14 +84,53 @@ describe("NIUM beneficiary requirements", () => {
     expect(schemaErrors(values, buildPayload(values, false, requirements), requirements)).toHaveProperty("routingCodeType1");
   });
 
-  it("honors routing fields explicitly marked optional by the schema", () => {
-    const requirements = { ...swiftRequirements, fields: [
-      { name: "routingCodeType1", required: false, allowed_values: ["SWIFT"] },
+  it("honors explicitly optional routing on other corridors", () => {
+    const requirements = { ...multiple, fields: [
+      { name: "routingCodeType1", required: false, allowed_values: ["IFSC", "SWIFT"] },
       { name: "routingCodeValue1", required: false },
     ] };
     const values = form({ routingValue: "" });
     expect(routingSlots(requirements)[0].required).toBe(false);
     expect(schemaErrors(values, buildPayload(values, false, requirements), requirements)).toEqual({});
+  });
+
+  it("requires SWIFT/BIC for a confirmed SWIFT-only corridor even if optional schema flags are returned", () => {
+    const requirements = { ...swiftRequirements, fields: [
+      { name: "routingCodeType1", required: false }, { name: "routingCodeValue1", required: false },
+    ] };
+    const values = form({ routingValue: "" });
+    expect(routingSlots(requirements)[0].required).toBe(true);
+    expect(schemaErrors(values, buildPayload(values, false, requirements), requirements)).toHaveProperty("routingCodeValue1");
+  });
+
+  it("accepts only complete schema metadata matching the selected form dimensions", () => {
+    expect(matchesNiumRequirements(swiftRequirements, form())).toBe(true);
+    for (const value of [undefined, { routingCodeType: "SWIFT" }, { ...swiftRequirements, fields: null },
+      { ...swiftRequirements, dimensions: { ...swiftRequirements.dimensions, destinationCurrency: "EUR" } },
+      { ...swiftRequirements, fields: [{ name: "routingCodeValue1", required: "true" }] }]) {
+      expect(matchesNiumRequirements(value, form())).toBe(false);
+    }
+  });
+
+  it("clears all routing values without discarding beneficiary identity or account details", () => {
+    const before = form({ routingType: "SWIFT", routingValue: "HDFCINBB", secondaryRoutingType: "IFSC", secondaryRoutingValue: "HDFC0001234",
+      bankCode: "legacy-bank", branchCode: "legacy-branch", swiftBic: "legacy-swift", iban: "IBAN-123",
+      schemaValues: { beneficiaryBankCode: "bank", beneficiaryBranchCode: "branch", beneficiaryAlias: "Vendor" } });
+    const cleared = clearRoutingInputs(before);
+    expect(cleared).toMatchObject({ routingType: "", routingValue: "", secondaryRoutingType: "", secondaryRoutingValue: "",
+      bankCode: "", branchCode: "", swiftBic: "", fullName: before.fullName, accountNumber: before.accountNumber,
+      confirmAccountNumber: before.confirmAccountNumber, iban: "IBAN-123", schemaValues: { beneficiaryAlias: "Vendor" } });
+    expect(cleared.schemaValues).not.toHaveProperty("beneficiaryBankCode");
+    expect(cleared.schemaValues).not.toHaveProperty("beneficiaryBranchCode");
+  });
+
+  it("maps backend validation paths to the routing inputs, including a secondary SWIFT code", () => {
+    const values = form({ routingType: "IFSC", secondaryRoutingType: "SWIFT" });
+    expect(normalizeBeneficiaryErrors({ swift_bic: ["Invalid SWIFT code"],
+      "raw_data.nium.routingInfo.0.type": ["Unsupported type"],
+      "raw_data.nium.additionalFields.beneficiaryAlias": ["Invalid alias"], bank_name: ["Bank is required"],
+    }, values, multiple)).toEqual({ routingCodeValue2: "Invalid SWIFT code", routingCodeType1: "Unsupported type",
+      beneficiaryAlias: "Invalid alias", beneficiaryBankName: "Bank is required" });
   });
 
   it("hides optional routing slots that have no supported schema choices", () => {

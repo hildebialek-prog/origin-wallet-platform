@@ -1,16 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { swiftRequirements } from "@/test/beneficiaryFixtures";
 import { ApiRequestError } from "@/services/apiClient";
 import AccountBeneficiaries from "./AccountBeneficiaries";
 
-const mocks = vi.hoisted(() => ({ requirements: vi.fn(), create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requirements: vi.fn(), create: vi.fn(), providerCode: "nium" }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "9" }, token: "test-token" }) }));
-vi.mock("@/services/fxOrderService", () => ({ getProviders: vi.fn().mockResolvedValue({ data: [
-  { id: 7, code: "nium", name: "Nium", status: "active", supports_beneficiaries: true },
-] }) }));
+vi.mock("@/services/fxOrderService", () => ({ getProviders: vi.fn(async () => ({ data: [
+  { id: 7, code: mocks.providerCode, name: "Nium", status: "active", supports_beneficiaries: true },
+] })) }));
 vi.mock("@/services/moneyMovementService", () => ({
   getBeneficiaries: vi.fn().mockResolvedValue([]), getBeneficiaryRequirements: mocks.requirements,
   createBeneficiary: mocks.create, updateBeneficiary: vi.fn(), deleteBeneficiary: vi.fn(),
@@ -41,9 +41,21 @@ const fillSwift = () => {
 };
 
 describe("corridor-aware beneficiary wizard", () => {
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  beforeAll(() => { HTMLElement.prototype.scrollIntoView = vi.fn(); });
+  afterAll(() => { HTMLElement.prototype.scrollIntoView = originalScrollIntoView; });
   beforeEach(() => {
+    mocks.providerCode = "nium";
     mocks.requirements.mockReset().mockResolvedValue(swiftRequirements);
     mocks.create.mockReset().mockResolvedValue({ id: 1 });
+  });
+
+  it.each(["NIUM", "Nium"])("loads validated requirements for provider code %s instead of showing the legacy form", async (code) => {
+    mocks.providerCode = code;
+    await openBank();
+    await waitFor(() => expect(mocks.requirements).toHaveBeenCalled());
+    expect(screen.queryByLabelText(/^Bank code|^Branch code/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^SWIFT \/ BIC/)).toBeRequired();
   });
 
   it("reviews and submits the exact supported SWIFT routing payload", async () => {
@@ -105,6 +117,71 @@ describe("corridor-aware beneficiary wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue to review" }));
     expect(screen.getByText("Review vendor details")).toBeVisible();
     expect(screen.getByText("HDFC0001234")).toBeVisible();
+  });
+
+  it.each([
+    ["raw V3 data without a schema", { routingCodeType: "SWIFT" }],
+    ["malformed schema", { ...swiftRequirements, fields: null }],
+    ["another corridor", { ...swiftRequirements, dimensions: { ...swiftRequirements.dimensions, destinationCurrency: "EUR" } }],
+  ])("blocks review for %s instead of assuming HK/USD has valid metadata", async (_label, response) => {
+    mocks.requirements.mockResolvedValue(response);
+    await openBank();
+    await screen.findByText(/Beneficiary requirements are unavailable/);
+    expect(screen.queryByLabelText(/^SWIFT \/ BIC|^Bank code|^Branch code/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue to review" })).toBeDisabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("explains an unsupported corridor and blocks review", async () => {
+    mocks.requirements.mockRejectedValue(new ApiRequestError("Unsupported corridor", 422));
+    await openBank();
+    expect(await screen.findByText(/This beneficiary corridor is not supported/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Continue to review" })).toBeDisabled();
+    expect(screen.queryByLabelText(/^Bank code|^Branch code/)).not.toBeInTheDocument();
+  });
+
+  it.each(["", "invalid"])("shows missing or invalid SWIFT errors beneath the input (value: %s)", async (code) => {
+    await openBank();
+    await screen.findByLabelText(/^SWIFT \/ BIC/);
+    fillSwift();
+    change(/^SWIFT \/ BIC/, code);
+    fireEvent.click(screen.getByRole("button", { name: "Continue to review" }));
+    const input = screen.getByLabelText("SWIFT / BIC (Required)");
+    expect(input).toBeRequired();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(input.getAttribute("aria-describedby")!)).toHaveTextContent(/required|format/);
+    expect(screen.getByText(/NIUM requires the bank's SWIFT\/BIC/)).toBeVisible();
+    expect(screen.queryByText("Review vendor details")).not.toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it.each(["swift_bic", "raw_data.nium.routingInfo.0.value"])("places backend %s errors directly beneath SWIFT/BIC", async (field) => {
+    mocks.create.mockRejectedValue(new ApiRequestError("Invalid routing", 422, { [field]: ["Use the bank's current SWIFT code."] }));
+    await openBank();
+    await screen.findByLabelText(/^SWIFT \/ BIC/);
+    fillSwift();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create beneficiary" }));
+    const input = await screen.findByLabelText(/^SWIFT \/ BIC/);
+    expect(input).toHaveAccessibleDescription("Use the bank's current SWIFT code.");
+  });
+
+  it("reloads requirements and clears routing when the payment method changes, retaining account details", async () => {
+    mocks.requirements.mockImplementation(async (params) => params.payoutMethod === "LOCAL" ? {
+      ...swiftRequirements, dimensions: { ...swiftRequirements.dimensions, payoutMethod: "LOCAL" }, routing_code_types: ["IFSC"],
+      fields: [{ name: "routingCodeType1", required: true, allowed_values: ["IFSC"] }, { name: "routingCodeValue1", required: true }],
+    } : swiftRequirements);
+    await openBank();
+    await screen.findByLabelText(/^SWIFT \/ BIC/);
+    fillSwift();
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Payout method" }), { key: "ArrowDown" });
+    fireEvent.keyDown(await screen.findByRole("option", { name: "Local bank transfer" }), { key: "Enter" });
+    const routing = await screen.findByLabelText(/^IFSC code/);
+    expect(routing).toHaveValue("");
+    expect(screen.queryByLabelText(/^SWIFT \/ BIC/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Account number/)).toHaveValue(" 123456789 ");
+    expect(screen.getByLabelText(/^Bank name/)).toHaveValue(" Bank ");
+    expect(mocks.requirements).toHaveBeenLastCalledWith(expect.objectContaining({ payoutMethod: "LOCAL" }));
   });
 
   it("returns authoritative backend field errors to the editable bank step", async () => {

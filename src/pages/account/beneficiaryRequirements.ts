@@ -1,6 +1,56 @@
 import type { BeneficiaryPayload, NiumBeneficiaryRequirements } from "@/services/moneyMovementService";
 import type { BeneficiaryForm } from "./AccountBeneficiaries";
 
+export const matchesNiumRequirements = (value: unknown, form: Pick<BeneficiaryForm, "countryCode" | "currency" | "payoutMethod" | "beneficiaryType">): value is NiumBeneficiaryRequirements => {
+  if (!value || typeof value !== "object") return false;
+  const metadata = value as Partial<NiumBeneficiaryRequirements>;
+  const dimensions = metadata.dimensions;
+  if (!dimensions || typeof dimensions !== "object" || Array.isArray(dimensions)) return false;
+  const expected = {
+    destinationCountry: form.countryCode,
+    destinationCurrency: form.currency,
+    payoutMethod: form.payoutMethod,
+    beneficiaryAccountType: ["company", "business", "corporate"].includes(form.beneficiaryType.toLowerCase()) ? "CORPORATE" : "INDIVIDUAL",
+  };
+  if (!Object.entries(expected).every(([key, value]) => dimensions[key] === value.toUpperCase())
+    || !["CORPORATE", "INDIVIDUAL"].includes(dimensions.customerType)) return false;
+  return Array.isArray(metadata.routing_code_types)
+    && metadata.routing_code_types.every((type) => typeof type === "string" && type.trim() !== "")
+    && Array.isArray(metadata.fields) && metadata.fields.every((field) => field && typeof field === "object"
+      && typeof field.name === "string" && field.name.trim() !== "" && typeof field.required === "boolean"
+      && (field.type === undefined || typeof field.type === "string")
+      && (field.pattern === undefined || typeof field.pattern === "string")
+      && (field.allowed_values === undefined || Array.isArray(field.allowed_values))
+      && [field.min_length, field.max_length].every((length) => length === undefined || (Number.isInteger(length) && length >= 0)));
+};
+
+export const isSwiftOnlyCorridor = (requirements: NiumBeneficiaryRequirements) =>
+  requirements.routing_code_types.length === 1 && requirements.routing_code_types[0] === "SWIFT";
+
+export const clearRoutingInputs = (form: BeneficiaryForm): BeneficiaryForm => {
+  const { beneficiaryBankCode: _bank, beneficiaryBranchCode: _branch, ...schemaValues } = form.schemaValues;
+  return { ...form, bankCode: "", branchCode: "", swiftBic: "", routingType: "", routingValue: "",
+    secondaryRoutingType: "", secondaryRoutingValue: "", schemaValues };
+};
+
+export const normalizeBeneficiaryErrors = (errors: Record<string, string[]>, form: BeneficiaryForm, requirements?: NiumBeneficiaryRequirements): Record<string, string> => {
+  const aliases: Record<string, string> = {
+    full_name: "beneficiaryName", company_name: "beneficiaryName", email: "beneficiaryEmail", phone: "beneficiaryContactNumber",
+    bank_name: "beneficiaryBankName", account_number: "beneficiaryAccountNumber", iban: "beneficiaryAccountNumber",
+    address_line1: "beneficiaryAddress", city: "beneficiaryCity", state: "beneficiaryState", postal_code: "beneficiaryPostcode",
+  };
+  const swiftSlot = requirements ? routingEntries(form, requirements).find((entry) => entry.type === "SWIFT")?.slot : undefined;
+  const result: Record<string, string> = {};
+  for (const [key, messages] of Object.entries(errors)) {
+    const routing = key.match(/^raw_data\.nium\.routingInfo\.(\d+)\.(type|value)$/);
+    const field = routing ? `routingCode${routing[2] === "type" ? "Type" : "Value"}${Number(routing[1]) + 1}`
+      : key === "swift_bic" && swiftSlot ? `routingCodeValue${swiftSlot}`
+        : aliases[key] ?? key.replace(/^raw_data\.nium\.(?:additionalFields\.)?/, "");
+    result[field] = [result[field], ...messages].filter(Boolean).join(" ");
+  }
+  return result;
+};
+
 export const schemaFormFields: Record<string, keyof BeneficiaryForm> = {
   beneficiaryName: "fullName", beneficiaryEmail: "email", beneficiaryContactNumber: "phone",
   beneficiaryContactCountryCode: "phoneCountryCode", beneficiaryAddress: "addressLine1",
@@ -11,7 +61,7 @@ export const schemaFormFields: Record<string, keyof BeneficiaryForm> = {
 const fixedFields = ["clientLegalEntity", "destinationCountry", "destinationCurrency", "payoutMethod", "beneficiaryAccountType", "customerType", "beneficiaryCountryCode"];
 export const extraSchemaFields = (requirements: NiumBeneficiaryRequirements) => requirements.fields.filter(
   (field) => !schemaFormFields[field.name] && !fixedFields.includes(field.name) && !field.name.startsWith("routingCode")
-    && !(requirements.routing_code_types.length === 1 && requirements.routing_code_types[0] === "SWIFT" && ["beneficiaryBankCode", "beneficiaryBranchCode"].includes(field.name)),
+    && !(isSwiftOnlyCorridor(requirements) && ["beneficiaryBankCode", "beneficiaryBranchCode"].includes(field.name)),
 );
 export const fieldLabel = (name: string) => name.split(".").pop()!.replace(/^beneficiary/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 
@@ -20,8 +70,8 @@ export const routingSlots = (requirements: NiumBeneficiaryRequirements) => [1, 2
   const valueField = requirements.fields.find((f) => f.name === `routingCodeValue${slot}`);
   if (slot === 1 ? !requirements.routing_code_types.length && !typeField && !valueField : !typeField && !valueField) return [];
   const types = requirements.routing_code_types.filter((type) => !typeField?.allowed_values || typeField.allowed_values.includes(type));
-  if (!types.length && !typeField?.required && !valueField?.required) return [];
-  const required = !!typeField?.required || !!valueField?.required || (slot === 1 && !typeField && !valueField);
+  const required = !!typeField?.required || !!valueField?.required || (slot === 1 && (isSwiftOnlyCorridor(requirements) || (!typeField && !valueField)));
+  if (!types.length && !required) return [];
   return [{ slot, types, required }];
 });
 
