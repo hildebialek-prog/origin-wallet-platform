@@ -41,6 +41,23 @@ describe("SGD Local preparation", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("selects an explicitly bound preparation-only SGD beneficiary without claiming payout admission", () => {
+    const payee: Beneficiary = { ...localBeneficiary, payout_admission: {
+      allowed: false, reason: "financial_terms_unverified", preparation_allowed: true, fx_lock_enabled: true,
+      beneficiary_id: localBeneficiary.id, provider_id: localBeneficiary.provider_id, source_currency: "USD",
+      destination_country: "SG", destination_currency: "SGD", payout_method: "LOCAL",
+    } };
+    const onSelect = vi.fn();
+    render(<MemoryRouter><PayeeStep search="" onSearchChange={vi.fn()} beneficiaries={[payee]}
+      providerById={new Map([[7, niumProvider]])} loading={false} onSelect={onSelect} /></MemoryRouter>);
+    const button = screen.getByText("SG Individual").closest("button");
+    expect(button).toBeEnabled();
+    expect(screen.getByText("Preparation only — provider fees and release approval are pending.")).toBeVisible();
+    fireEvent.click(button!);
+    expect(onSelect).toHaveBeenCalledWith(payee);
+    expect(payee.payout_admission?.allowed).toBe(false);
+  });
+
   it("shows USD funding, SGD destination, unavailable FX and unknown fees on details", () => {
     render(<DetailsStep form={form} selectedProvider={niumProvider} selectedBeneficiary={localBeneficiary}
       sourceCurrencies={["USD"]} effectiveSourceAmount={1} onBack={vi.fn()} onContinue={vi.fn()} onChange={vi.fn()}
@@ -61,6 +78,8 @@ describe("SGD Local preparation", () => {
     </>);
     expect(screen.getAllByText("SGD amount unavailable — FX confirmation pending")).toHaveLength(2);
     expect(screen.getAllByText("Unavailable pending provider confirmation")).toHaveLength(2);
+    expect(screen.getAllByText("FX lock expiry")).toHaveLength(2);
+    expect(screen.getAllByText("USD total wallet debit")).toHaveLength(2);
     expect(screen.getAllByText("Provider fees are not yet available")).toHaveLength(2);
     expect(screen.getAllByText("SGD")).toHaveLength(2);
     expect(screen.queryByText(/SHA/)).not.toBeInTheDocument();

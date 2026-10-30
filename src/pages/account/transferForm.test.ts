@@ -5,6 +5,7 @@ import {
   buildTransferPayload,
   beneficiaryTransferOption,
   createClientReference,
+  hasSgdLocalPreparation,
   isTransferAmountInput,
   NIUM_HK_USD_SWIFT_CONFIG,
   NIUM_SG_SGD_LOCAL_UNAVAILABLE,
@@ -308,6 +309,23 @@ describe("provider-aware transfer contract", () => {
     expect(beneficiaryTransferOption({ ...local, raw_data: { payout_admission: admission } }, niumProvider).selectable).toBe(false);
     expect(validateTransferConfiguration({ provider: niumProvider, beneficiary: { ...local, payout_admission: admission },
       sourceCurrency: "USD", targetCurrency: "SGD", purposeCode: "IR01811", purposeOptions: [] })).toBe("Select a supported Nium payment purpose.");
+  });
+
+  it("keeps preparation eligibility bound to the active SGD LOCAL beneficiary and backend corridor", () => {
+    const local: Beneficiary = { ...beneficiary, country_code: "SG", currency: "SGD", payout_method: "LOCAL", beneficiary_type: "personal" };
+    const admission = { allowed: false, reason: "financial_terms_unverified", preparation_allowed: true,
+      beneficiary_id: local.id, provider_id: local.provider_id, source_currency: "USD",
+      destination_country: "SG", destination_currency: "SGD", payout_method: "LOCAL" };
+    expect(hasSgdLocalPreparation({ ...local, payout_admission: admission })).toBe(true);
+    for (const change of [
+      { preparation_allowed: false }, { beneficiary_id: 123 }, { provider_id: 123 }, { source_currency: "SGD" },
+      { destination_country: "HK" }, { destination_currency: "USD" }, { payout_method: "SWIFT" },
+    ]) {
+      expect(hasSgdLocalPreparation({ ...local, payout_admission: { ...admission, ...change } })).toBe(false);
+    }
+    expect(hasSgdLocalPreparation({ ...local, status: "pending", payout_admission: admission })).toBe(false);
+    expect(hasSgdLocalPreparation({ ...local, raw_data: { payout_admission: admission } })).toBe(false);
+    expect(beneficiaryTransferOption({ ...local, payout_admission: admission }, { ...niumProvider, supports_transfers: false }).selectable).toBe(false);
   });
 
   it("preserves USD source and SGD destination without client FX values or SWIFT fee fields", () => {
