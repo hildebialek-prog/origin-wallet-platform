@@ -55,15 +55,19 @@ import {
   toNumber,
 } from "@/lib/money";
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
+import { SgdLocalAmountBreakdown } from "./SgdLocalAmountBreakdown";
+import { SgdLocalPayoutWorkflow } from "./SgdLocalPayoutWorkflow";
 import {
   buildTransferPayload,
   beneficiaryTransferOption,
   createClientReference,
   isNiumProvider,
+  hasSgdLocalPreparation,
   isTransferAmountInput,
   purposeOptionsForProvider,
   purposeOptionsForTransferProvider,
   recipientAmountPresentation,
+  payoutFeePresentation,
   shouldFetchNiumPurposeCodes,
   validateTransferConfiguration,
   validateTransferAmount,
@@ -238,6 +242,7 @@ const AccountTransfers = () => {
       beneficiaryId: String(beneficiary.id),
       sourceCurrency: nextBalance?.currency ?? form.sourceCurrency,
       targetCurrency: beneficiary.currency,
+      sourceAmount: form.sourceAmount,
       purposeCode: isNiumProvider(provider?.code) ? "" : purposeOptionsForProvider(provider?.code)[0]?.code ?? "",
     });
     setFormError("");
@@ -444,7 +449,16 @@ const AccountTransfers = () => {
                   />
                 )}
 
-                {step === "details" && (
+                {step === "details" && selectedBeneficiary && isNiumProvider(selectedProvider?.code) && hasSgdLocalPreparation(selectedBeneficiary) ? (
+                  <SgdLocalPayoutWorkflow key={selectedBeneficiary.id} userId={String(user?.id ?? "")} token={token ?? ""}
+                    beneficiary={selectedBeneficiary} balance={selectedBalance} sourceAmount={form.sourceAmount}
+                    purposeCode={form.purposeCode} purposes={purposeOptions} purposesLoading={purposeCodesQuery.isLoading}
+                    purposesFailed={purposeCodesQuery.isError}
+                    existingTransfer={transfers.find((transfer) => transfer.beneficiary_id === selectedBeneficiary.id && !!transfer.payout_workflow && !["completed", "failed", "cancelled", "rejected"].includes(transfer.status))}
+                    onAmountChange={(sourceAmount) => setForm((current) => ({ ...current, sourceAmount }))}
+                    onPurposeChange={(purposeCode) => setForm((current) => ({ ...current, purposeCode }))}
+                    onBack={() => setStep("payee")} onTransferChanged={refreshTransfers} />
+                ) : step === "details" && (
                   <DetailsStep
                     form={form}
                     selectedProvider={selectedProvider}
@@ -620,7 +634,7 @@ export const PayeeStep = ({
                   <p className="mt-1 truncate text-sm text-[#62708a] dark:text-gray-400">
                     {beneficiarySubtitle(beneficiary, provider)}
                   </p>
-                  {!eligibility.selectable ? (
+                  {eligibility.reason ? (
                     <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-300">{eligibility.reason}</p>
                   ) : null}
                 </div>
@@ -718,8 +732,14 @@ export const DetailsStep = ({
         </div>
 
         <div className="rounded-2xl border border-[#e1e7f0] bg-[#f3fdf9] px-4 py-3 text-sm text-[#62708a] dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
-          Estimated recipient amount: <strong className="text-[#0f2442] dark:text-white">Determined during processing</strong>
-          <span className="ml-2">Provider and intermediary bank fees may apply (SHA).</span>
+          {isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD" ? (
+            <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} />
+          ) : <>
+          Estimated recipient amount: <strong className="text-[#0f2442] dark:text-white">{recipientAmountPresentation(selectedProvider?.code, form.targetCurrency) ?? "Unavailable"}</strong>
+          <p className="mt-2">Destination currency: {form.targetCurrency}</p>
+          {form.sourceCurrency !== form.targetCurrency ? <p>FX rate: Unavailable pending provider confirmation</p> : null}
+          </>}
+          <span className="ml-2">{payoutFeePresentation(selectedBeneficiary?.payout_method)}.</span>
         </div>
       </div>
     </div>
@@ -764,7 +784,7 @@ export const DetailsStep = ({
   );
 };
 
-const ReviewStep = ({
+export const ReviewStep = ({
   form,
   provider,
   beneficiary,
@@ -809,9 +829,13 @@ const ReviewStep = ({
       <SectionTitle icon={<WalletCards className="h-5 w-5" />} title="Payment" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <ReviewItem label="Transfer amount" value={<CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(effectiveSourceAmount, form.sourceCurrency)}</CurrencyDisplay>} />
-        <ReviewItem label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code) ?? "-"} />
+        <ReviewItem label="Destination currency" value={form.targetCurrency} />
+        {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <div className="sm:col-span-2"><SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} /></div> : <>
+        <ReviewItem label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code, form.targetCurrency) ?? "-"} />
+        {form.sourceCurrency !== form.targetCurrency ? <ReviewItem label="FX rate" value="Unavailable pending provider confirmation" /> : null}
         <ReviewItem label="Provider fee" value="Calculated during processing" />
-        <ReviewItem label="Fee handling" value="Provider and intermediary bank fees may apply (SHA)" />
+        </>}
+        <ReviewItem label="Fee handling" value={payoutFeePresentation(beneficiary?.payout_method)} />
         <ReviewItem label="Funding source" value="Nium wallet balance" />
         <ReviewItem label="Available balance" value={balance ? <CurrencyDisplay currency={balance.currency}>{formatAmount(balance.available_balance, balance.currency)}</CurrencyDisplay> : "No synced balance"} />
         <ReviewItem label="Purpose" value={purposeLabel} />
@@ -829,7 +853,7 @@ const ReviewStep = ({
   </div>
 );
 
-const ResultStep = ({
+export const ResultStep = ({
   transfer,
   provider,
   beneficiary,
@@ -853,7 +877,9 @@ const ResultStep = ({
         Payment request created
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        The request is saved in Origin Wallet. Submit it when approval rules allow.
+        {isNiumProvider(provider?.code) && transfer?.target_currency === "SGD"
+          ? "The request is saved in Origin Wallet. SGD Local submission is currently unavailable."
+          : "The request is saved in Origin Wallet. Submit it when approval rules allow."}
       </p>
     </div>
 
@@ -871,20 +897,24 @@ const ResultStep = ({
           <ReviewItem label="Infrastructure" value={provider ? getProviderDisplayName(provider) : PRIMARY_PROVIDER_NAME} />
           <ReviewItem label="Beneficiary" value={beneficiary?.full_name ?? `Beneficiary #${transfer.beneficiary_id}`} />
           <ReviewItem label="Transfer amount" value={<CurrencyDisplay currency={transfer.source_currency}>{formatAmount(transfer.source_amount, transfer.source_currency)}</CurrencyDisplay>} />
+          {isNiumProvider(provider?.code) && transfer.target_currency === "SGD" ? <div className="sm:col-span-2"><SgdLocalAmountBreakdown sourceAmount={transfer.source_amount} amounts={transfer.payout_amounts} /></div> : <>
           <ReviewItem
             label="Estimated recipient amount"
-            value={recipientAmountPresentation(provider?.code) ?? formatAmount(transfer.target_amount, transfer.target_currency)}
+            value={recipientAmountPresentation(provider?.code, transfer.target_currency) ?? formatAmount(transfer.target_amount, transfer.target_currency)}
           />
           <ReviewItem
             label="Provider fee"
             value={isNiumProvider(provider?.code) ? "Calculated during processing" : formatAmount(transfer.fee_amount, transfer.fee_currency)}
           />
+          </>}
           <ReviewItem label="Created" value={formatDateTime(transfer.created_at)} />
         </div>
 
         {transfer.status === "approval_required" ? (
           <div role="status" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {isNiumProvider(provider?.code)
+            {isNiumProvider(provider?.code) && transfer.target_currency === "SGD"
+              ? "Waiting for admin approval. SGD Local submission remains unavailable while payout support is being verified."
+              : isNiumProvider(provider?.code)
               ? "Waiting for admin approval. This payment will be submitted automatically once approved."
               : "Admin approval is required before this payment can be submitted."}
           </div>
@@ -899,7 +929,7 @@ const ResultStep = ({
     ) : null}
 
     <div className="flex flex-col justify-center gap-3 sm:flex-row">
-      {!isNiumProvider(provider?.code) ? (
+      {provider && !isNiumProvider(provider.code) ? (
       <Button
         className="h-12 rounded-full bg-[#15803d] px-7 text-white hover:bg-[#166534]"
         disabled={!transfer || !canSubmitProvider(transfer.status) || submitting}
@@ -920,7 +950,7 @@ const ResultStep = ({
   </div>
 );
 
-const PaymentSummary = ({
+export const PaymentSummary = ({
   provider,
   beneficiary,
   balance,
@@ -943,14 +973,18 @@ const PaymentSummary = ({
       <SummaryLine label="Funding" value={isNiumProvider(provider?.code) ? "Nium wallet balance" : "Provider funding account"} />
       <SummaryLine label="Available" value={balance ? <CurrencyDisplay currency={balance.currency}>{formatAmount(balance.available_balance, balance.currency)}</CurrencyDisplay> : "No synced balance"} />
       <SummaryLine label="Transfer amount" value={sourceAmount > 0 ? <CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(sourceAmount, form.sourceCurrency)}</CurrencyDisplay> : "-"} />
-      <SummaryLine label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code) ?? "-"} />
+      <SummaryLine label="Destination currency" value={form.targetCurrency} />
+      {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} /> : <>
+      <SummaryLine label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code, form.targetCurrency) ?? "-"} />
+      {form.sourceCurrency !== form.targetCurrency ? <SummaryLine label="FX rate" value="Unavailable pending provider confirmation" /> : null}
       <SummaryLine label="Provider fee" value="Calculated during processing" />
-      <SummaryLine label="Fee handling" value="Provider and intermediary bank fees may apply (SHA)" />
+      </>}
+      <SummaryLine label="Fee handling" value={payoutFeePresentation(beneficiary?.payout_method)} />
     </CardContent>
   </Card>
 );
 
-const TransferRow = ({
+export const TransferRow = ({
   transfer,
   provider,
   beneficiary,
@@ -1002,14 +1036,15 @@ const TransferRow = ({
           <p className="font-semibold text-[#0f2442] dark:text-white">
             <CurrencyDisplay currency={transfer.source_currency}>{formatAmount(transfer.source_amount, transfer.source_currency)}</CurrencyDisplay>
           </p>
-          <p className="text-xs text-[#62708a] dark:text-gray-400">
-            {recipientAmountPresentation(provider?.code) ?? `Receives ${formatAmount(transfer.target_amount, transfer.target_currency)}`}
-          </p>
+          {isNiumProvider(provider?.code) && transfer.target_currency === "SGD" ? <SgdLocalAmountBreakdown sourceAmount={transfer.source_amount} amounts={transfer.payout_amounts} /> : <p className="text-xs text-[#62708a] dark:text-gray-400">
+            {recipientAmountPresentation(provider?.code, transfer.target_currency) ?? `Receives ${formatAmount(transfer.target_amount, transfer.target_currency)}`}
+          </p>}
+          {transfer.status === "submission_unknown" ? <p role="status" className="mt-2 text-sm text-amber-700">Submission outcome is unknown. Do not submit again; contact support for reconciliation.</p> : null}
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {!isNiumProvider(provider?.code) ? <Button
+        {provider && !isNiumProvider(provider.code) ? <Button
           size="sm"
           disabled={!canSubmitProvider(transfer.status) || submitting}
           onClick={onSubmit}
@@ -1021,7 +1056,8 @@ const TransferRow = ({
         <Button
           size="sm"
           variant="outline"
-          disabled={!canSync(transfer.status) || syncing}
+          disabled={syncing || (isNiumProvider(provider?.code) && transfer.target_currency === "SGD"
+            ? transfer.payout_workflow?.can_reconcile_status !== true : !canSync(transfer.status))}
           onClick={onSync}
           className="rounded-full border-[#d7d7d2] bg-white px-4 dark:border-white/10 dark:bg-[#10141b] dark:text-white"
         >

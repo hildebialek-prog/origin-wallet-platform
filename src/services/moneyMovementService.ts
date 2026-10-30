@@ -52,6 +52,18 @@ export interface Beneficiary {
   country_code: string;
   currency: string;
   payout_method?: string | null;
+  payout_admission?: {
+    allowed: boolean;
+    reason: string | null;
+    beneficiary_id: number;
+    provider_id: number;
+    source_currency: string;
+    destination_country: string;
+    destination_currency: string;
+    payout_method: string;
+    preparation_allowed?: boolean;
+    fx_lock_enabled?: boolean;
+  } | null;
   bank_name?: string | null;
   bank_code?: string | null;
   branch_code?: string | null;
@@ -86,6 +98,8 @@ export interface Transfer {
   fx_rate?: string | number | null;
   fee_amount?: string | number | null;
   fee_currency?: string | null;
+  payout_amounts?: NiumPayoutAmounts | null;
+  payout_workflow?: NiumSgdLocalWorkflow | null;
   purpose_code?: string | null;
   reference_text?: string | null;
   client_reference?: string | null;
@@ -99,6 +113,59 @@ export interface Transfer {
   raw_data?: Record<string, unknown> | null;
   beneficiary?: Beneficiary | null;
   source_bank_account?: BankAccount | null;
+}
+
+export interface NiumPayoutAmounts {
+  source_currency: string;
+  destination_currency: string;
+  source_amount: string | number;
+  total_wallet_debit: string | number | null;
+  fx_rate: string | number | null;
+  fx_lock_expires_at?: string | null;
+  conversion_amount: string | number | null;
+  transfer_fee: { amount: string | number; currency: string } | null;
+  beneficiary_credit: string | number | null;
+  estimated_conversion_amount?: string | null;
+  actual_debit?: {
+    state: string;
+    currency?: string;
+    principal_debit?: string;
+    observed_charge_debit?: string;
+    observed_total_debit?: string;
+    charge_completeness?: string;
+    pilot_charge_reserve_remaining?: string | null;
+    pilot_charge_ceiling_breached?: boolean | null;
+    pilot_charge_exposure?: "uncapped" | "funded_reserve";
+    pilot_additional_charges_observed?: boolean;
+    checked_at?: string;
+  } | null;
+}
+
+export interface NiumSgdLocalWorkflow {
+  pilot_policy?: { authorization_id: string; reservation_amount: string; reserve_currency: "USD";
+    reserve_amount: string | null; fee_status: "unverified"; total_wallet_debit: null;
+    policy?: "funded_reserve" | "one_time_uncapped"; charge_ceiling?: string | null;
+    risk_acknowledgement?: string | null } | null;
+  business_policy?: { basis: "internal_business_policy"; currency: string; reservation_amount: string;
+    expected_principal_debit: string; expected_fee_amount: string | null } | null;
+  can_recover_captured_outcome?: boolean;
+  can_restart_review?: boolean;
+  can_refresh_pricing?: boolean;
+  financial_terms_token?: string | null;
+  checker_approval_allowed?: boolean;
+  dispatch_owner?: "checker_approval";
+  recovery_kind?: string | null;
+  can_request_recovery_review?: boolean;
+  recovery_review_requested_at?: string | null;
+  can_reconcile_status?: boolean;
+  state: string;
+  fx_lock_active: boolean;
+  fx_lock_enabled: boolean;
+  expected_fee: { amount: string | null; currency: string; basis: "user_expectation" | "unknown_fees_explicitly_accepted" };
+  provider_fee_status: "unavailable" | "confirmed";
+  approval_request_allowed: boolean;
+  dispatch_allowed: boolean;
+  blockers: string[];
 }
 
 export interface Transaction {
@@ -240,6 +307,47 @@ export const getTransfers = async (params: AuthenticatedParams) =>
       token: params.token,
     }),
   );
+
+export const getTransfer = (params: AuthenticatedParams & { transferId: number }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}`, { token: params.token });
+
+export const prepareSgdLocalPayout = (params: AuthenticatedParams & { payload: {
+  provider_id: number; beneficiary_id: number; source_currency: string; target_currency: string;
+  source_amount: string; purpose_code: string; purpose_confirmed: true; client_reference: string;
+  expected_fee_amount: "0"; expected_fee_currency: string;
+} }) => requestApi<Transfer>(`/user/users/${params.userId}/sgd-local-payouts`, {
+  method: "POST", token: params.token, body: params.payload,
+});
+
+export const requestSgdLocalFxLock = (params: AuthenticatedParams & { transferId: number; requestId: string }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-fx-lock`, {
+    method: "POST", token: params.token, body: { request_id: params.requestId, confirm_fx_lock: true },
+  });
+
+export const recoverSgdLocalCapturedOutcome = (params: AuthenticatedParams & { transferId: number }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-recover-captured`, {
+    method: "POST", token: params.token,
+  });
+
+export const restartSgdLocalReview = (params: AuthenticatedParams & { transferId: number }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-restart-review`, {
+    method: "POST", token: params.token, body: { confirm_new_review: true },
+  });
+
+export const requestSgdLocalRecoveryReview = (params: AuthenticatedParams & { transferId: number }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-recovery-review`, {
+    method: "POST", token: params.token,
+  });
+
+export const refreshSgdLocalPricing = (params: AuthenticatedParams & { transferId: number }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-refresh-pricing`, {
+    method: "POST", token: params.token,
+  });
+
+export const requestSgdLocalApproval = (params: AuthenticatedParams & { transferId: number; financialTermsToken: string }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-request-approval`, {
+    method: "POST", token: params.token, body: { financial_terms_token: params.financialTermsToken },
+  });
 
 export const createTransfer = (params: AuthenticatedParams & { payload: TransferPayload }) =>
   requestApi<Transfer>(`/user/users/${params.userId}/transfers`, {

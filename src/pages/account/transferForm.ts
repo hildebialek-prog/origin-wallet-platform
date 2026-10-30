@@ -13,6 +13,9 @@ export const NIUM_HK_USD_SWIFT_CONFIG = {
   swiftFeeTypes: ["SHA"],
 } as const;
 
+export const NIUM_SG_SGD_LOCAL_UNAVAILABLE =
+  "SGD Local payments are temporarily unavailable while payout and FX support are being verified.";
+
 export type TransferPayloadValues = {
   providerId: string;
   beneficiaryId: string;
@@ -61,8 +64,15 @@ export const validateTransferAmount = (value: string, maximumFractionDigits = 8)
 export const isTransferAmountInput = (value: string, maximumFractionDigits = 8) =>
   new RegExp(`^\\d*(?:\\.\\d{0,${maximumFractionDigits}})?$`).test(value);
 
-export const recipientAmountPresentation = (providerCode?: string | null) =>
-  isNiumProvider(providerCode) ? "Determined during processing" : null;
+export const recipientAmountPresentation = (providerCode?: string | null, targetCurrency?: string | null) =>
+  isNiumProvider(providerCode)
+    ? targetCurrency === "SGD" ? "SGD amount unavailable — FX confirmation pending" : "Determined during processing"
+    : null;
+
+export const payoutFeePresentation = (payoutMethod?: string | null) =>
+  payoutMethod === "LOCAL"
+    ? "Provider fees are not yet available"
+    : "Provider and intermediary bank fees may apply (SHA)";
 
 export const buildTransferPayload = (values: TransferPayloadValues): TransferPayload => {
   const nium = isNiumProvider(values.providerCode);
@@ -70,7 +80,9 @@ export const buildTransferPayload = (values: TransferPayloadValues): TransferPay
     ? {
         nium: {
           sourceOfFunds: NIUM_HK_USD_SWIFT_CONFIG.sourceOfFunds[0],
-          payout: { swiftFeeType: NIUM_HK_USD_SWIFT_CONFIG.swiftFeeTypes[0] },
+          ...(values.targetCurrency === "USD"
+            ? { payout: { swiftFeeType: NIUM_HK_USD_SWIFT_CONFIG.swiftFeeTypes[0] } }
+            : {}),
         },
       }
     : {};
@@ -104,11 +116,32 @@ const beneficiaryPayoutMethod = (beneficiary: Beneficiary | null) => {
   return beneficiary?.payout_method ?? "";
 };
 
+const isSgdLocalBeneficiary = (beneficiary: Beneficiary) =>
+  beneficiary.country_code === "SG" && beneficiary.currency === "SGD" && beneficiary.payout_method === "LOCAL" &&
+  ["personal", "individual"].includes(beneficiary.beneficiary_type);
+
+const hasSgdLocalAdmission = (beneficiary: Beneficiary, sourceCurrency = "USD", targetCurrency = "SGD") => {
+  const admission = beneficiary.payout_admission;
+  return isSgdLocalBeneficiary(beneficiary) && admission?.allowed === true && admission.reason === null &&
+    admission.beneficiary_id === beneficiary.id && admission.provider_id === beneficiary.provider_id &&
+    admission.source_currency === sourceCurrency && admission.destination_country === beneficiary.country_code &&
+    admission.destination_currency === targetCurrency && admission.payout_method === beneficiary.payout_method;
+};
+
+export const hasSgdLocalPreparation = (beneficiary: Beneficiary) => {
+  const admission = beneficiary.payout_admission;
+  return isSgdLocalBeneficiary(beneficiary) && normalizeStatus(beneficiary.status) === "active" &&
+    admission?.preparation_allowed === true &&
+    admission.beneficiary_id === beneficiary.id && admission.provider_id === beneficiary.provider_id &&
+    admission.source_currency === "USD" && admission.destination_country === "SG" &&
+    admission.destination_currency === "SGD" && admission.payout_method === "LOCAL";
+};
+
 export const isNiumBeneficiaryAvailable = (beneficiary: Beneficiary) =>
   normalizeStatus(beneficiary.status) === "active" &&
-  beneficiary.country_code === NIUM_HK_USD_SWIFT_CONFIG.destinationCountry &&
+  ((beneficiary.country_code === NIUM_HK_USD_SWIFT_CONFIG.destinationCountry &&
   beneficiary.currency === NIUM_HK_USD_SWIFT_CONFIG.destinationCurrency &&
-  beneficiaryPayoutMethod(beneficiary) === NIUM_HK_USD_SWIFT_CONFIG.payoutMethod;
+  beneficiaryPayoutMethod(beneficiary) === NIUM_HK_USD_SWIFT_CONFIG.payoutMethod) || hasSgdLocalAdmission(beneficiary));
 
 export const validateNiumTransferConfiguration = ({ provider, beneficiary, sourceCurrency, targetCurrency, purposeCode, purposeOptions }: {
   provider: ProviderSummary;
@@ -121,6 +154,13 @@ export const validateNiumTransferConfiguration = ({ provider, beneficiary, sourc
   if (!isNiumProvider(provider.code)) return "";
   const config = NIUM_HK_USD_SWIFT_CONFIG;
   if (sourceCurrency !== config.sourceCurrency) return "Nium transfers currently require source currency USD.";
+  if (isSgdLocalBeneficiary(beneficiary) && targetCurrency === "SGD") {
+    if (!hasSgdLocalAdmission(beneficiary, sourceCurrency, targetCurrency)) {
+      return NIUM_SG_SGD_LOCAL_UNAVAILABLE;
+    }
+    if (!purposeCode || !purposeOptions?.some((purpose) => purpose.code === purposeCode)) return "Select a supported Nium payment purpose.";
+    return "";
+  }
   if (targetCurrency !== config.destinationCurrency || beneficiary.currency !== config.destinationCurrency || beneficiary.country_code !== config.destinationCountry) {
     return "This Nium beneficiary corridor is not currently available. Select an active HK beneficiary receiving USD.";
   }
@@ -155,6 +195,18 @@ export const beneficiaryTransferOption = (beneficiary: Beneficiary, provider?: P
 
   if (!provider) {
     return { visible: true, selectable: false, reason: "Transfer rail is not available yet." };
+  }
+
+  // Selection needs backend admission; payment-purpose validation happens when
+  // the user chooses from the fetched provider list on the details screen.
+  if (isNiumProvider(provider.code) && isSgdLocalBeneficiary(beneficiary)) {
+    if (provider.supports_transfers && beneficiary.provider_id === provider.id && hasSgdLocalPreparation(beneficiary)) {
+      return { visible: true, selectable: true, reason: "Preparation only — provider fees and release approval are pending." };
+    }
+    const admissionReason = !provider.supports_transfers ? "The selected provider does not support transfers."
+      : beneficiary.provider_id !== provider.id ? "The selected beneficiary is not associated with this provider."
+      : hasSgdLocalAdmission(beneficiary) ? "" : NIUM_SG_SGD_LOCAL_UNAVAILABLE;
+    return { visible: true, selectable: admissionReason === "", reason: admissionReason };
   }
 
   const reason = validateTransferConfiguration({

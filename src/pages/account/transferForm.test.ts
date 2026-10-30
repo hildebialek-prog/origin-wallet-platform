@@ -7,6 +7,8 @@ import {
   createClientReference,
   isTransferAmountInput,
   NIUM_HK_USD_SWIFT_CONFIG,
+  NIUM_SG_SGD_LOCAL_UNAVAILABLE,
+  payoutFeePresentation,
   recipientAmountPresentation,
   purposeOptionsForTransferProvider,
   shouldFetchNiumPurposeCodes,
@@ -276,5 +278,44 @@ describe("provider-aware transfer contract", () => {
   it("does not present an exact recipient amount for Nium", () => {
     expect(recipientAmountPresentation("nium")).toBe("Determined during processing");
     expect(recipientAmountPresentation("airwallex")).toBeNull();
+  });
+
+  it("keeps SGD Local recipients disabled until the backend route is verified", () => {
+    const localBeneficiary = { ...beneficiary, country_code: "SG", currency: "SGD", payout_method: "LOCAL", beneficiary_type: "personal" };
+    expect(beneficiaryTransferOption(localBeneficiary, niumProvider)).toEqual({
+      visible: true, selectable: false, reason: NIUM_SG_SGD_LOCAL_UNAVAILABLE,
+    });
+    for (const overrides of [
+      { payout_method: "SWIFT" }, { payout_method: null }, { currency: "USD" },
+      { country_code: "MY" }, { beneficiary_type: "business" },
+    ]) {
+      expect(beneficiaryTransferOption({ ...localBeneficiary, ...overrides }, niumProvider).selectable).toBe(false);
+    }
+  });
+
+  it("requires explicit backend admission bound to the exact SGD beneficiary, provider and corridor", () => {
+    const local = { ...beneficiary, country_code: "SG", currency: "SGD", payout_method: "LOCAL", beneficiary_type: "personal" };
+    const admission = { allowed: true, reason: null, beneficiary_id: local.id, provider_id: local.provider_id,
+      source_currency: "USD", destination_country: "SG", destination_currency: "SGD", payout_method: "LOCAL" };
+    // Future capability contract only: the current backend always returns allowed=false.
+    expect(beneficiaryTransferOption({ ...local, payout_admission: admission }, niumProvider).selectable).toBe(true);
+    for (const change of [
+      { allowed: false }, { reason: "contract_verification_pending" }, { beneficiary_id: 123 }, { provider_id: 123 },
+      { source_currency: "SGD" }, { destination_country: "HK" }, { destination_currency: "USD" }, { payout_method: "SWIFT" },
+    ]) {
+      expect(beneficiaryTransferOption({ ...local, payout_admission: { ...admission, ...change } }, niumProvider).selectable).toBe(false);
+    }
+    expect(beneficiaryTransferOption({ ...local, raw_data: { payout_admission: admission } }, niumProvider).selectable).toBe(false);
+    expect(validateTransferConfiguration({ provider: niumProvider, beneficiary: { ...local, payout_admission: admission },
+      sourceCurrency: "USD", targetCurrency: "SGD", purposeCode: "IR01811", purposeOptions: [] })).toBe("Select a supported Nium payment purpose.");
+  });
+
+  it("preserves USD source and SGD destination without client FX values or SWIFT fee fields", () => {
+    const payload = buildTransferPayload(values({ targetCurrency: "SGD" }));
+    expect(payload).toMatchObject({ source_currency: "USD", target_currency: "SGD", source_amount: 1250, target_amount: null, fx_rate: null });
+    expect(payload.raw_data.nium).not.toHaveProperty("payout");
+    expect(recipientAmountPresentation("nium", "SGD")).toBe("SGD amount unavailable — FX confirmation pending");
+    expect(payoutFeePresentation("LOCAL")).toBe("Provider fees are not yet available");
+    expect(payoutFeePresentation("SWIFT")).toBe("Provider and intermediary bank fees may apply (SHA)");
   });
 });
