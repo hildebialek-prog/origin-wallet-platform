@@ -23,6 +23,10 @@ vi.mock("@/services/fxOrderService", () => ({
 }));
 
 vi.mock("@/services/moneyMovementService", () => ({
+  getBeneficiaryPayoutMethods: vi.fn(async (params) => ({
+    provider_id: Number(params.providerId), beneficiary_type: params.beneficiaryType,
+    country_code: params.countryCode, currency: params.currency, payout_methods: ["SWIFT"],
+  })),
   getBeneficiaryRequirements: vi.fn().mockResolvedValue(swiftRequirements),
   getBeneficiaries: vi.fn().mockResolvedValue([{
     id: 42,

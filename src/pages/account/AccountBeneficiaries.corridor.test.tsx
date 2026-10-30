@@ -6,13 +6,14 @@ import { swiftRequirements } from "@/test/beneficiaryFixtures";
 import { ApiRequestError } from "@/services/apiClient";
 import AccountBeneficiaries from "./AccountBeneficiaries";
 
-const mocks = vi.hoisted(() => ({ requirements: vi.fn(), create: vi.fn(), providerCode: "nium" }));
+const mocks = vi.hoisted(() => ({ methods: vi.fn(), requirements: vi.fn(), create: vi.fn(), providerCode: "nium" }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "9" }, token: "test-token" }) }));
 vi.mock("@/services/fxOrderService", () => ({ getProviders: vi.fn(async () => ({ data: [
   { id: 7, code: mocks.providerCode, name: "Nium", status: "active", supports_beneficiaries: true },
 ] })) }));
 vi.mock("@/services/moneyMovementService", () => ({
   getBeneficiaries: vi.fn().mockResolvedValue([]), getBeneficiaryRequirements: mocks.requirements,
+  getBeneficiaryPayoutMethods: mocks.methods,
   createBeneficiary: mocks.create, updateBeneficiary: vi.fn(), deleteBeneficiary: vi.fn(),
 }));
 
@@ -46,6 +47,10 @@ describe("corridor-aware beneficiary wizard", () => {
   afterAll(() => { HTMLElement.prototype.scrollIntoView = originalScrollIntoView; });
   beforeEach(() => {
     mocks.providerCode = "nium";
+    mocks.methods.mockReset().mockImplementation(async (params) => ({
+      provider_id: Number(params.providerId), beneficiary_type: params.beneficiaryType,
+      country_code: params.countryCode, currency: params.currency, payout_methods: ["SWIFT"],
+    }));
     mocks.requirements.mockReset().mockResolvedValue(swiftRequirements);
     mocks.create.mockReset().mockResolvedValue({ id: 1 });
   });
@@ -55,7 +60,7 @@ describe("corridor-aware beneficiary wizard", () => {
     await openBank();
     await waitFor(() => expect(mocks.requirements).toHaveBeenCalled());
     expect(screen.queryByLabelText(/^Bank code|^Branch code/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/^SWIFT \/ BIC/)).toBeRequired();
+    expect(await screen.findByLabelText(/^SWIFT \/ BIC/)).toBeRequired();
   });
 
   it("reviews and submits the exact supported SWIFT routing payload", async () => {
@@ -97,6 +102,7 @@ describe("corridor-aware beneficiary wizard", () => {
     await openBank();
     expect(screen.getByText(/Loading supported beneficiary requirements/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Continue to review" })).toBeDisabled();
+    await waitFor(() => expect(mocks.requirements).toHaveBeenCalled());
     resolve!(swiftRequirements);
     await screen.findByLabelText(/^SWIFT \/ BIC/);
   });
@@ -167,6 +173,10 @@ describe("corridor-aware beneficiary wizard", () => {
   });
 
   it("reloads requirements and clears routing when the payment method changes, retaining account details", async () => {
+    mocks.methods.mockImplementation(async (params) => ({
+      provider_id: Number(params.providerId), beneficiary_type: params.beneficiaryType,
+      country_code: params.countryCode, currency: params.currency, payout_methods: ["SWIFT", "LOCAL"],
+    }));
     mocks.requirements.mockImplementation(async (params) => params.payoutMethod === "LOCAL" ? {
       ...swiftRequirements, dimensions: { ...swiftRequirements.dimensions, payoutMethod: "LOCAL" }, routing_code_types: ["IFSC"],
       fields: [{ name: "routingCodeType1", required: true, allowed_values: ["IFSC"] }, { name: "routingCodeValue1", required: true }],

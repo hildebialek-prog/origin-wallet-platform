@@ -43,6 +43,7 @@ export interface Beneficiary {
   user_id: number;
   provider_id: number;
   external_beneficiary_id?: string | null;
+  is_registered?: boolean;
   beneficiary_type: string;
   full_name: string;
   company_name?: string | null;
@@ -311,6 +312,24 @@ export interface NiumBeneficiaryRequirements {
   routing_code_types: string[];
   fields: BeneficiaryRequirementField[];
 }
+
+export interface NiumBeneficiaryPayoutMethods {
+  provider_id: number;
+  beneficiary_type: string;
+  country_code: string;
+  currency: string;
+  payout_methods: string[];
+}
+
+export const getBeneficiaryPayoutMethods = (params: AuthenticatedParams & {
+  providerId: string; beneficiaryType: string; countryCode: string; currency: string;
+}) => {
+  const query = new URLSearchParams({
+    provider_id: params.providerId, beneficiary_type: params.beneficiaryType,
+    country_code: params.countryCode, currency: params.currency,
+  });
+  return requestApi<NiumBeneficiaryPayoutMethods>(`/user/users/${params.userId}/beneficiaries/payout-methods?${query}`, { token: params.token });
+};
 
 export const getBeneficiaryRequirements = (params: AuthenticatedParams & {
   providerId: string; beneficiaryType: string; countryCode: string; currency: string; payoutMethod: string;

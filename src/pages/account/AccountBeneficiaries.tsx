@@ -43,6 +43,7 @@ import {
   createBeneficiary,
   deleteBeneficiary,
   getBeneficiaries,
+  getBeneficiaryPayoutMethods,
   getBeneficiaryRequirements,
   type NiumBeneficiaryRequirements,
   updateBeneficiary,
@@ -51,6 +52,7 @@ import {
 } from "@/services/moneyMovementService";
 import { ApiRequestError } from "@/services/apiClient";
 import { applyNiumRequirements, clearRoutingInputs, extraSchemaFields, fieldLabel, isSwiftOnlyCorridor, matchesNiumRequirements, normalizeBeneficiaryErrors, routingEntries, schemaErrors, schemaFormFields } from "./beneficiaryRequirements";
+import { beneficiaryRequirementsError, matchesPayoutMethods } from "./beneficiaryPayoutMethods";
 import { countryOptions, currencyOptions, formatDateTime, statusBadgeClassName } from "@/lib/money";
 import { getProviderDisplayName, isPrimaryProvider, PRIMARY_PROVIDER_NAME } from "@/lib/primaryProvider";
 
@@ -173,7 +175,7 @@ export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
     city: beneficiary.city || "",
     state: beneficiary.state || "",
     postalCode: beneficiary.postal_code || "",
-    payoutMethod: String(beneficiary.payout_method ?? nium.payoutMethod ?? "SWIFT"),
+    payoutMethod: String(beneficiary.payout_method ?? nium.payoutMethod ?? ""),
     bankAccountType: String(nium.beneficiaryBankAccountType ?? nium.bankAccountType ?? "CURRENT"),
     verifyBeforeCreate: String(Boolean(nium.verify_before_create ?? false)),
     vendorType: String(origin.vendor_type ?? nium.remitterBeneficiaryRelationship ?? "supplier"),
@@ -274,8 +276,6 @@ const phoneCountryOptions = [
   { code: "+1", label: "US/CA +1" },
 ];
 
-export const payoutMethodsFor = () => ["LOCAL", "SWIFT"];
-
 export const applyCountryChange = (form: BeneficiaryForm, countryCode: string): BeneficiaryForm => ({ ...form, countryCode });
 
 export const validateBankForm = (form: BeneficiaryForm) => {
@@ -293,7 +293,7 @@ const AccountBeneficiaries = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Beneficiary | null>(null);
-  const [form, setForm] = useState<BeneficiaryForm>(emptyForm);
+  const [draftForm, setForm] = useState<BeneficiaryForm>(emptyForm);
   const [step, setStep] = useState<BeneficiaryStep>("basic");
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -316,13 +316,35 @@ const AccountBeneficiaries = () => {
   const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
   const beneficiaryProviders = providers.filter((provider) => provider.supports_beneficiaries);
   const beneficiaries = beneficiariesQuery.data ?? [];
-  const selectedProvider = beneficiaryProviders.find((provider) => String(provider.id) === form.providerId);
-  const selectedCountry = countryOptions.find((country) => country.code === form.countryCode);
+  const selectedProvider = beneficiaryProviders.find((provider) => String(provider.id) === draftForm.providerId);
+  const selectedCountry = countryOptions.find((country) => country.code === draftForm.countryCode);
   const isNium = isPrimaryProvider(selectedProvider);
   const requiresMetadata = !selectedProvider || isNium;
+  const methodsQuery = useQuery({
+    queryKey: ["beneficiary-payout-methods", user?.id, token, draftForm.providerId, draftForm.beneficiaryType, draftForm.countryCode, draftForm.currency],
+    enabled: dialogOpen && isNium && !!token && !!user?.id,
+    retry: false,
+    queryFn: async () => {
+      const metadata = await getBeneficiaryPayoutMethods({
+        userId: user!.id, token: token!, providerId: draftForm.providerId, beneficiaryType: draftForm.beneficiaryType,
+        countryCode: draftForm.countryCode, currency: draftForm.currency,
+      });
+      if (!matchesPayoutMethods(metadata, draftForm)) throw new Error("Supported payout methods do not match these beneficiary details.");
+      return metadata;
+    },
+  });
+  const payoutMethods = !methodsQuery.isFetching && !methodsQuery.isError ? methodsQuery.data?.payout_methods ?? [] : [];
+  const preferredMethod = draftForm.countryCode === "SG" && draftForm.currency === "SGD" &&
+    ["individual", "personal"].includes(draftForm.beneficiaryType) ? "LOCAL" : "SWIFT";
+  // Resolve a create default only after authoritative discovery. Edits retain the saved method.
+  const form = { ...draftForm, payoutMethod: !isNium || editing ? draftForm.payoutMethod
+    : payoutMethods.includes(draftForm.payoutMethod) ? draftForm.payoutMethod
+      : payoutMethods.includes(preferredMethod) ? preferredMethod : payoutMethods.length === 1 ? payoutMethods[0] : "" };
+  const methodSupported = payoutMethods.includes(form.payoutMethod);
+  const registeredEdit = isNium && editing && editing.is_registered !== false;
   const requirementsQuery = useQuery({
     queryKey: ["beneficiary-requirements", user?.id, token, form.providerId, form.beneficiaryType, form.countryCode, form.currency, form.payoutMethod],
-    enabled: dialogOpen && isNium && !!token && !!user?.id,
+    enabled: dialogOpen && isNium && methodSupported && !!token && !!user?.id,
     retry: false,
     queryFn: async () => {
       const metadata = await getBeneficiaryRequirements({
@@ -333,11 +355,16 @@ const AccountBeneficiaries = () => {
       return metadata;
     },
   });
-  const requirements = isNium && !requirementsQuery.isFetching && !requirementsQuery.isError ? requirementsQuery.data : undefined;
+  const requirements = isNium && methodSupported && !requirementsQuery.isFetching && !requirementsQuery.isError ? requirementsQuery.data : undefined;
   const submittedPayload = buildPayload(form, selectedProvider?.supports_account_verification === true, requirements);
   const changeForm = (next: BeneficiaryForm) => {
+    if (registeredEdit && ["providerId", "beneficiaryType", "countryCode", "currency", "payoutMethod"].some((key) => next[key] !== form[key])) {
+      setFormError("A registered NIUM beneficiary cannot be converted to another country, currency, legal type or payout method. Use Add beneficiary to create separate payment details.");
+      return;
+    }
     const changedCorridor = ["providerId", "beneficiaryType", "countryCode", "currency", "payoutMethod"].some((key) => next[key] !== form[key]);
-    setForm(changedCorridor ? clearRoutingInputs(next) : next);
+    const changedDimensions = ["providerId", "beneficiaryType", "countryCode", "currency"].some((key) => next[key] !== form[key]);
+    setForm(changedCorridor ? clearRoutingInputs({ ...next, payoutMethod: isNium && !editing && changedDimensions ? "" : next.payoutMethod }) : next);
     setFieldErrors({});
     setFormError("");
   };
@@ -674,15 +701,17 @@ const AccountBeneficiaries = () => {
               </div>
             ) : null}
 
+            {registeredEdit && <p className="mt-4 text-sm text-muted-foreground">Editing an existing registered NIUM beneficiary. Country, currency, legal type and payout method must stay the same. Use Add beneficiary for a different corridor.</p>}
             {requiresMetadata && (step === "bank" || step === "review") && !requirements && (
               <div role="status" className="mt-6 space-y-3 rounded-xl border p-4">
                 <p>{!selectedProvider ? "Beneficiary provider is unavailable. Reload the provider before continuing."
-                  : requirementsQuery.isFetching ? "Loading supported beneficiary requirements…"
-                    : requirementsQuery.error instanceof ApiRequestError && requirementsQuery.error.status === 422
-                      ? "This beneficiary corridor is not supported. Change the country, currency or payout method."
-                      : "Beneficiary requirements are unavailable. Check the country, currency and payout method, then retry before continuing."}</p>
-                <Button variant="outline" disabled={requirementsQuery.isFetching || providersQuery.isFetching}
-                  onClick={() => selectedProvider ? requirementsQuery.refetch() : providersQuery.refetch()}>Retry requirements</Button>
+                  : methodsQuery.isFetching || requirementsQuery.isFetching ? "Loading supported beneficiary requirements…"
+                    : methodsQuery.error || requirementsQuery.error ? beneficiaryRequirementsError(methodsQuery.error ?? requirementsQuery.error)
+                      : !methodSupported ? "Select a supported payout method. The saved method may be unavailable for these details."
+                        : beneficiaryRequirementsError(undefined)}</p>
+                <Button variant="outline" disabled={methodsQuery.isFetching || requirementsQuery.isFetching || providersQuery.isFetching}
+                  onClick={() => !selectedProvider ? providersQuery.refetch() : methodsQuery.isError || !methodsQuery.data
+                    ? methodsQuery.refetch() : methodSupported ? requirementsQuery.refetch() : methodsQuery.refetch()}>Retry requirements</Button>
                 {step === "review" && <Button variant="outline" onClick={goBack}>Back to bank details</Button>}
               </div>
             )}
@@ -724,6 +753,7 @@ const AccountBeneficiaries = () => {
                   supportsAccountVerification={selectedProvider?.supports_account_verification === true}
                   isNium={requiresMetadata}
                   requirements={requirements}
+                  payoutMethods={isNium ? payoutMethods : ["LOCAL", "SWIFT"]}
                   fieldErrors={fieldErrors}
                 />
               )}
@@ -973,7 +1003,7 @@ const BankAccountStep = ({
   onChange,
   onContinue,
   supportsAccountVerification,
-  isNium, requirements, fieldErrors,
+  isNium, requirements, fieldErrors, payoutMethods,
 }: {
   form: BeneficiaryForm;
   selectedCountry?: { code: string; name: string };
@@ -984,6 +1014,7 @@ const BankAccountStep = ({
   supportsAccountVerification: boolean;
   isNium: boolean;
   requirements?: NiumBeneficiaryRequirements;
+  payoutMethods: string[];
   fieldErrors: Record<string, string>;
 }) => (
   <div className="space-y-7">
@@ -1107,7 +1138,7 @@ const BankAccountStep = ({
           selectedLabel={payoutMethodLabels[form.payoutMethod]}
           onChange={(value) => onChange({ ...form, payoutMethod: value })}
         >
-          {payoutMethodsFor().map((method) => (
+          {payoutMethods.map((method) => (
             <SelectItem key={method} value={method}>{payoutMethodLabels[method]}</SelectItem>
           ))}
         </FormSelect>
@@ -1196,7 +1227,7 @@ export const ReviewBeneficiaryStep = ({
           <ReviewItem label="IBAN" value={payload.iban || "-"} />
           {requirements && extraSchemaFields(requirements).filter((f) => form.schemaValues[f.name]).map((field) =>
             <ReviewItem key={field.name} label={fieldLabel(field.name)} value={form.schemaValues[field.name]} />)}
-          <ReviewItem label="Payout method" value={payoutMethodLabels[form.payoutMethod]} />
+          <ReviewItem label="Payout method" value={form.payoutMethod === "LOCAL" ? "LOCAL (Local bank transfer)" : payoutMethodLabels[form.payoutMethod] ?? form.payoutMethod} />
           {provider?.supports_account_verification ? (
             <ReviewItem label="Verify before create" value={verifyLabels[form.verifyBeforeCreate]} />
           ) : null}
