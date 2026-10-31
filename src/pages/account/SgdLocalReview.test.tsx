@@ -139,6 +139,7 @@ describe("SGD LOCAL Review → Submit", () => {
   it.each([
     { beneficiary_id: 8 }, { provider_id: 11 }, { user_id: 13 }, { source_currency: "SGD" },
     { target_currency: "USD" }, { source_amount: "5.00000001" }, { purpose_code: "OTHER" },
+    { reference_text: "UNREVIEWED-REFERENCE" },
   ])("rejects a mismatched saved intent: %j", (change) => {
     mount({ ...locked(), ...change });
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
@@ -151,6 +152,20 @@ describe("SGD LOCAL Review → Submit", () => {
     mount(draft);
     expect(screen.getByText(/payment instruction does not match/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+  });
+
+  it("does not lock again when preparation resolves to an existing locked draft", async () => {
+    api.prepareSgdLocal.mockResolvedValue(locked());
+    mount(null);
+    fireEvent.click(screen.getByRole("checkbox", { name: /selected payment purpose/ }));
+    const button = screen.getByRole("button", { name: "Get current FX quote" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await screen.findByRole("checkbox", { name: /I authorize/ });
+    expect(api.prepareSgdLocal).toHaveBeenCalledTimes(1);
+    expect(api.lockSgdLocal).not.toHaveBeenCalled();
+    expect(api.cancelTransfer).not.toHaveBeenCalled();
+    expect(api.submitSgdLocal).not.toHaveBeenCalled();
   });
 
   it.each(["expired_lock", "wrong_currency", "wrong_amount"])("rejects conflicting payout evidence: %s", (scenario) => {

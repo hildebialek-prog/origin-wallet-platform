@@ -1,4 +1,4 @@
-import type { Beneficiary, TransferPayload } from "@/services/moneyMovementService";
+import type { Beneficiary, Transfer, TransferPayload } from "@/services/moneyMovementService";
 import type { ProviderSummary, PurposeCodeOption } from "@/services/fxOrderService";
 import { normalizeStatus } from "@/lib/status";
 
@@ -50,6 +50,17 @@ export const purposeOptionsForTransferProvider = (
   isNiumProvider(providerCode) ? niumPurposeOptions : purposeOptionsForProvider(providerCode);
 
 export const createClientReference = () => `OW-${crypto.randomUUID()}`;
+
+export const transferFormFromTransfer = (transfer: Transfer) => ({
+  providerId: String(transfer.provider_id),
+  beneficiaryId: String(transfer.beneficiary_id ?? ""),
+  transferType: transfer.transfer_type,
+  sourceCurrency: transfer.source_currency,
+  targetCurrency: transfer.target_currency,
+  sourceAmount: String(transfer.source_amount),
+  purposeCode: transfer.purpose_code ?? "",
+  referenceText: transfer.reference_text ?? "",
+});
 
 export const validateTransferAmount = (value: string, maximumFractionDigits = 8) => {
   const normalized = value.trim();

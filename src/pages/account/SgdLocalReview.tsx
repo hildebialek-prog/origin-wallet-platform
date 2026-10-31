@@ -15,6 +15,7 @@ type Props = {
   beneficiaryId: number;
   sourceAmount: string;
   purposeCode: string;
+  referenceText?: string;
   fxEnabled: boolean;
   balance?: Balance;
   validationError: string;
@@ -51,7 +52,8 @@ export default function SgdLocalReview(props: Props) {
   const matchesDraft = (transfer: Transfer) => transfer.user_id === Number(props.userId) && transfer.provider_id === props.providerId
     && transfer.beneficiary_id === props.beneficiaryId && transfer.transfer_type === "payout"
     && transfer.source_currency === "USD" && transfer.target_currency === "SGD"
-    && principal !== null && units(transfer.source_amount) === principal && transfer.purpose_code === props.purposeCode;
+    && principal !== null && units(transfer.source_amount) === principal && transfer.purpose_code === props.purposeCode
+    && (transfer.reference_text ?? "") === (props.referenceText ?? "");
   const matches = !draft || matchesDraft(draft);
   const instructionMatches = !!instruction && instruction.transfer_id === draft?.id && instruction.source_currency === "USD"
     && instruction.destination_currency === "SGD" && units(instruction.source_amount) === principal
@@ -79,7 +81,7 @@ export default function SgdLocalReview(props: Props) {
   const valid = !!props.userId && !!props.token && !props.validationError && matches && principal !== null && principal > 0n;
   const ready = valid && funded && !unexpectedFee && current && draft?.status === "draft"
     && workflow?.approval_request_allowed === true && !!workflow.submission_token;
-  const intentKey = JSON.stringify([props.userId, props.providerId, props.beneficiaryId, props.sourceAmount, props.purposeCode]);
+  const intentKey = JSON.stringify([props.userId, props.providerId, props.beneficiaryId, props.sourceAmount, props.purposeCode, props.referenceText ?? ""]);
   // Bind consent to the entire displayed instruction, even if a response reuses its token.
   const reviewKey = JSON.stringify([intentKey, draft?.id, workflow?.submission_token, instruction]);
   const accepted = acceptedReview === reviewKey;
@@ -136,7 +138,7 @@ export default function SgdLocalReview(props: Props) {
     <p className="text-sm">Submit records your payment instruction for independent Admin approval. Admin Approve &amp; submit initiates the payout.</p>
     {uncapped && <p className="text-sm text-amber-800">Additional NIUM charges are unknown, uncapped and not reserved. Only the USD principal is reserved. The total wallet debit and final SGD credit are unverified.</p>}
     {props.validationError && <p role="alert">{props.validationError}</p>}
-    {!matches && <p role="alert">The saved draft has different payment details. Cancel that draft before creating a replacement.</p>}
+    {!matches && <p role="alert">The saved draft has different payment details. Reopen the saved payment from Transfer Activity to review its existing details.</p>}
     {instruction && !instructionMatches && <p role="alert">The payment instruction does not match the current beneficiary, amount, currency or purpose.</p>}
     {instruction && !current && <p role="status">FX or financial terms expired or unavailable. Review new terms before Submit.</p>}
     {!funded && <p role="status">A matching USD wallet with sufficient available balance for the reviewed debit is required.</p>}
@@ -154,7 +156,7 @@ export default function SgdLocalReview(props: Props) {
         if (!canQuote || !props.fxEnabled || !purposeConfirmed || pending) return;
         const prepared = draft ?? await prepareSgdLocal({ ...auth, payload: { provider_id: props.providerId,
           beneficiary_id: props.beneficiaryId, source_amount: props.sourceAmount, purpose_code: props.purposeCode,
-          client_reference: clientReference.current } });
+          client_reference: clientReference.current, reference_text: props.referenceText || null } });
         onDraft(prepared);
         if (!matchesDraft(prepared)) throw new Error("The saved payment does not match the reviewed details.");
         // An idempotent prepare may return an existing hold: never replace it automatically.

@@ -68,22 +68,14 @@ import {
   recipientAmountPresentation,
   payoutFeePresentation,
   shouldFetchNiumPurposeCodes,
+  transferFormFromTransfer,
   validateTransferConfiguration,
   validateTransferAmount,
 } from "./transferForm";
 
 type WizardStep = "payee" | "details" | "review" | "result";
 
-type TransferForm = {
-  providerId: string;
-  beneficiaryId: string;
-  transferType: string;
-  sourceCurrency: string;
-  targetCurrency: string;
-  sourceAmount: string;
-  purposeCode: string;
-  referenceText: string;
-};
+type TransferForm = ReturnType<typeof transferFormFromTransfer>;
 
 const defaultForm: TransferForm = {
   providerId: "",
@@ -189,11 +181,17 @@ const AccountTransfers = () => {
   useEffect(() => {
     const purposeCodeIsCompatible = purposeOptions.some((purpose) => purpose.code === form.purposeCode);
     if (isNiumProvider(selectedProvider?.code)) {
-      if (form.purposeCode && !purposeCodeIsCompatible) setForm((current) => ({ ...current, purposeCode: "" }));
+      // Reopening a saved draft must not erase its purpose while the allowlist loads.
+      // An unsupported saved purpose remains visible and is blocked by validation.
+      const savedPurpose = sgdDraft && String(sgdDraft.provider_id) === form.providerId &&
+        String(sgdDraft.beneficiary_id) === form.beneficiaryId && sgdDraft.purpose_code === form.purposeCode;
+      if (!savedPurpose && purposeCodesQuery.isSuccess && form.purposeCode && !purposeCodeIsCompatible) {
+        setForm((current) => ({ ...current, purposeCode: "" }));
+      }
     } else if (!purposeCodeIsCompatible && (purposeOptions.length > 0 || form.purposeCode)) {
       setForm((current) => ({ ...current, purposeCode: purposeOptions[0]?.code ?? "" }));
     }
-  }, [form.purposeCode, purposeOptions, selectedProvider?.code]);
+  }, [form.purposeCode, form.providerId, form.beneficiaryId, purposeOptions, selectedProvider?.code, purposeCodesQuery.isSuccess, sgdDraft]);
 
   const filteredBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
@@ -232,27 +230,31 @@ const AccountTransfers = () => {
     setStep("payee");
   };
 
+  const findExistingSgdDraft = (beneficiaryId: number, providerId: number) => transfers.find((transfer) =>
+    transfer.user_id === Number(user?.id) && transfer.beneficiary_id === beneficiaryId && transfer.provider_id === providerId &&
+    transfer.transfer_type === "payout" && transfer.source_currency === "USD" && transfer.target_currency === "SGD" &&
+    !!transfer.payout_workflow && !["completed", "failed", "cancelled", "rejected"].includes(transfer.status));
+
   const pickBeneficiary = (beneficiary: Beneficiary) => {
     const providerId = String(beneficiary.provider_id);
     const provider = providerById.get(beneficiary.provider_id);
     if (!beneficiaryTransferOption(beneficiary, provider).selectable) return;
-    const existing = transfers.find((transfer) => transfer.beneficiary_id === beneficiary.id &&
-      transfer.provider_id === beneficiary.provider_id && !!transfer.payout_workflow &&
-      !["completed", "failed", "cancelled", "rejected"].includes(transfer.status));
+    const existing = isNiumProvider(provider?.code) && beneficiary.currency === "SGD"
+      ? findExistingSgdDraft(beneficiary.id, beneficiary.provider_id) : undefined;
     const saved = sgdDraft?.beneficiary_id === beneficiary.id && sgdDraft.provider_id === beneficiary.provider_id &&
       !["completed", "failed", "cancelled", "rejected"].includes(sgdDraft.status) ? sgdDraft : existing;
     setSgdDraft(saved ?? null);
     const nextBalance = balances.find(
       (balance) => String(balance.provider_id) === providerId && (!isNiumProvider(provider?.code) || balance.currency === "USD"),
     );
-    setForm({
+    setForm(saved ? transferFormFromTransfer(saved) : {
       ...form,
       providerId,
       beneficiaryId: String(beneficiary.id),
       sourceCurrency: nextBalance?.currency ?? form.sourceCurrency,
       targetCurrency: beneficiary.currency,
-      sourceAmount: saved ? String(saved.source_amount) : form.sourceAmount,
-      purposeCode: saved?.purpose_code ?? (isNiumProvider(provider?.code) ? "" : purposeOptionsForProvider(provider?.code)[0]?.code ?? ""),
+      sourceAmount: form.sourceAmount,
+      purposeCode: isNiumProvider(provider?.code) ? "" : purposeOptionsForProvider(provider?.code)[0]?.code ?? "",
     });
     setFormError("");
     setStep("details");
@@ -264,6 +266,9 @@ const AccountTransfers = () => {
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
     if (!selectedProvider) return "Transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
+    if (isNiumProvider(selectedProvider.code) && form.targetCurrency === "SGD" && !transfersQuery.isSuccess) {
+      return transfersQuery.isError ? "Saved payment requests are unavailable. Refresh before continuing." : "Loading saved payment requests before continuing.";
+    }
     const amountValidation = validateTransferAmount(form.sourceAmount);
     if (amountValidation) return amountValidation;
     const corridorValidation = validateTransferConfiguration({
@@ -291,6 +296,11 @@ const AccountTransfers = () => {
     }
 
     setFormError("");
+    // The transfer list may have arrived after the payee was selected.
+    // Attach the existing draft, keeping any user edits subject to the Review mismatch guard.
+    if (!sgdDraft && isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD") {
+      setSgdDraft(findExistingSgdDraft(Number(form.beneficiaryId), Number(form.providerId)) ?? null);
+    }
     setStep("review");
   };
 
@@ -500,6 +510,7 @@ const AccountTransfers = () => {
                       key={`${user?.id}:${form.providerId}:${form.beneficiaryId}`}
                       userId={user?.id as string} token={token as string} providerId={Number(form.providerId)}
                       beneficiaryId={Number(form.beneficiaryId)} sourceAmount={form.sourceAmount} purposeCode={form.purposeCode}
+                      referenceText={form.referenceText}
                       balance={selectedBalance} validationError={validateDetails()} onBusyChange={setSgdBusy}
                       onTransferChanged={refreshTransfers}
                       fxEnabled={selectedBeneficiary?.payout_admission?.fx_lock_enabled === true}
@@ -559,10 +570,7 @@ const AccountTransfers = () => {
                         onReview={() => {
                           if (sgdBusy) return;
                           setSgdDraft(transfer);
-                          setForm({ providerId: String(transfer.provider_id), beneficiaryId: String(transfer.beneficiary_id),
-                            transferType: transfer.transfer_type, sourceCurrency: transfer.source_currency,
-                            targetCurrency: transfer.target_currency, sourceAmount: String(transfer.source_amount),
-                            purposeCode: transfer.purpose_code ?? "", referenceText: transfer.reference_text ?? "" });
+                          setForm(transferFormFromTransfer(transfer));
                           setFormError(""); setStep("review");
                         }}
                         onSync={() => syncMutation.mutate(transfer.id)}
@@ -774,7 +782,7 @@ export const DetailsStep = ({
         <FormSelect
           label="Payment purpose"
           value={form.purposeCode}
-          selectedLabel={providerPurposeOptions.find((purpose) => purpose.code === form.purposeCode)?.label}
+          selectedLabel={providerPurposeOptions.find((purpose) => purpose.code === form.purposeCode)?.label ?? form.purposeCode}
           onChange={onPurposeChange}
         >
           {providerPurposeOptions.map((purpose) => (

@@ -340,6 +340,7 @@ export const getTransfer = (params: AuthenticatedParams & { transferId: number }
 export const prepareSgdLocalPayout = (params: AuthenticatedParams & { payload: {
   provider_id: number; beneficiary_id: number; source_currency: string; target_currency: string;
   source_amount: string; purpose_code: string; purpose_confirmed: true; client_reference: string;
+  reference_text?: string | null;
   expected_fee_amount: "0"; expected_fee_currency: string;
 } }) => requestApi<Transfer>(`/user/users/${params.userId}/sgd-local-payouts`, {
   method: "POST", token: params.token, body: params.payload,
@@ -390,6 +391,7 @@ export const submitTransfer = (params: AuthenticatedParams & { transferId: numbe
 
 export const prepareSgdLocal = (params: AuthenticatedParams & { payload: {
   provider_id: number; beneficiary_id: number; source_amount: string; purpose_code: string; client_reference: string;
+  reference_text?: string | null;
 } }) => prepareSgdLocalPayout({ ...params, payload: { ...params.payload,
   source_currency: "USD", target_currency: "SGD", purpose_confirmed: true,
   expected_fee_amount: "0", expected_fee_currency: "USD",
