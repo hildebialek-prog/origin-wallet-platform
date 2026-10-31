@@ -26,4 +26,15 @@ describe("SGD customer instruction API", () => {
         target_currency: "SGD", purpose_confirmed: true, expected_fee_amount: "0", expected_fee_currency: "USD" },
     });
   });
+  it.each([null, "SAVED-REFERENCE"])("preserves the supplied payment reference %s during explicit preparation", async (reference) => {
+    await prepareSgdLocal({ userId: "12", token: "customer-token", payload: {
+      provider_id: 10, beneficiary_id: 9, source_amount: "5", purpose_code: "IR008", client_reference: "synthetic-ref",
+      reference_text: reference,
+    } });
+    expect(request).toHaveBeenCalledExactlyOnceWith("/user/users/12/sgd-local-payouts", expect.objectContaining({
+      method: "POST", token: "customer-token", body: expect.objectContaining({
+        beneficiary_id: 9, source_amount: "5", purpose_code: "IR008", reference_text: reference,
+      }),
+    }));
+  });
 });
