@@ -132,10 +132,10 @@ describe("SGD payout amount distinctions", () => {
     expect(screen.queryByRole("button", { name: /^Submit/ })).not.toBeInTheDocument();
   });
 
-  it("explains that admin approval does not open the blocked SGD route", () => {
+  it("leaves dispatch to independent Admin approval with no second customer Submit", () => {
     render(<ResultStep transfer={{ ...transfer, status: "approval_required" }} provider={provider}
       submitting={false} onSubmitToProvider={vi.fn()} onNewPayment={vi.fn()} />);
-    expect(screen.getByRole("status")).toHaveTextContent("SGD Local submission remains unavailable");
+    expect(screen.getByRole("status")).toHaveTextContent("Admin Approve & submit initiates the NIUM payout");
     expect(screen.queryByText(/submitted automatically once approved/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Submit/ })).not.toBeInTheDocument();
   });

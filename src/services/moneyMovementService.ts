@@ -141,7 +141,31 @@ export interface NiumPayoutAmounts {
   } | null;
 }
 
+export interface SgdLocalInstruction {
+  transfer_id: number;
+  source_amount: string;
+  source_currency: string;
+  destination_currency: string;
+  purpose_code: string;
+  fx_quote_id: number;
+  rate: string;
+  expires_at: string;
+  receiving_account: { name: string; bank: string | null; last_four: string; sha256: string };
+  financial_terms: {
+    policy?: string;
+    fee_amount: string | null;
+    fee_currency: string;
+    total_wallet_debit: string | null;
+    reservation_amount?: string;
+    risk_acknowledgement?: string;
+    pilot_reserve?: { amount: string; currency: string } | null;
+    expires_at: string;
+  };
+}
+
 export interface NiumSgdLocalWorkflow {
+  submission_token?: string | null;
+  customer_instruction?: SgdLocalInstruction | null;
   pilot_policy?: { authorization_id: string; reservation_amount: string; reserve_currency: "USD";
     reserve_amount: string | null; fee_status: "unverified"; total_wallet_debit: null;
     policy?: "funded_reserve" | "one_time_uncapped"; charge_ceiling?: string | null;
@@ -161,12 +185,14 @@ export interface NiumSgdLocalWorkflow {
   state: string;
   fx_lock_active: boolean;
   fx_lock_enabled: boolean;
-  expected_fee: { amount: string | null; currency: string; basis: "user_expectation" | "unknown_fees_explicitly_accepted" };
-  provider_fee_status: "unavailable" | "confirmed";
+  expected_fee?: { amount: string | null; currency: string; basis: "user_expectation" | "unknown_fees_explicitly_accepted" };
+  provider_fee_status?: "unavailable" | "confirmed";
   approval_request_allowed: boolean;
-  dispatch_allowed: boolean;
+  dispatch_allowed?: boolean;
   blockers: string[];
 }
+
+export type SgdLocalWorkflow = NiumSgdLocalWorkflow;
 
 export interface Transaction {
   id: number;
@@ -360,6 +386,21 @@ export const submitTransfer = (params: AuthenticatedParams & { transferId: numbe
   requestApi<{ message?: string; transfer: Transfer }>(`/user/users/${params.userId}/transfers/${params.transferId}/submit`, {
     method: "POST",
     token: params.token,
+  });
+
+export const prepareSgdLocal = (params: AuthenticatedParams & { payload: {
+  provider_id: number; beneficiary_id: number; source_amount: string; purpose_code: string; client_reference: string;
+} }) => prepareSgdLocalPayout({ ...params, payload: { ...params.payload,
+  source_currency: "USD", target_currency: "SGD", purpose_confirmed: true,
+  expected_fee_amount: "0", expected_fee_currency: "USD",
+} });
+
+export const lockSgdLocal = requestSgdLocalFxLock;
+
+export const submitSgdLocal = (params: AuthenticatedParams & { transferId: number; submissionToken: string; acceptUncappedCharges: boolean }) =>
+  requestApi<Transfer>(`/user/users/${params.userId}/transfers/${params.transferId}/sgd-local-submit`, {
+    method: "POST", token: params.token, body: { submission_token: params.submissionToken,
+      accept_payment_terms: true, purpose_confirmed: true, accept_uncapped_charges: params.acceptUncappedCharges },
   });
 
 export const syncTransferStatus = (params: AuthenticatedParams & { transferId: number }) =>

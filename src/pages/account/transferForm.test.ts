@@ -53,6 +53,18 @@ const values = (overrides = {}) => ({
 });
 
 describe("provider-aware transfer contract", () => {
+  it("allows the bound SGD preparation workflow while dispatch admission remains closed", () => {
+    const local: Beneficiary = { ...beneficiary, beneficiary_type: "personal", country_code: "SG", currency: "SGD", payout_method: "LOCAL",
+      payout_admission: { allowed: false, reason: "financial_terms_unverified", preparation_allowed: true,
+        beneficiary_id: beneficiary.id, provider_id: beneficiary.provider_id, source_currency: "USD",
+        destination_country: "SG", destination_currency: "SGD", payout_method: "LOCAL" } };
+    expect(beneficiaryTransferOption(local, niumProvider).selectable).toBe(true);
+    expect(validateTransferConfiguration({ provider: niumProvider, beneficiary: local, sourceCurrency: "USD",
+      targetCurrency: "SGD", purposeCode: "TRUTHFUL", purposeOptions: [{ code: "TRUTHFUL", label: "Truthful purpose" }],
+      allowSgdPreparation: true })).toBe("");
+    expect(beneficiaryTransferOption({ ...local, payout_admission: { ...local.payout_admission!, beneficiary_id: 999 } }, niumProvider).selectable).toBe(false);
+  });
+
   it("uses backend Nium purposes only for Nium and keeps provider mappings for other rails", () => {
     const backendNiumPurposes = [
       { code: "IR004", label: "Medical Treatment" },
@@ -326,6 +338,15 @@ describe("provider-aware transfer contract", () => {
     expect(hasSgdLocalPreparation({ ...local, status: "pending", payout_admission: admission })).toBe(false);
     expect(hasSgdLocalPreparation({ ...local, raw_data: { payout_admission: admission } })).toBe(false);
     expect(beneficiaryTransferOption({ ...local, payout_admission: admission }, { ...niumProvider, supports_transfers: false }).selectable).toBe(false);
+    const config = { provider: niumProvider, beneficiary: { ...local, payout_admission: admission }, sourceCurrency: "USD",
+      targetCurrency: "SGD", purposeCode: "IR01811", purposeOptions: [{ code: "IR01811", label: "Supported purpose" }] };
+    expect(validateTransferConfiguration(config)).toBe(NIUM_SG_SGD_LOCAL_UNAVAILABLE);
+    expect(validateTransferConfiguration({ ...config, allowSgdPreparation: true })).toBe("");
+    expect(validateTransferConfiguration({ ...config, allowSgdPreparation: true, purposeOptions: [] })).toBe("Select a supported Nium payment purpose.");
+    expect(validateTransferConfiguration({ ...config, allowSgdPreparation: true, sourceCurrency: "SGD" })).not.toBe("");
+    expect(validateTransferConfiguration({ ...config, allowSgdPreparation: true, beneficiary: {
+      ...local, payout_admission: { ...admission, beneficiary_id: 123 },
+    } })).toBe(NIUM_SG_SGD_LOCAL_UNAVAILABLE);
   });
 
   it("preserves USD source and SGD destination without client FX values or SWIFT fee fields", () => {

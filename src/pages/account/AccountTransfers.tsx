@@ -56,13 +56,12 @@ import {
 } from "@/lib/money";
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 import { SgdLocalAmountBreakdown } from "./SgdLocalAmountBreakdown";
-import { SgdLocalPayoutWorkflow } from "./SgdLocalPayoutWorkflow";
+import SgdLocalReview from "./SgdLocalReview";
 import {
   buildTransferPayload,
   beneficiaryTransferOption,
   createClientReference,
   isNiumProvider,
-  hasSgdLocalPreparation,
   isTransferAmountInput,
   purposeOptionsForProvider,
   purposeOptionsForTransferProvider,
@@ -117,6 +116,8 @@ const AccountTransfers = () => {
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
   const [createdTransfer, setCreatedTransfer] = useState<Transfer | null>(null);
+  const [sgdDraft, setSgdDraft] = useState<Transfer | null>(null);
+  const [sgdBusy, setSgdBusy] = useState(false);
 
   const providersQuery = useQuery({
     queryKey: ["money-providers"],
@@ -227,12 +228,20 @@ const AccountTransfers = () => {
     setSearch("");
     setFormError("");
     setCreatedTransfer(null);
+    setSgdDraft(null);
     setStep("payee");
   };
 
   const pickBeneficiary = (beneficiary: Beneficiary) => {
     const providerId = String(beneficiary.provider_id);
     const provider = providerById.get(beneficiary.provider_id);
+    if (!beneficiaryTransferOption(beneficiary, provider).selectable) return;
+    const existing = transfers.find((transfer) => transfer.beneficiary_id === beneficiary.id &&
+      transfer.provider_id === beneficiary.provider_id && !!transfer.payout_workflow &&
+      !["completed", "failed", "cancelled", "rejected"].includes(transfer.status));
+    const saved = sgdDraft?.beneficiary_id === beneficiary.id && sgdDraft.provider_id === beneficiary.provider_id &&
+      !["completed", "failed", "cancelled", "rejected"].includes(sgdDraft.status) ? sgdDraft : existing;
+    setSgdDraft(saved ?? null);
     const nextBalance = balances.find(
       (balance) => String(balance.provider_id) === providerId && (!isNiumProvider(provider?.code) || balance.currency === "USD"),
     );
@@ -242,8 +251,8 @@ const AccountTransfers = () => {
       beneficiaryId: String(beneficiary.id),
       sourceCurrency: nextBalance?.currency ?? form.sourceCurrency,
       targetCurrency: beneficiary.currency,
-      sourceAmount: form.sourceAmount,
-      purposeCode: isNiumProvider(provider?.code) ? "" : purposeOptionsForProvider(provider?.code)[0]?.code ?? "",
+      sourceAmount: saved ? String(saved.source_amount) : form.sourceAmount,
+      purposeCode: saved?.purpose_code ?? (isNiumProvider(provider?.code) ? "" : purposeOptionsForProvider(provider?.code)[0]?.code ?? ""),
     });
     setFormError("");
     setStep("details");
@@ -264,6 +273,7 @@ const AccountTransfers = () => {
       targetCurrency: form.targetCurrency,
       purposeCode: form.purposeCode,
       purposeOptions,
+      allowSgdPreparation: true,
     });
     if (corridorValidation) return corridorValidation;
     if (effectiveSourceAmount <= 0) return "Enter a sending amount.";
@@ -289,6 +299,9 @@ const AccountTransfers = () => {
       const validation = validateDetails();
       if (validation) throw new Error(validation);
 
+      if (isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD") {
+        throw new Error("Review the current SGD LOCAL payment terms before Submit.");
+      }
       return createTransfer({
         userId: user?.id as string,
         token: token as string,
@@ -449,16 +462,7 @@ const AccountTransfers = () => {
                   />
                 )}
 
-                {step === "details" && selectedBeneficiary && isNiumProvider(selectedProvider?.code) && hasSgdLocalPreparation(selectedBeneficiary) ? (
-                  <SgdLocalPayoutWorkflow key={selectedBeneficiary.id} userId={String(user?.id ?? "")} token={token ?? ""}
-                    beneficiary={selectedBeneficiary} balance={selectedBalance} sourceAmount={form.sourceAmount}
-                    purposeCode={form.purposeCode} purposes={purposeOptions} purposesLoading={purposeCodesQuery.isLoading}
-                    purposesFailed={purposeCodesQuery.isError}
-                    existingTransfer={transfers.find((transfer) => transfer.beneficiary_id === selectedBeneficiary.id && !!transfer.payout_workflow && !["completed", "failed", "cancelled", "rejected"].includes(transfer.status))}
-                    onAmountChange={(sourceAmount) => setForm((current) => ({ ...current, sourceAmount }))}
-                    onPurposeChange={(purposeCode) => setForm((current) => ({ ...current, purposeCode }))}
-                    onBack={() => setStep("payee")} onTransferChanged={refreshTransfers} />
-                ) : step === "details" && (
+                {step === "details" && (
                   <DetailsStep
                     form={form}
                     selectedProvider={selectedProvider}
@@ -489,8 +493,19 @@ const AccountTransfers = () => {
                     effectiveSourceAmount={effectiveSourceAmount}
                     purposeLabel={selectedPurpose?.label ?? form.purposeCode}
                     creating={createMutation.isPending}
+                    backDisabled={sgdBusy}
                     onBack={() => setStep("details")}
                     onSubmit={() => createMutation.mutate()}
+                    sgdReview={isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD" ? <SgdLocalReview
+                      key={`${user?.id}:${form.providerId}:${form.beneficiaryId}`}
+                      userId={user?.id as string} token={token as string} providerId={Number(form.providerId)}
+                      beneficiaryId={Number(form.beneficiaryId)} sourceAmount={form.sourceAmount} purposeCode={form.purposeCode}
+                      balance={selectedBalance} validationError={validateDetails()} onBusyChange={setSgdBusy}
+                      onTransferChanged={refreshTransfers}
+                      fxEnabled={selectedBeneficiary?.payout_admission?.fx_lock_enabled === true}
+                      draft={sgdDraft} onDraft={setSgdDraft} onSubmitted={(transfer) => {
+                        setCreatedTransfer(transfer); setStep("result"); void refreshTransfers();
+                      }} /> : undefined}
                   />
                 )}
 
@@ -537,9 +552,19 @@ const AccountTransfers = () => {
                         provider={providerById.get(transfer.provider_id)}
                         beneficiary={beneficiaryById.get(Number(transfer.beneficiary_id))}
                         submitting={submitMutation.isPending}
-                        syncing={syncMutation.isPending}
-                        canceling={cancelMutation.isPending}
+                        syncing={syncMutation.isPending || sgdBusy}
+                        canceling={cancelMutation.isPending || sgdBusy}
+                        reviewDisabled={sgdBusy}
                         onSubmit={() => submitMutation.mutate(transfer.id)}
+                        onReview={() => {
+                          if (sgdBusy) return;
+                          setSgdDraft(transfer);
+                          setForm({ providerId: String(transfer.provider_id), beneficiaryId: String(transfer.beneficiary_id),
+                            transferType: transfer.transfer_type, sourceCurrency: transfer.source_currency,
+                            targetCurrency: transfer.target_currency, sourceAmount: String(transfer.source_amount),
+                            purposeCode: transfer.purpose_code ?? "", referenceText: transfer.reference_text ?? "" });
+                          setFormError(""); setStep("review");
+                        }}
                         onSync={() => syncMutation.mutate(transfer.id)}
                         onCancel={() => cancelMutation.mutate(transfer.id)}
                       />
@@ -794,6 +819,8 @@ export const ReviewStep = ({
   creating,
   onBack,
   onSubmit,
+  sgdReview,
+  backDisabled = false,
 }: {
   form: TransferForm;
   provider: ProviderSummary | null;
@@ -804,6 +831,8 @@ export const ReviewStep = ({
   creating: boolean;
   onBack: () => void;
   onSubmit: () => void;
+  sgdReview?: ReactNode;
+  backDisabled?: boolean;
 }) => (
   <div className="mx-auto max-w-3xl space-y-6">
     <div className="text-center">
@@ -830,7 +859,7 @@ export const ReviewStep = ({
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <ReviewItem label="Transfer amount" value={<CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(effectiveSourceAmount, form.sourceCurrency)}</CurrencyDisplay>} />
         <ReviewItem label="Destination currency" value={form.targetCurrency} />
-        {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <div className="sm:col-span-2"><SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} /></div> : <>
+        {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <div className="sm:col-span-2">{sgdReview ? null : <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} />}</div> : <>
         <ReviewItem label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code, form.targetCurrency) ?? "-"} />
         {form.sourceCurrency !== form.targetCurrency ? <ReviewItem label="FX rate" value="Unavailable pending provider confirmation" /> : null}
         <ReviewItem label="Provider fee" value="Calculated during processing" />
@@ -843,13 +872,14 @@ export const ReviewStep = ({
       </div>
     </div>
 
-    <WizardActions
+    {sgdReview}
+    {sgdReview ? <Button variant="outline" disabled={backDisabled} onClick={onBack}>Back</Button> : <WizardActions
       backLabel="Back"
-      nextLabel="Create payment request"
+      nextLabel="Submit"
       loading={creating}
       onBack={onBack}
       onNext={onSubmit}
-    />
+    />}
   </div>
 );
 
@@ -878,7 +908,7 @@ export const ResultStep = ({
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
         {isNiumProvider(provider?.code) && transfer?.target_currency === "SGD"
-          ? "The request is saved in Origin Wallet. SGD Local submission is currently unavailable."
+          ? "Your payment instruction is saved in Origin Wallet. Admin Approve & submit initiates the payout."
           : "The request is saved in Origin Wallet. Submit it when approval rules allow."}
       </p>
     </div>
@@ -913,7 +943,7 @@ export const ResultStep = ({
         {transfer.status === "approval_required" ? (
           <div role="status" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {isNiumProvider(provider?.code) && transfer.target_currency === "SGD"
-              ? "Waiting for admin approval. SGD Local submission remains unavailable while payout support is being verified."
+              ? "Waiting for independent Admin approval. Admin Approve & submit initiates the NIUM payout. No further customer submission is needed."
               : isNiumProvider(provider?.code)
               ? "Waiting for admin approval. This payment will be submitted automatically once approved."
               : "Admin approval is required before this payment can be submitted."}
@@ -992,6 +1022,8 @@ export const TransferRow = ({
   syncing,
   canceling,
   onSubmit,
+  onReview,
+  reviewDisabled = false,
   onSync,
   onCancel,
 }: {
@@ -1002,6 +1034,8 @@ export const TransferRow = ({
   syncing: boolean;
   canceling: boolean;
   onSubmit: () => void;
+  onReview?: () => void;
+  reviewDisabled?: boolean;
   onSync: () => void;
   onCancel: () => void;
 }) => (
@@ -1044,6 +1078,8 @@ export const TransferRow = ({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {isNiumProvider(provider?.code) && transfer.target_currency === "SGD" && transfer.payout_workflow && onReview &&
+          <Button size="sm" variant="outline" disabled={reviewDisabled} onClick={onReview}>Review payment</Button>}
         {provider && !isNiumProvider(provider.code) ? <Button
           size="sm"
           disabled={!canSubmitProvider(transfer.status) || submitting}
