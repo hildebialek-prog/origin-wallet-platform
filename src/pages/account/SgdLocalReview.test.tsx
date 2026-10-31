@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Balance, Transfer } from "@/services/moneyMovementService";
 import SgdLocalReview from "./SgdLocalReview";
 
-const api = vi.hoisted(() => ({ getTransfer: vi.fn(), lockSgdLocal: vi.fn(), prepareSgdLocal: vi.fn(),
+const api = vi.hoisted(() => ({ getTransfer: vi.fn(), prepareSgdLocalReview: vi.fn(), lockSgdLocal: vi.fn(), prepareSgdLocal: vi.fn(),
   refreshSgdLocalPricing: vi.fn(), restartSgdLocalReview: vi.fn(), submitSgdLocal: vi.fn(),
   recoverSgdLocalCapturedOutcome: vi.fn(), requestSgdLocalRecoveryReview: vi.fn(), syncTransferStatus: vi.fn(),
   cancelTransfer: vi.fn(), submitTransfer: vi.fn(), requestSgdLocalApproval: vi.fn() }));
@@ -44,6 +44,7 @@ const accept = () => {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  api.prepareSgdLocalReview.mockReturnValue(new Promise(() => {}));
   vi.stubGlobal("crypto", { randomUUID: () => "104afd37-c9e7-43ec-97c4-3644f99d8fbc" });
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -78,19 +79,35 @@ describe("SGD LOCAL Review → Submit", () => {
     expect(screen.queryByRole("button", { name: /Request Approval|Submit for Admin/ })).not.toBeInTheDocument();
   });
 
-  it("requires an explicit quote request and never repeats an uncertain FX lock", async () => {
-    const prepared = { ...locked(), payout_workflow: { ...locked().payout_workflow!, state: "draft", customer_instruction: null,
-      submission_token: null, approval_request_allowed: false } };
-    api.prepareSgdLocal.mockResolvedValue(prepared);
-    api.lockSgdLocal.mockRejectedValue(new Error("FX lock outcome unknown"));
+  it("automatically prepares review once and never repeats an uncertain FX request", async () => {
+    api.prepareSgdLocalReview.mockRejectedValue(new Error("FX request outcome unknown"));
     mount(null);
-    expect(api.prepareSgdLocal).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("checkbox", { name: /selected payment purpose is truthful/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Get current FX quote" }));
     await screen.findByRole("alert");
-    expect(api.prepareSgdLocal).toHaveBeenCalledTimes(1);
-    expect(api.lockSgdLocal).toHaveBeenCalledTimes(1);
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1);
+    expect(api.lockSgdLocal).not.toHaveBeenCalled();
+    expect(api.submitSgdLocal).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Get current FX quote" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refresh financial terms" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review new FX terms" })).not.toBeInTheDocument();
+  });
+
+  it("fences automatic preparation in StrictMode and double-click review retries", async () => {
+    let complete!: (value: Transfer) => void;
+    api.prepareSgdLocalReview.mockReturnValue(new Promise((resolve) => { complete = resolve; }));
+    const Harness = () => {
+      const [draft, onDraft] = useState<Transfer | null>(null);
+      return <SgdLocalReview userId="12" token="test" providerId={10} beneficiaryId={9} sourceAmount="5"
+        purposeCode="TRUTHFUL_PURPOSE" fxEnabled balance={balance} validationError="" draft={draft}
+        onDraft={onDraft} onSubmitted={vi.fn()} />;
+    };
+    render(<StrictMode><Harness /></StrictMode>);
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1);
+    const retry = screen.getByRole("button", { name: "Refresh review" });
+    fireEvent.click(retry); fireEvent.click(retry);
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1);
+    await act(async () => complete(locked()));
+    fireEvent.click(retry); fireEvent.click(retry);
+    await waitFor(() => expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(2));
     expect(api.submitSgdLocal).not.toHaveBeenCalled();
   });
 
@@ -154,18 +171,15 @@ describe("SGD LOCAL Review → Submit", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 
-  it("does not lock again when preparation resolves to an existing locked draft", async () => {
-    api.prepareSgdLocal.mockResolvedValue(locked());
+  it("automatically reuses the returned locked draft without another lock or implicit consent", async () => {
+    api.prepareSgdLocalReview.mockResolvedValue(locked());
     mount(null);
-    fireEvent.click(screen.getByRole("checkbox", { name: /selected payment purpose/ }));
-    const button = screen.getByRole("button", { name: "Get current FX quote" });
-    fireEvent.click(button);
-    fireEvent.click(button);
     await screen.findByRole("checkbox", { name: /I authorize/ });
-    expect(api.prepareSgdLocal).toHaveBeenCalledTimes(1);
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1);
     expect(api.lockSgdLocal).not.toHaveBeenCalled();
     expect(api.cancelTransfer).not.toHaveBeenCalled();
     expect(api.submitSgdLocal).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 
   it.each(["expired_lock", "wrong_currency", "wrong_amount"])("rejects conflicting payout evidence: %s", (scenario) => {
@@ -218,31 +232,49 @@ describe("SGD LOCAL Review → Submit", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 
+  it("does not restore old consent when changed terms later return to the original token", () => {
+    const draft = locked();
+    const props = { userId: "12", token: "test", providerId: 10, beneficiaryId: 9, sourceAmount: "5",
+      purposeCode: "TRUTHFUL_PURPOSE", fxEnabled: true, balance, validationError: "", onDraft: vi.fn(), onSubmitted: vi.fn() };
+    const view = render(<SgdLocalReview {...props} draft={draft} />);
+    accept();
+    const changed = structuredClone(draft);
+    changed.payout_workflow!.submission_token = "changed";
+    view.rerender(<SgdLocalReview {...props} draft={changed} />);
+    view.rerender(<SgdLocalReview {...props} draft={draft} />);
+    expect(screen.getByRole("checkbox", { name: /I authorize/ })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+  });
+
   it("honors beneficiary/corridor validation again at Review", () => {
     mount(locked(), { validationError: "The selected beneficiary must be active." });
     expect(screen.getByRole("alert")).toHaveTextContent("must be active");
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 
-  it("restarts an expired approved review explicitly and reuses its draft for the next lock", async () => {
+  it("prepares an expired review on entry and requires fresh customer confirmation", async () => {
     const expired = locked();
     expired.status = "approved";
     expired.payout_workflow!.fx_lock_active = false;
     expired.payout_workflow!.can_restart_review = true;
-    const reset = { ...locked(), payout_workflow: { ...locked().payout_workflow!, state: "review_reset",
-      customer_instruction: null, submission_token: null, approval_request_allowed: false, fx_lock_active: false } };
-    api.restartSgdLocalReview.mockResolvedValue(reset);
-    api.lockSgdLocal.mockResolvedValue(locked());
+    api.prepareSgdLocalReview.mockResolvedValue(locked());
     mount(expired);
-    fireEvent.click(screen.getByRole("checkbox", { name: /selected payment purpose/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Review new FX terms" }));
-    await waitFor(() => expect(api.restartSgdLocalReview).toHaveBeenCalledTimes(1));
-    expect(api.lockSgdLocal).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: /selected payment purpose/ })).not.toBeChecked());
-    fireEvent.click(screen.getByRole("checkbox", { name: /selected payment purpose/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Get current FX quote" }));
-    await waitFor(() => expect(api.lockSgdLocal).toHaveBeenCalledTimes(1));
-    expect(api.prepareSgdLocal).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1));
+    await screen.findByRole("checkbox", { name: /I authorize/ });
+    expect(screen.getByRole("checkbox", { name: /selected payment purpose/ })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
+    expect(api.submitSgdLocal).not.toHaveBeenCalled();
+  });
+
+  it("automatically recovers changed terms after Submit and requires new consent", async () => {
+    const changed = locked();
+    changed.status = "approval_required";
+    changed.payout_workflow!.can_refresh_review = true;
+    api.prepareSgdLocalReview.mockResolvedValue(locked());
+    mount(changed);
+    await waitFor(() => expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("checkbox", { name: /I authorize/ })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(api.submitSgdLocal).not.toHaveBeenCalled();
   });
 

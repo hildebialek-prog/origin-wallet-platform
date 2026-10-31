@@ -1,5 +1,5 @@
 import { CurrencyBadge, CurrencyDisplay } from "@/components/shared/CurrencyDisplay";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -110,6 +110,13 @@ const AccountTransfers = () => {
   const [createdTransfer, setCreatedTransfer] = useState<Transfer | null>(null);
   const [sgdDraft, setSgdDraft] = useState<Transfer | null>(null);
   const [sgdBusy, setSgdBusy] = useState(false);
+  // Survive Review unmounts after a lost response; a retry must discover the same draft.
+  const sgdPreparationReferences = useRef(new Map<string, string>());
+  const sgdPreparationReference = () => {
+    const key = `${user?.id}:${form.providerId}:${form.beneficiaryId}`;
+    if (!sgdPreparationReferences.current.has(key)) sgdPreparationReferences.current.set(key, `OW-${crypto.randomUUID()}`);
+    return sgdPreparationReferences.current.get(key)!;
+  };
 
   const providersQuery = useQuery({
     queryKey: ["money-providers"],
@@ -227,6 +234,7 @@ const AccountTransfers = () => {
     setFormError("");
     setCreatedTransfer(null);
     setSgdDraft(null);
+    sgdPreparationReferences.current.clear();
     setStep("payee");
   };
 
@@ -510,7 +518,7 @@ const AccountTransfers = () => {
                       key={`${user?.id}:${form.providerId}:${form.beneficiaryId}`}
                       userId={user?.id as string} token={token as string} providerId={Number(form.providerId)}
                       beneficiaryId={Number(form.beneficiaryId)} sourceAmount={form.sourceAmount} purposeCode={form.purposeCode}
-                      referenceText={form.referenceText}
+                      preparationReference={sgdPreparationReference()} referenceText={form.referenceText}
                       balance={selectedBalance} validationError={validateDetails()} onBusyChange={setSgdBusy}
                       onTransferChanged={refreshTransfers}
                       fxEnabled={selectedBeneficiary?.payout_admission?.fx_lock_enabled === true}

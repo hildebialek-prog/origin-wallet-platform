@@ -7,7 +7,7 @@ import AccountTransfers from "./AccountTransfers";
 
 const api = vi.hoisted(() => ({ getProviders: vi.fn(), getNiumPurposeCodes: vi.fn(), getBalances: vi.fn(),
   getBeneficiaries: vi.fn(), getTransfers: vi.fn(), createTransfer: vi.fn(), submitTransfer: vi.fn(),
-  prepareSgdLocal: vi.fn(), lockSgdLocal: vi.fn(), submitSgdLocal: vi.fn(), getTransfer: vi.fn(),
+  prepareSgdLocalReview: vi.fn(), prepareSgdLocal: vi.fn(), lockSgdLocal: vi.fn(), submitSgdLocal: vi.fn(), getTransfer: vi.fn(),
   refreshSgdLocalPricing: vi.fn(), restartSgdLocalReview: vi.fn(), syncTransferStatus: vi.fn(), cancelTransfer: vi.fn(),
   recoverSgdLocalCapturedOutcome: vi.fn(), requestSgdLocalRecoveryReview: vi.fn(), requestSgdLocalApproval: vi.fn() }));
 vi.mock("@/services/moneyMovementService", () => api);
@@ -72,6 +72,7 @@ beforeEach(() => {
   api.getBalances.mockResolvedValue([{ id: 1, user_id: 12, provider_id: 10, currency: "USD", available_balance: "85" }]);
   api.getTransfers.mockResolvedValue([]);
   api.getNiumPurposeCodes.mockResolvedValue({ data: [{ code: "TRUTHFUL", label: "Truthful purpose" }] });
+  api.prepareSgdLocalReview.mockImplementation(async () => locked());
   api.prepareSgdLocal.mockResolvedValue(prepared);
   api.lockSgdLocal.mockImplementation(async () => locked());
   api.submitSgdLocal.mockImplementation(async () => ({ ...locked(), status: "approval_required" }));
@@ -85,16 +86,14 @@ describe("customer payment wizard routing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     const review = screen.getByRole("region", { name: "SGD LOCAL payment review" });
     expect(review).toBeVisible();
-    expect(api.prepareSgdLocal).not.toHaveBeenCalled();
-    fireEvent.click(within(review).getByRole("checkbox", { name: /selected payment purpose/ }));
-    fireEvent.click(within(review).getByRole("button", { name: "Get current FX quote" }));
     fireEvent.click(await within(review).findByRole("checkbox", { name: /I authorize/ }));
+    fireEvent.click(within(review).getByRole("checkbox", { name: /selected payment purpose/ }));
     fireEvent.click(within(review).getByRole("checkbox", { name: /I explicitly accept/ }));
     const submit = within(review).getByRole("button", { name: "Submit" });
     fireEvent.click(submit);
     fireEvent.click(submit);
     await screen.findByRole("heading", { name: "Payment request created" });
-    expect(api.prepareSgdLocal).toHaveBeenCalledTimes(1);
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1);
     expect(api.submitSgdLocal).toHaveBeenCalledTimes(1);
     expect(api.submitSgdLocal).toHaveBeenCalledWith({ userId: "12", token: "customer-token", transferId: 3,
       submissionToken: "reviewed-customer-instruction", acceptUncappedCharges: true });
@@ -105,14 +104,29 @@ describe("customer payment wizard routing", () => {
     expect(screen.queryByRole("button", { name: /Submit|Request Approval/ })).not.toBeInTheDocument();
   });
 
+  it("reuses preparation identity when a lost response is followed by reopening Review", async () => {
+    api.prepareSgdLocalReview.mockRejectedValueOnce(new Error("Response unavailable"));
+    mount();
+    await details();
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    await screen.findByRole("alert");
+    const reference = api.prepareSgdLocalReview.mock.calls[0][0].payload.client_reference;
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    await screen.findByRole("checkbox", { name: /I authorize/ });
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(2);
+    expect(api.prepareSgdLocalReview.mock.calls[1][0].payload.client_reference).toBe(reference);
+    expect(api.submitSgdLocal).not.toHaveBeenCalled();
+    expect(api.lockSgdLocal).not.toHaveBeenCalled();
+  });
+
   it("rechecks backend beneficiary/corridor evidence after entering Review", async () => {
     const client = mount();
     await details();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     act(() => client.setQueryData(["money-beneficiaries", "12", "customer-token"], [{ ...payee,
       payout_admission: { ...payee.payout_admission!, destination_country: "HK" } }]));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Get current FX quote" })).toBeDisabled());
-    expect(api.lockSgdLocal).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh review" })).toBeDisabled());
     expect(api.submitSgdLocal).not.toHaveBeenCalled();
   });
 
@@ -210,6 +224,7 @@ describe("customer payment wizard routing", () => {
 
   it("keeps an expired Transfer 3 quote blocked without replacing or relocking the draft", async () => {
     const draft = transfer3();
+    api.prepareSgdLocalReview.mockReturnValue(new Promise(() => {}));
     draft.payout_amounts!.fx_lock_expires_at = "2000-01-01T00:00:00Z";
     draft.payout_workflow!.customer_instruction!.expires_at = "2000-01-01T00:00:00Z";
     api.getTransfers.mockResolvedValue([draft]);
@@ -222,6 +237,26 @@ describe("customer payment wizard routing", () => {
     expect(within(review).getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(api.prepareSgdLocal).not.toHaveBeenCalled();
     expect(api.lockSgdLocal).not.toHaveBeenCalled();
+    expect(api.submitSgdLocal).not.toHaveBeenCalled();
+  });
+
+  it("reopens a submitted payment with changed terms for automatic preparation and fresh consent", async () => {
+    const changed = transfer3();
+    changed.status = "approval_required";
+    changed.payout_workflow!.can_refresh_review = true;
+    api.getTransfers.mockResolvedValue([changed]);
+    api.getNiumPurposeCodes.mockResolvedValue({ data: [{ code: "IR008", label: "Supported IR008 purpose" }] });
+    api.prepareSgdLocalReview.mockImplementation(async () => transfer3());
+    mount();
+    await screen.findByText("SYNTHETIC-WIZARD");
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    const review = screen.getByRole("region", { name: "SGD LOCAL payment review" });
+    await waitFor(() => expect(api.prepareSgdLocalReview).toHaveBeenCalledTimes(1));
+    expect(api.prepareSgdLocalReview).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({
+      transfer_id: 3, beneficiary_id: 9, source_amount: "5.00000000", purpose_code: "IR008", reference_text: null,
+    }) }));
+    expect(await within(review).findByRole("checkbox", { name: /I authorize/ })).not.toBeChecked();
+    expect(within(review).getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(api.submitSgdLocal).not.toHaveBeenCalled();
   });
 

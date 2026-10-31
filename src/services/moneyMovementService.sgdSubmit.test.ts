@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { lockSgdLocal, prepareSgdLocal, requestSgdLocalFxLock, submitSgdLocal } from "./moneyMovementService";
+import { lockSgdLocal, prepareSgdLocal, prepareSgdLocalReview, requestSgdLocalFxLock, submitSgdLocal } from "./moneyMovementService";
 const request = vi.hoisted(() => vi.fn());
 vi.mock("./apiClient", () => ({ requestApi: request }));
 beforeEach(() => request.mockReset());
@@ -13,6 +13,14 @@ describe("SGD customer instruction API", () => {
     expect(request).toHaveBeenCalledExactlyOnceWith("/user/users/12/transfers/3/sgd-local-submit", {
       method: "POST", token: "customer-token", body: { submission_token: "current-review",
         accept_payment_terms: true, purpose_confirmed: true, accept_uncapped_charges: true },
+    });
+  });
+  it("automatically prepares an authenticated review without claiming acceptance or dispatch", async () => {
+    const payload = { transfer_id: 3, preparation_id: "review-attempt", provider_id: 10, beneficiary_id: 9,
+      source_amount: "5", purpose_code: "IR008", reference_text: null, client_reference: "existing-payment" };
+    await prepareSgdLocalReview({ userId: "12", token: "customer-token", payload });
+    expect(request).toHaveBeenCalledExactlyOnceWith("/user/users/12/sgd-local-payouts/review", {
+      method: "POST", token: "customer-token", body: payload,
     });
   });
   it("retains preparation and FX lock contracts under both caller names", async () => {

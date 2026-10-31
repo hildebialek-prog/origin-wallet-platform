@@ -142,6 +142,7 @@ export interface NiumPayoutAmounts {
 }
 
 export interface SgdLocalInstruction {
+  reference_text?: string | null;
   transfer_id: number;
   source_amount: string;
   source_currency: string;
@@ -174,6 +175,7 @@ export interface NiumSgdLocalWorkflow {
     expected_principal_debit: string; expected_fee_amount: string | null } | null;
   can_recover_captured_outcome?: boolean;
   can_restart_review?: boolean;
+  can_refresh_review?: boolean;
   can_refresh_pricing?: boolean;
   financial_terms_token?: string | null;
   checker_approval_allowed?: boolean;
@@ -343,6 +345,14 @@ export const prepareSgdLocalPayout = (params: AuthenticatedParams & { payload: {
   reference_text?: string | null;
   expected_fee_amount: "0"; expected_fee_currency: string;
 } }) => requestApi<Transfer>(`/user/users/${params.userId}/sgd-local-payouts`, {
+  method: "POST", token: params.token, body: params.payload,
+});
+
+// Review preparation can acquire FX/pricing evidence, but cannot accept or dispatch a payment.
+export const prepareSgdLocalReview = (params: AuthenticatedParams & { payload: {
+  transfer_id?: number; preparation_id: string; provider_id: number; beneficiary_id: number;
+  source_amount: string; purpose_code: string; reference_text?: string | null; client_reference: string;
+} }) => requestApi<Transfer>(`/user/users/${params.userId}/sgd-local-payouts/review`, {
   method: "POST", token: params.token, body: params.payload,
 });
 

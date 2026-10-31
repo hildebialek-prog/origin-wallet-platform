@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiRequestError } from "@/services/apiClient";
 import {
-  cancelTransfer, getTransfer, lockSgdLocal, prepareSgdLocal, recoverSgdLocalCapturedOutcome,
-  refreshSgdLocalPricing, requestSgdLocalRecoveryReview, restartSgdLocalReview, submitSgdLocal,
+  cancelTransfer, getTransfer, prepareSgdLocalReview, recoverSgdLocalCapturedOutcome,
+  requestSgdLocalRecoveryReview, submitSgdLocal,
   syncTransferStatus, type Balance, type Transfer,
 } from "@/services/moneyMovementService";
 import { SgdLocalAmountBreakdown } from "./SgdLocalAmountBreakdown";
@@ -16,6 +16,7 @@ type Props = {
   sourceAmount: string;
   purposeCode: string;
   referenceText?: string;
+  preparationReference?: string;
   fxEnabled: boolean;
   balance?: Balance;
   validationError: string;
@@ -43,8 +44,10 @@ export default function SgdLocalReview(props: Props) {
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState("");
   const started = useRef(false);
-  const clientReference = useRef(`OW-${crypto.randomUUID()}`);
+  const automaticReview = useRef<string | null>(null);
+  const clientReference = useRef(props.preparationReference ?? `OW-${crypto.randomUUID()}`);
   const workflow = draft?.payout_workflow;
+  const canRefreshReview = workflow?.can_refresh_review || workflow?.can_restart_review;
   const instruction = workflow?.customer_instruction;
   const terms = instruction?.financial_terms;
   const uncapped = terms?.policy === "one_time_uncapped";
@@ -89,6 +92,12 @@ export default function SgdLocalReview(props: Props) {
   const uncappedAccepted = uncappedReview === reviewKey;
 
   useEffect(() => {
+    setAcceptedReview(null);
+    setUncappedReview(null);
+  }, [reviewKey]);
+  useEffect(() => { setConfirmedPurpose(null); }, [intentKey]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -106,7 +115,7 @@ export default function SgdLocalReview(props: Props) {
       if (failure instanceof ApiRequestError && failure.payload?.transfer) onDraft(failure.payload.transfer as Transfer);
       setUncertain(true);
       clearAcceptance();
-      setError(`${failure instanceof Error ? failure.message : "Request could not be confirmed."} Refresh payment details before continuing.`);
+      setError(`${failure instanceof Error ? failure.message : "Request could not be confirmed."} ${draft ? "Refresh payment details" : "Refresh review"} before continuing.`);
     } finally { started.current = false; setBusy(false); props.onBusyChange?.(false); }
   };
   const auth = { userId: props.userId, token: props.token };
@@ -121,12 +130,41 @@ export default function SgdLocalReview(props: Props) {
   const canRead = draft?.user_id === Number(props.userId);
   const canQuote = valid && fundingMatches && available !== null && principal !== null && available >= principal;
 
+  const prepareReview = () => run(async () => {
+    if (!canQuote || !props.fxEnabled || !matches || ["locking", "lock_unknown"].includes(workflow?.state ?? "")) return;
+    clearAcceptance();
+    setConfirmedPurpose(null);
+    const prepared = await prepareSgdLocalReview({ ...auth, payload: {
+      transfer_id: draft?.id, preparation_id: crypto.randomUUID(), provider_id: props.providerId,
+      beneficiary_id: props.beneficiaryId, source_amount: props.sourceAmount, purpose_code: props.purposeCode,
+      reference_text: props.referenceText || null, client_reference: draft?.client_reference ?? clientReference.current,
+    } });
+    onDraft(prepared);
+    if (!matchesDraft(prepared)) throw new Error("The saved payment does not match the reviewed details.");
+    setUncertain(false);
+    if (prepared.status === "approval_required") onSubmitted(prepared);
+  });
+
+  useEffect(() => {
+    // One attempt per displayed payment intent, including React StrictMode effect replay.
+    // Expiry while reading never silently replaces terms or reuses customer acceptance.
+    if (current && !canRefreshReview) { automaticReview.current = intentKey; return; }
+    if (!canQuote || !props.fxEnabled || pending || !matches
+      || (draft && draft.status !== "draft" && !canRefreshReview)
+      || automaticReview.current === intentKey) return;
+    automaticReview.current = intentKey;
+    void prepareReview();
+    // Operations use the latest render; changing response objects must not repeat preparation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intentKey, canQuote, props.fxEnabled, pending, matches, canRefreshReview]);
+
   return <section aria-label="SGD LOCAL payment review" className="space-y-4 rounded-2xl border p-5">
     <h3 className="font-semibold">SGD LOCAL payment terms</h3>
     <SgdLocalAmountBreakdown sourceAmount={props.sourceAmount} amounts={matches ? draft?.payout_amounts : null} />
     {instruction && matches && <dl className="space-y-2 text-sm">
       <div><dt>Receiving account</dt><dd>{instruction.receiving_account.name} · {instruction.receiving_account.bank} · ending {instruction.receiving_account.last_four}</dd></div>
       <div><dt>Payment purpose</dt><dd>{instruction.purpose_code}</dd></div>
+      <div><dt>Payment reference</dt><dd>{draft?.reference_text || "None"}</dd></div>
       <div><dt>Current FX quote</dt><dd>{instruction.fx_quote_id} · {instruction.rate} SGD per USD</dd></div>
       <div><dt>FX expires</dt><dd>{instruction.expires_at}</dd></div>
       <div><dt>Financial terms expire</dt><dd>{terms?.expires_at}</dd></div>
@@ -137,10 +175,12 @@ export default function SgdLocalReview(props: Props) {
     </dl>}
     <p className="text-sm">Submit records your payment instruction for independent Admin approval. Admin Approve &amp; submit initiates the payout.</p>
     {uncapped && <p className="text-sm text-amber-800">Additional NIUM charges are unknown, uncapped and not reserved. Only the USD principal is reserved. The total wallet debit and final SGD credit are unverified.</p>}
+    {busy && <p role="status">Preparing or confirming payment details…</p>}
     {props.validationError && <p role="alert">{props.validationError}</p>}
     {!matches && <p role="alert">The saved draft has different payment details. Reopen the saved payment from Transfer Activity to review its existing details.</p>}
     {instruction && !instructionMatches && <p role="alert">The payment instruction does not match the current beneficiary, amount, currency or purpose.</p>}
-    {instruction && !current && <p role="status">FX or financial terms expired or unavailable. Review new terms before Submit.</p>}
+    {instruction && !current && <p role="status">FX or financial terms expired or unavailable. Refresh review and accept the current terms before Submit.</p>}
+    {!busy && !instruction && <p role="status">Current payment terms are unavailable. Refresh review to prepare them; Submit remains blocked until the terms can be verified and accepted.</p>}
     {!funded && <p role="status">A matching USD wallet with sufficient available balance for the reviewed debit is required.</p>}
     {unexpectedFee && <p role="alert">The provider charge exceeds the principal-only funding policy. Payment remains blocked.</p>}
     {pending && <p role="status">The request outcome is pending or unknown. Do not submit again; refresh or reconcile its status.</p>}
@@ -152,31 +192,9 @@ export default function SgdLocalReview(props: Props) {
       {uncapped && <label className="flex gap-2 text-sm"><input type="checkbox" disabled={busy} checked={uncappedAccepted} onChange={(event) => setUncappedReview(event.target.checked ? reviewKey : null)} />I explicitly accept that additional NIUM charges are unknown, uncapped and not reserved.</label>}
     </>}
     <div className="flex flex-wrap gap-2">
-      {(!draft || (draft.status === "draft" && ["draft", "review_reset"].includes(workflow?.state ?? ""))) && <Button disabled={busy || pending || !canQuote || !props.fxEnabled || !purposeConfirmed} onClick={() => void run(async () => {
-        if (!canQuote || !props.fxEnabled || !purposeConfirmed || pending) return;
-        const prepared = draft ?? await prepareSgdLocal({ ...auth, payload: { provider_id: props.providerId,
-          beneficiary_id: props.beneficiaryId, source_amount: props.sourceAmount, purpose_code: props.purposeCode,
-          client_reference: clientReference.current, reference_text: props.referenceText || null } });
-        onDraft(prepared);
-        if (!matchesDraft(prepared)) throw new Error("The saved payment does not match the reviewed details.");
-        // An idempotent prepare may return an existing hold: never replace it automatically.
-        if (prepared.status !== "draft" || !["draft", "review_reset"].includes(prepared.payout_workflow?.state ?? "")) return;
-        const locking = { ...prepared, payout_workflow: { ...prepared.payout_workflow!, state: "locking", fx_lock_active: false } };
-        onDraft(locking);
-        const locked = await lockSgdLocal({ ...auth, transferId: prepared.id, requestId: crypto.randomUUID() });
-        onDraft(locked);
-        clearAcceptance();
-        if (locked.payout_workflow?.can_refresh_pricing && !locked.payout_workflow.customer_instruction) {
-          onDraft(await refreshSgdLocalPricing({ ...auth, transferId: locked.id }));
-        }
-      })}>Get current FX quote</Button>}
-      {draft?.status === "draft" && workflow?.fx_lock_active && workflow.can_refresh_pricing && !instruction && <Button variant="outline" disabled={busy || pending || !valid} onClick={() => void run(async () => {
-        onDraft(await refreshSgdLocalPricing({ ...auth, transferId: draft.id })); clearAcceptance();
-      })}>Refresh financial terms</Button>}
-      {draft && workflow?.can_restart_review && <Button variant="outline" disabled={busy || pending || !valid || !purposeConfirmed} onClick={() => void run(async () => {
-        onDraft(await restartSgdLocalReview({ ...auth, transferId: draft.id }));
-        clearAcceptance(); setConfirmedPurpose(null);
-      })}>Review new FX terms</Button>}
+      {(!draft || draft.status === "draft" || canRefreshReview) && <Button variant="outline"
+        disabled={busy || !canQuote || !props.fxEnabled || ["locking", "lock_unknown"].includes(workflow?.state ?? "")}
+        onClick={() => void prepareReview()}>Refresh review</Button>}
       {draft && <Button variant="outline" disabled={busy || !canRead} onClick={() => void refresh()}>Refresh payment details</Button>}
       {draft && workflow?.can_reconcile_status && <Button variant="outline" disabled={busy || !canRead} onClick={() => void run(async () => {
         onDraft((await syncTransferStatus({ ...auth, transferId: draft.id })).transfer); clearAcceptance();
