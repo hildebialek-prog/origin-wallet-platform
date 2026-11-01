@@ -48,6 +48,7 @@ import {
   type NiumBeneficiaryRequirements,
   updateBeneficiary,
   type Beneficiary,
+  type BeneficiaryEditFields,
   type BeneficiaryPayload,
 } from "@/services/moneyMovementService";
 import { ApiRequestError } from "@/services/apiClient";
@@ -135,31 +136,24 @@ const beneficiarySteps: { key: BeneficiaryStep; label: string }[] = [
   { key: "review", label: "Review" },
 ];
 
-const toRawData = (beneficiary?: Beneficiary | null) => (beneficiary?.raw_data ?? {}) as Record<string, unknown>;
-
 export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
   if (!beneficiary) return emptyForm;
 
-  const rawData = toRawData(beneficiary);
-  const nium = (rawData.nium ?? {}) as Record<string, unknown>;
-  const origin = (rawData.origin ?? {}) as Record<string, unknown>;
-
-  const routing = (nium.routingInfo as { type: string; value: string }[] | undefined) ?? [
+  const fields = beneficiary.edit_fields ?? {};
+  const routing = fields.routing ?? [
     ...(beneficiary.swift_bic ? [{ type: "SWIFT", value: beneficiary.swift_bic }] : []),
-    ...(beneficiary.bank_code ? [{ type: String(nium.bankCodeType ?? ""), value: beneficiary.bank_code }] : []),
-    ...(beneficiary.branch_code ? [{ type: String(nium.branchCodeType ?? ""), value: beneficiary.branch_code }] : []),
   ];
 
   return {
     routingType: routing[0]?.type ?? "", routingValue: routing[0]?.value ?? "",
     secondaryRoutingType: routing[1]?.type ?? "", secondaryRoutingValue: routing[1]?.value ?? "",
-    schemaValues: (nium.additionalFields as Record<string, string>) ?? {},
+    schemaValues: { ...fields.additional_fields },
     providerId: String(beneficiary.provider_id),
     beneficiaryType: beneficiary.beneficiary_type || "business",
     fullName: beneficiary.full_name || "",
     companyName: beneficiary.company_name || "",
     email: beneficiary.email || "",
-    phoneCountryCode: String(nium.beneficiaryContactCountryCode ?? origin.phone_country_code ?? "+852"),
+    phoneCountryCode: fields.contact_country_code ?? "+852",
     phone: beneficiary.phone || "",
     countryCode: beneficiary.country_code || "HK",
     currency: beneficiary.currency || "USD",
@@ -175,12 +169,12 @@ export const toForm = (beneficiary?: Beneficiary | null): BeneficiaryForm => {
     city: beneficiary.city || "",
     state: beneficiary.state || "",
     postalCode: beneficiary.postal_code || "",
-    payoutMethod: String(beneficiary.payout_method ?? nium.payoutMethod ?? ""),
-    bankAccountType: String(nium.beneficiaryBankAccountType ?? nium.bankAccountType ?? "CURRENT"),
-    verifyBeforeCreate: String(Boolean(nium.verify_before_create ?? false)),
-    vendorType: String(origin.vendor_type ?? nium.remitterBeneficiaryRelationship ?? "supplier"),
-    transactionDocumentName: String(origin.transaction_document_name ?? ""),
-    accountRoute: String(origin.account_route ?? "bank") === "provider" ? "provider" : "bank",
+    payoutMethod: beneficiary.payout_method ?? "",
+    bankAccountType: fields.bank_account_type ?? "CURRENT",
+    verifyBeforeCreate: String(fields.verify_before_create ?? false),
+    vendorType: fields.relationship ?? "supplier",
+    transactionDocumentName: "",
+    accountRoute: fields.account_route ?? "bank",
   };
 };
 
@@ -226,8 +220,58 @@ export const buildPayload = (form: BeneficiaryForm, supportsAccountVerification 
   return requirements ? applyNiumRequirements(payload, form, requirements) : payload;
 };
 
+/** Compare with the opened form, so absent response fields never write defaults. */
+export const buildUpdatePayload = (form: BeneficiaryForm, original: Beneficiary, supportsAccountVerification = false, requirements?: NiumBeneficiaryRequirements): Partial<BeneficiaryPayload> => {
+  const opened = toForm(original);
+  const next = buildPayload(form, supportsAccountVerification, requirements);
+  const previous = buildPayload(opened, supportsAccountVerification, requirements);
+  const changes = (before: Record<string, unknown>, after: Record<string, unknown>): Record<string, unknown> => {
+    const patch: Record<string, unknown> = {};
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      const value = after[key];
+      const old = before[key];
+      if (value && old && typeof value === "object" && typeof old === "object" && !Array.isArray(value) && !Array.isArray(old)) {
+        const nested = changes(old as Record<string, unknown>, value as Record<string, unknown>);
+        if (Object.keys(nested).length) patch[key] = nested;
+      } else if (JSON.stringify(value) !== JSON.stringify(old)) {
+        patch[key] = value === undefined ? null : value;
+      }
+    }
+    return patch;
+  };
+  const patch = changes(previous as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>);
+  const raw = (patch.raw_data ?? {}) as Record<string, Record<string, unknown>>;
+  // Adding/removing a phone number must not write or erase an unchanged dial code.
+  for (const [group, key] of [["nium", "beneficiaryContactCountryCode"], ["origin", "phone_country_code"]]) {
+    const fields = raw[group] ?? {};
+    if (form.phoneCountryCode !== opened.phoneCountryCode) fields[key] = form.phoneCountryCode.trim() || null;
+    else delete fields[key];
+    if (Object.keys(fields).length) raw[group] = fields;
+    else delete raw[group];
+  }
+  if (Object.keys(raw).length) patch.raw_data = raw;
+  else delete patch.raw_data;
+  return patch as Partial<BeneficiaryPayload>;
+};
+
+// Review local, customer-authored request values; API responses use edit_fields only.
+const payloadToForm = (payload: BeneficiaryPayload): BeneficiaryForm => {
+  const nium = (payload.raw_data?.nium ?? {}) as Record<string, unknown>;
+  const origin = (payload.raw_data?.origin ?? {}) as Record<string, unknown>;
+  return toForm({ ...payload, id: 0, user_id: 0, status: "pending", payout_method: String(nium.payoutMethod ?? ""), edit_fields: {
+    bank_account_type: String(nium.beneficiaryBankAccountType ?? nium.bankAccountType ?? "CURRENT"),
+    contact_country_code: String(nium.beneficiaryContactCountryCode ?? "+852"),
+    relationship: String(nium.remitterBeneficiaryRelationship ?? origin.vendor_type ?? "supplier"),
+    account_route: origin.account_route === "provider" ? "provider" : "bank",
+    verify_before_create: nium.verify_before_create === true,
+    routing: nium.routingInfo as BeneficiaryEditFields["routing"],
+    additional_fields: nium.additionalFields as BeneficiaryEditFields["additional_fields"],
+  } });
+};
+
 const beneficiaryTypeLabels: Record<string, string> = {
   individual: "Individual",
+  personal: "Individual",
   business: "Business",
 };
 
@@ -462,7 +506,7 @@ const AccountBeneficiaries = () => {
           userId: user?.id as string,
           token: token as string,
           beneficiaryId: editing.id,
-          payload,
+          payload: buildUpdatePayload(form, editing, selectedProvider?.supports_account_verification === true, requirements),
         });
       }
 
@@ -764,6 +808,7 @@ const AccountBeneficiaries = () => {
                   country={selectedCountry}
                   saving={saveMutation.isPending || (requiresMetadata && !requirements)}
                   payload={submittedPayload}
+                  formValues={form}
                   requirements={requirements}
                   editing={Boolean(editing)}
                   onBack={goBack}
@@ -1164,7 +1209,7 @@ const BankAccountStep = ({
 );
 
 export const ReviewBeneficiaryStep = ({
-  payload, requirements,
+  payload, requirements, formValues,
   provider,
   country,
   saving,
@@ -1174,6 +1219,7 @@ export const ReviewBeneficiaryStep = ({
 }: {
   payload: BeneficiaryPayload;
   requirements?: NiumBeneficiaryRequirements;
+  formValues?: BeneficiaryForm;
   provider?: ProviderSummary;
   country?: { code: string; name: string };
   saving: boolean;
@@ -1181,7 +1227,7 @@ export const ReviewBeneficiaryStep = ({
   onBack: () => void;
   onSave: () => void;
 }) => {
-  const form = toForm({ ...payload, id: 0, user_id: 0, status: "pending" });
+  const form = formValues ?? payloadToForm(payload);
   const routing = ((payload.raw_data?.nium as { routingInfo?: { type: string; value: string }[] })?.routingInfo ?? []);
   return (
     <div className="space-y-7">

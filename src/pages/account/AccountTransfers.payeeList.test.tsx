@@ -52,7 +52,7 @@ describe("SGD Local preparation", () => {
       providerById={new Map([[7, niumProvider]])} loading={false} onSelect={onSelect} /></MemoryRouter>);
     const button = screen.getByText("SG Individual").closest("button");
     expect(button).toBeEnabled();
-    expect(screen.getByText("Preparation only — provider fees and release approval are pending.")).toBeVisible();
+    expect(screen.getByText("Payment terms and fees must be verified before Submit.")).toBeVisible();
     fireEvent.click(button!);
     expect(onSelect).toHaveBeenCalledWith(payee);
     expect(payee.payout_admission?.allowed).toBe(false);
@@ -66,7 +66,7 @@ describe("SGD Local preparation", () => {
     expect(screen.getByText("SGD conversion amount")).toBeVisible();
     expect(screen.getByText("Unavailable pending provider confirmation")).toBeVisible();
     expect(screen.getByText("SGD amount unavailable — FX confirmation pending")).toBeVisible();
-    expect(screen.getByText("Provider fees are not yet available.")).toBeVisible();
+    expect(screen.getByText("Provider fees must be verified before Submit.")).toBeVisible();
     expect(screen.queryByText(/SHA/)).not.toBeInTheDocument();
   });
 
@@ -80,7 +80,7 @@ describe("SGD Local preparation", () => {
     expect(screen.getAllByText("Unavailable pending provider confirmation")).toHaveLength(2);
     expect(screen.getAllByText("FX lock expiry")).toHaveLength(2);
     expect(screen.getAllByText("USD total wallet debit")).toHaveLength(2);
-    expect(screen.getAllByText("Provider fees are not yet available")).toHaveLength(2);
+    expect(screen.getAllByText("Provider fees must be verified before Submit")).toHaveLength(2);
     expect(screen.getAllByText("SGD")).toHaveLength(2);
     expect(screen.queryByText(/SHA/)).not.toBeInTheDocument();
   });

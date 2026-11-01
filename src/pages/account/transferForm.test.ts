@@ -318,7 +318,8 @@ describe("provider-aware transfer contract", () => {
     ]) {
       expect(beneficiaryTransferOption({ ...local, payout_admission: { ...admission, ...change } }, niumProvider).selectable).toBe(false);
     }
-    expect(beneficiaryTransferOption({ ...local, raw_data: { payout_admission: admission } }, niumProvider).selectable).toBe(false);
+    const untrustedResponse = { ...local, raw_data: { payout_admission: admission } };
+    expect(beneficiaryTransferOption(untrustedResponse, niumProvider).selectable).toBe(false);
     expect(validateTransferConfiguration({ provider: niumProvider, beneficiary: { ...local, payout_admission: admission },
       sourceCurrency: "USD", targetCurrency: "SGD", purposeCode: "IR01811", purposeOptions: [] })).toBe("Select a supported Nium payment purpose.");
   });
@@ -336,7 +337,8 @@ describe("provider-aware transfer contract", () => {
       expect(hasSgdLocalPreparation({ ...local, payout_admission: { ...admission, ...change } })).toBe(false);
     }
     expect(hasSgdLocalPreparation({ ...local, status: "pending", payout_admission: admission })).toBe(false);
-    expect(hasSgdLocalPreparation({ ...local, raw_data: { payout_admission: admission } })).toBe(false);
+    const untrustedResponse = { ...local, raw_data: { payout_admission: admission } };
+    expect(hasSgdLocalPreparation(untrustedResponse)).toBe(false);
     expect(beneficiaryTransferOption({ ...local, payout_admission: admission }, { ...niumProvider, supports_transfers: false }).selectable).toBe(false);
     const config = { provider: niumProvider, beneficiary: { ...local, payout_admission: admission }, sourceCurrency: "USD",
       targetCurrency: "SGD", purposeCode: "IR01811", purposeOptions: [{ code: "IR01811", label: "Supported purpose" }] };
@@ -354,7 +356,7 @@ describe("provider-aware transfer contract", () => {
     expect(payload).toMatchObject({ source_currency: "USD", target_currency: "SGD", source_amount: 1250, target_amount: null, fx_rate: null });
     expect(payload.raw_data.nium).not.toHaveProperty("payout");
     expect(recipientAmountPresentation("nium", "SGD")).toBe("SGD amount unavailable — FX confirmation pending");
-    expect(payoutFeePresentation("LOCAL")).toBe("Provider fees are not yet available");
+    expect(payoutFeePresentation("LOCAL")).toBe("Provider fees must be verified before Submit");
     expect(payoutFeePresentation("SWIFT")).toBe("Provider and intermediary bank fees may apply (SHA)");
   });
 });

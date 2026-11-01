@@ -40,6 +40,8 @@ import {
   createTransfer,
   getBalances,
   getBeneficiaries,
+  getBeneficiary,
+  getTransfer,
   getTransfers,
   submitTransfer,
   syncTransferStatus,
@@ -57,10 +59,13 @@ import {
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 import { SgdLocalAmountBreakdown } from "./SgdLocalAmountBreakdown";
 import SgdLocalReview from "./SgdLocalReview";
+import PaymentRecovery from "./PaymentRecovery";
+import { belongsToIdentity, canCancelPayment, canLeavePayment, claimPaymentIdentity, clearPaymentIdentity,
+  paymentFingerprint, paymentPresentation, paymentUncertain, readPaymentIdentity, rememberPaymentTransfer,
+  structuredTransfer, writePaymentIdentity, type PaymentIdentity } from "./paymentSafety";
 import {
   buildTransferPayload,
   beneficiaryTransferOption,
-  createClientReference,
   isNiumProvider,
   isTransferAmountInput,
   purposeOptionsForProvider,
@@ -96,7 +101,6 @@ const wizardSteps: { key: WizardStep; label: string }[] = [
 ];
 
 const canSubmitProvider = (status?: string | null) => ["draft", "approved"].includes(normalizeStatus(status));
-const canCancel = (status?: string | null) => ["draft", "approval_required", "approved"].includes(normalizeStatus(status));
 const canSync = (status?: string | null) =>
   ["pending", "processing", "submitted", "sent", "provider_pending"].includes(normalizeStatus(status));
 
@@ -108,15 +112,57 @@ const AccountTransfers = () => {
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
   const [createdTransfer, setCreatedTransfer] = useState<Transfer | null>(null);
-  const [sgdDraft, setSgdDraft] = useState<Transfer | null>(null);
   const [sgdBusy, setSgdBusy] = useState(false);
-  // Survive Review unmounts after a lost response; a retry must discover the same draft.
-  const sgdPreparationReferences = useRef(new Map<string, string>());
-  const sgdPreparationReference = () => {
-    const key = `${user?.id}:${form.providerId}:${form.beneficiaryId}`;
-    if (!sgdPreparationReferences.current.has(key)) sgdPreparationReferences.current.set(key, `OW-${crypto.randomUUID()}`);
-    return sgdPreparationReferences.current.get(key)!;
+  const [identity, setIdentity] = useState<PaymentIdentity | null>(null);
+  const [identityReady, setIdentityReady] = useState(false);
+  const preparing = useRef(false);
+  const creating = useRef(false);
+
+  const findSavedPayment = async (saved: PaymentIdentity): Promise<Transfer | null> => {
+    const params = { userId: String(user!.id), token: token! };
+    const candidate = saved.transferId !== undefined
+      ? await getTransfer({ ...params, transferId: saved.transferId })
+      : (await getTransfers(params)).find((transfer) => transfer.provider_id === saved.providerId
+        && transfer.client_reference === saved.clientReference);
+    if (!candidate) return null; // Retry may use the same reference; never allocate a replacement.
+    if (!belongsToIdentity(candidate, saved)) throw new Error("Saved payment identity does not match. Contact support.");
+    const current = saved.transferId !== undefined ? candidate : await getTransfer({ ...params, transferId: candidate.id });
+    setIdentity(rememberPaymentTransfer(String(user!.id), saved, current));
+    return current;
   };
+
+  const inspectSavedPayment = async () => {
+    const saved = readPaymentIdentity(String(user!.id));
+    if (!saved) return;
+    const current = await findSavedPayment(saved);
+    if (current) { setCreatedTransfer(current); setStep("result"); }
+    else setFormError("No saved transfer was found yet. Retry only the unchanged instruction with its retained identity.");
+  };
+
+  useEffect(() => {
+    let active = true;
+    setIdentityReady(false); setIdentity(null); setCreatedTransfer(null); setFormError(""); setForm(defaultForm); setStep("payee");
+    if (!user?.id || !token) return;
+    void (async () => {
+      try {
+        const saved = readPaymentIdentity(String(user.id));
+        if (saved) {
+          const params = { userId: String(user.id), token };
+          const candidate = saved.transferId !== undefined ? await getTransfer({ ...params, transferId: saved.transferId })
+            : (await getTransfers(params)).find((item) => item.provider_id === saved.providerId && item.client_reference === saved.clientReference);
+          const current = candidate && (saved.transferId !== undefined ? candidate : await getTransfer({ ...params, transferId: candidate.id }));
+          if (!active) return;
+          setIdentity(current ? rememberPaymentTransfer(String(user.id), saved, current) : saved);
+          if (current) { setCreatedTransfer(current); setStep("result"); }
+          else setFormError("A previous payment attempt is saved. Enter the unchanged details to retry; its reference will be retained.");
+        }
+        if (active) setIdentityReady(true);
+      } catch (failure) {
+        if (active) setFormError(failure instanceof Error ? failure.message : "Cannot inspect the saved payment. New writes are blocked.");
+      }
+    })();
+    return () => { active = false; };
+  }, [user?.id, token]);
 
   const providersQuery = useQuery({
     queryKey: ["money-providers"],
@@ -188,17 +234,14 @@ const AccountTransfers = () => {
   useEffect(() => {
     const purposeCodeIsCompatible = purposeOptions.some((purpose) => purpose.code === form.purposeCode);
     if (isNiumProvider(selectedProvider?.code)) {
-      // Reopening a saved draft must not erase its purpose while the allowlist loads.
-      // An unsupported saved purpose remains visible and is blocked by validation.
-      const savedPurpose = sgdDraft && String(sgdDraft.provider_id) === form.providerId &&
-        String(sgdDraft.beneficiary_id) === form.beneficiaryId && sgdDraft.purpose_code === form.purposeCode;
-      if (!savedPurpose && purposeCodesQuery.isSuccess && form.purposeCode && !purposeCodeIsCompatible) {
+      // Wait for the authoritative allowlist before clearing an unsupported purpose.
+      if (purposeCodesQuery.isSuccess && form.purposeCode && !purposeCodeIsCompatible) {
         setForm((current) => ({ ...current, purposeCode: "" }));
       }
     } else if (!purposeCodeIsCompatible && (purposeOptions.length > 0 || form.purposeCode)) {
       setForm((current) => ({ ...current, purposeCode: purposeOptions[0]?.code ?? "" }));
     }
-  }, [form.purposeCode, form.providerId, form.beneficiaryId, purposeOptions, selectedProvider?.code, purposeCodesQuery.isSuccess, sgdDraft]);
+  }, [form.purposeCode, form.providerId, form.beneficiaryId, purposeOptions, selectedProvider?.code, purposeCodesQuery.isSuccess]);
 
   const filteredBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
@@ -228,34 +271,34 @@ const AccountTransfers = () => {
     ]);
   };
 
-  const resetPayment = () => {
+  const resetPayment = async () => {
+    try {
+      if (!createdTransfer || !canLeavePayment(createdTransfer)) throw new Error("Resolve the saved payment before starting another instruction.");
+      // Re-check before releasing the browser identity; stale UI must not hide an unknown outcome.
+      const current = await getTransfer({ userId: String(user!.id), token: token!, transferId: createdTransfer.id });
+      if (!canLeavePayment(current)) { setCreatedTransfer(current); throw new Error("The saved payment requires review before starting another instruction."); }
+      const saved = readPaymentIdentity(String(user!.id));
+      if (saved) {
+        if (!belongsToIdentity(current, saved)) throw new Error("Reopen the active saved payment before starting another instruction.");
+        clearPaymentIdentity(String(user!.id), saved);
+      }
+    } catch (failure) { setFormError(failure instanceof Error ? failure.message : "Unable to confirm saved payment."); return; }
     setForm(defaultForm);
     setSearch("");
     setFormError("");
     setCreatedTransfer(null);
-    setSgdDraft(null);
-    sgdPreparationReferences.current.clear();
+    setIdentity(null);
     setStep("payee");
   };
-
-  const findExistingSgdDraft = (beneficiaryId: number, providerId: number) => transfers.find((transfer) =>
-    transfer.user_id === Number(user?.id) && transfer.beneficiary_id === beneficiaryId && transfer.provider_id === providerId &&
-    transfer.transfer_type === "payout" && transfer.source_currency === "USD" && transfer.target_currency === "SGD" &&
-    !!transfer.payout_workflow && !["completed", "failed", "cancelled", "rejected"].includes(transfer.status));
 
   const pickBeneficiary = (beneficiary: Beneficiary) => {
     const providerId = String(beneficiary.provider_id);
     const provider = providerById.get(beneficiary.provider_id);
     if (!beneficiaryTransferOption(beneficiary, provider).selectable) return;
-    const existing = isNiumProvider(provider?.code) && beneficiary.currency === "SGD"
-      ? findExistingSgdDraft(beneficiary.id, beneficiary.provider_id) : undefined;
-    const saved = sgdDraft?.beneficiary_id === beneficiary.id && sgdDraft.provider_id === beneficiary.provider_id &&
-      !["completed", "failed", "cancelled", "rejected"].includes(sgdDraft.status) ? sgdDraft : existing;
-    setSgdDraft(saved ?? null);
     const nextBalance = balances.find(
       (balance) => String(balance.provider_id) === providerId && (!isNiumProvider(provider?.code) || balance.currency === "USD"),
     );
-    setForm(saved ? transferFormFromTransfer(saved) : {
+    setForm({
       ...form,
       providerId,
       beneficiaryId: String(beneficiary.id),
@@ -274,9 +317,6 @@ const AccountTransfers = () => {
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
     if (!selectedProvider) return "Transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
-    if (isNiumProvider(selectedProvider.code) && form.targetCurrency === "SGD" && !transfersQuery.isSuccess) {
-      return transfersQuery.isError ? "Saved payment requests are unavailable. Refresh before continuing." : "Loading saved payment requests before continuing.";
-    }
     const amountValidation = validateTransferAmount(form.sourceAmount);
     if (amountValidation) return amountValidation;
     const corridorValidation = validateTransferConfiguration({
@@ -290,37 +330,118 @@ const AccountTransfers = () => {
     });
     if (corridorValidation) return corridorValidation;
     if (effectiveSourceAmount <= 0) return "Enter a sending amount.";
+    if (isNiumProvider(selectedProvider.code) && form.targetCurrency === "SGD") {
+      return form.referenceText.trim() ? "" : "Enter a payment reference.";
+    }
     if (!selectedBalance) return "No synced wallet balance is available for the selected source currency.";
     if (toNumber(selectedBalance.available_balance) < effectiveSourceAmount) return "Available balance is not enough for this payment.";
     if (!form.purposeCode) return "Select a payment purpose.";
     return "";
   };
 
-  const continueToReview = () => {
+  const verifyIdentity = async () => {
+    const saved = readPaymentIdentity(String(user!.id));
+    if (!saved || !selectedBeneficiary || saved.clientReference !== identity?.clientReference) throw new Error("Reopen the saved payment before continuing.");
+    const current = await getBeneficiary({ userId: String(user!.id), token: token!, beneficiaryId: saved.beneficiaryId });
+    if (current.id !== Number(form.beneficiaryId) || current.provider_id !== Number(form.providerId)
+      || current.status !== "active" || await paymentFingerprint(form, current) !== saved.fingerprint) {
+      throw new Error("Payment details or receiving account changed. Cancel a safe saved draft before editing; review the beneficiary again.");
+    }
+    if (readPaymentIdentity(String(user!.id))?.clientReference !== saved.clientReference) throw new Error("Another payment became active. Reopen the saved payment.");
+  };
+
+  const prepareIdentity = async () => {
+    if (!identityReady) throw new Error("Saved payment identity must be checked before continuing. Reload to retry the status check.");
+    const current = await getBeneficiary({ userId: String(user!.id), token: token!, beneficiaryId: Number(form.beneficiaryId) });
+    if (!selectedBeneficiary || current.id !== selectedBeneficiary.id || current.provider_id !== Number(form.providerId)
+      || current.status !== "active" || await paymentFingerprint(form, current) !== await paymentFingerprint(form, selectedBeneficiary)) {
+      throw new Error("The receiving account changed. Refresh beneficiaries and review the payment again.");
+    }
+    const saved = await claimPaymentIdentity(String(user!.id), current.provider_id, current.id, await paymentFingerprint(form, current));
+    setIdentity(saved);
+    const transfer = await findSavedPayment(saved);
+    return { identity: saved, transfer };
+  };
+
+  const saveTransfer = (transfer: Transfer) => {
+    const saved = readPaymentIdentity(String(user!.id));
+    if (!saved) throw new Error("Payment identity is unavailable. Reopen the saved payment.");
+    setIdentity(rememberPaymentTransfer(String(user!.id), saved, transfer));
+  };
+  const showSavedTransfer = (transfer: Transfer) => {
+    saveTransfer(transfer); setCreatedTransfer(transfer); setStep("result"); void refreshTransfers();
+  };
+
+  const updateOpenedTransfer = (transfer: Transfer) => {
+    const saved = readPaymentIdentity(String(user!.id));
+    if (saved && belongsToIdentity(transfer, saved)) saveTransfer(transfer);
+    setCreatedTransfer(transfer); void refreshTransfers();
+  };
+
+  const resumeSavedTransfer = async (transfer: Transfer) => {
+    try {
+      const saved = readPaymentIdentity(String(user!.id));
+      if (saved && !belongsToIdentity(transfer, saved)) throw new Error("Resolve the active saved payment before reviewing another instruction.");
+      if (!transfer.client_reference || paymentUncertain(transfer)) throw new Error("This instruction needs status recovery before review.");
+      const current = await getBeneficiary({ userId: String(user!.id), token: token!, beneficiaryId: transfer.beneficiary_id! });
+      const restored = transferFormFromTransfer(transfer);
+      const fingerprint = await paymentFingerprint(restored, current);
+      if (saved && saved.fingerprint !== fingerprint) throw new Error("The saved receiving account or instruction changed. Cancel a safe draft before editing it.");
+      const reopened: PaymentIdentity = saved ?? { version: 1, providerId: transfer.provider_id,
+        beneficiaryId: transfer.beneficiary_id!, transferId: transfer.id, clientReference: transfer.client_reference,
+        preparationId: crypto.randomUUID(), fingerprint };
+      writePaymentIdentity(String(user!.id), reopened); setIdentity(reopened);
+      queryClient.setQueryData<Beneficiary[]>(["money-beneficiaries", user?.id, token], (items) =>
+        (items ?? []).map((item) => item.id === current.id ? current : item));
+      setForm(restored); setFormError(""); setStep("details");
+    } catch (failure) { setFormError(failure instanceof Error ? failure.message : "Unable to reopen payment."); }
+  };
+
+  const continueToReview = async () => {
+    if (preparing.current) return;
     const validation = validateDetails();
     if (validation) {
       setFormError(validation);
       return;
     }
 
-    setFormError("");
-    // The transfer list may have arrived after the payee was selected.
-    // Attach the existing draft, keeping any user edits subject to the Review mismatch guard.
-    if (!sgdDraft && isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD") {
-      setSgdDraft(findExistingSgdDraft(Number(form.beneficiaryId), Number(form.providerId)) ?? null);
+    // HK SWIFT review is read-only. Claim its durable identity immediately before Create.
+    if (!(isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD")) {
+      if (!identityReady) { setFormError("Saved payment identity must be checked before continuing."); return; }
+      setFormError(""); setStep("review"); return;
     }
-    setStep("review");
+
+    preparing.current = true; setSgdBusy(true);
+    try {
+      const { transfer } = await prepareIdentity();
+      if (transfer && (paymentUncertain(transfer) || (transfer.status !== "draft" && transfer.payout_workflow?.can_refresh_review !== true))) {
+        showSavedTransfer(transfer); return;
+      }
+      setFormError(""); setStep("review");
+    } catch (failure) { setFormError(failure instanceof Error ? failure.message : "Unable to confirm payment identity."); }
+    finally { preparing.current = false; setSgdBusy(false); }
   };
 
   const createMutation = useMutation({
+    retry: false,
     mutationFn: async () => {
+      if (creating.current) throw new Error("Payment acceptance is already in progress.");
+      creating.current = true;
+      try {
       const validation = validateDetails();
       if (validation) throw new Error(validation);
 
       if (isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD") {
         throw new Error("Review the current SGD LOCAL payment terms before Submit.");
       }
-      return createTransfer({
+      const prepared = await prepareIdentity();
+      if (prepared.transfer) return prepared.transfer;
+      const freshBeneficiary = await getBeneficiary({ userId: String(user!.id), token: token!, beneficiaryId: Number(form.beneficiaryId) });
+      if (freshBeneficiary.status !== "active" || await paymentFingerprint(form, freshBeneficiary) !== prepared.identity.fingerprint
+        || readPaymentIdentity(String(user!.id))?.clientReference !== prepared.identity.clientReference) {
+        throw new Error("Payment details or receiving account changed. Reopen the saved payment.");
+      }
+      return await createTransfer({
         userId: user?.id as string,
         token: token as string,
         payload: buildTransferPayload({
@@ -337,33 +458,36 @@ const AccountTransfers = () => {
           feeCurrency: "USD",
           purposeCode: form.purposeCode,
           referenceText: form.referenceText,
-          clientReference: createClientReference(),
+          clientReference: prepared.identity.clientReference,
           providerCode: selectedProvider?.code ?? "",
           beneficiaryName: selectedBeneficiary?.full_name ?? "",
         }),
       });
+      } finally { creating.current = false; }
     },
     onSuccess: async (transfer) => {
-      setCreatedTransfer(transfer);
+      saveTransfer(transfer); setCreatedTransfer(transfer);
       setFormError("");
       setStep("result");
       await refreshTransfers();
       toast({
-        title: "Payment request created",
-        description:
-          transfer.status === "approval_required"
-            ? "Admin approval is required before submission."
-            : `${transfer.transfer_no} is ready for submission.`,
+        title: paymentPresentation(transfer).title,
+        description: paymentPresentation(transfer).message,
       });
     },
     onError: (error) => {
+      const saved = structuredTransfer(error);
+      if (saved) {
+        try { showSavedTransfer(saved); } catch (failure) { setFormError(String(failure)); }
+      }
       const message = error instanceof Error ? error.message : "Unable to create transfer.";
       setFormError(message);
-      toast({ variant: "destructive", title: "Transfer failed", description: message });
+      toast({ variant: "destructive", title: "Payment acceptance not confirmed", description: `${message} Check the saved payment before retrying; the reference is retained.` });
     },
   });
 
   const submitMutation = useMutation({
+    retry: false,
     mutationFn: async (transferId: number) => submitTransfer({ userId: user?.id as string, token: token as string, transferId }),
     onSuccess: async (payload) => {
       setCreatedTransfer(payload.transfer);
@@ -380,7 +504,13 @@ const AccountTransfers = () => {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async (transferId: number) => syncTransferStatus({ userId: user?.id as string, token: token as string, transferId }),
+    retry: false,
+    mutationFn: async (transferId: number) => {
+      const params = { userId: String(user!.id), token: token!, transferId };
+      const current = await getTransfer(params);
+      if (current.payout_workflow && current.payout_workflow.can_reconcile_status !== true) throw new Error("Reconciliation is not currently authorized. Open the saved payment.");
+      return syncTransferStatus(params);
+    },
     onSuccess: refreshTransfers,
     onError: (error) => {
       toast({
@@ -392,7 +522,13 @@ const AccountTransfers = () => {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (transferId: number) => cancelTransfer({ userId: user?.id as string, token: token as string, transferId }),
+    retry: false,
+    mutationFn: async (transferId: number) => {
+      const params = { userId: String(user!.id), token: token!, transferId };
+      const current = await getTransfer(params);
+      if (!canCancelPayment(current)) throw new Error("Resolve the current operation before cancelling.");
+      return cancelTransfer(params);
+    },
     onSuccess: refreshTransfers,
     onError: (error) => {
       toast({
@@ -489,7 +625,7 @@ const AccountTransfers = () => {
                     sourceCurrencies={sourceCurrencies}
                     effectiveSourceAmount={effectiveSourceAmount}
                     onBack={() => setStep("payee")}
-                    onContinue={continueToReview}
+                    onContinue={() => void continueToReview()}
                     onChange={setForm}
                     onSourceCurrencyChange={updateSourceCurrency}
                     purposeOptions={purposeOptions}
@@ -513,22 +649,24 @@ const AccountTransfers = () => {
                     creating={createMutation.isPending}
                     backDisabled={sgdBusy}
                     onBack={() => setStep("details")}
-                    onSubmit={() => createMutation.mutate()}
-                    sgdReview={isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD" ? <SgdLocalReview
+                    onSubmit={() => { if (!creating.current) createMutation.mutate(); }}
+                    sgdReview={identity && isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD" ? <SgdLocalReview
                       key={`${user?.id}:${form.providerId}:${form.beneficiaryId}`}
                       userId={user?.id as string} token={token as string} providerId={Number(form.providerId)}
                       beneficiaryId={Number(form.beneficiaryId)} sourceAmount={form.sourceAmount} purposeCode={form.purposeCode}
-                      preparationReference={sgdPreparationReference()} referenceText={form.referenceText}
-                      balance={selectedBalance} validationError={validateDetails()} onBusyChange={setSgdBusy}
-                      onTransferChanged={refreshTransfers}
-                      fxEnabled={selectedBeneficiary?.payout_admission?.fx_lock_enabled === true}
-                      draft={sgdDraft} onDraft={setSgdDraft} onSubmitted={(transfer) => {
-                        setCreatedTransfer(transfer); setStep("result"); void refreshTransfers();
+                      preparationReference={identity.clientReference} preparationId={identity.preparationId}
+                      transferId={identity.transferId} accountIdentity={identity.fingerprint} referenceText={form.referenceText}
+                      verifyIdentity={verifyIdentity} onPrepared={saveTransfer}
+                      onRecovery={(transfer) => { try { showSavedTransfer(transfer); } catch (failure) { setFormError(String(failure)); } }}
+                      onInspect={() => { void inspectSavedPayment().catch((failure) => setFormError(String(failure))); }}
+                      validationError={validateDetails()} onBusyChange={setSgdBusy}
+                      onSubmitted={(transfer) => {
+                        showSavedTransfer(transfer);
                       }} /> : undefined}
                   />
                 )}
 
-                {step === "result" && (
+                {step === "result" && <>
                   <ResultStep
                     transfer={createdTransfer}
                     provider={createdTransfer ? providerById.get(createdTransfer.provider_id) : selectedProvider}
@@ -538,9 +676,12 @@ const AccountTransfers = () => {
                     }
                     submitting={submitMutation.isPending}
                     onSubmitToProvider={() => createdTransfer && submitMutation.mutate(createdTransfer.id)}
-                    onNewPayment={resetPayment}
+                    onNewPayment={() => void resetPayment()}
                   />
-                )}
+                  {createdTransfer && <PaymentRecovery userId={String(user?.id)} token={token!}
+                    transfer={createdTransfer} onUpdated={updateOpenedTransfer}
+                    onResume={(transfer) => void resumeSavedTransfer(transfer)} />}
+                </>}
               </div>
             </CardContent>
           </Card>
@@ -573,16 +714,14 @@ const AccountTransfers = () => {
                         submitting={submitMutation.isPending}
                         syncing={syncMutation.isPending || sgdBusy}
                         canceling={cancelMutation.isPending || sgdBusy}
-                        reviewDisabled={sgdBusy}
                         onSubmit={() => submitMutation.mutate(transfer.id)}
-                        onReview={() => {
-                          if (sgdBusy) return;
-                          setSgdDraft(transfer);
-                          setForm(transferFormFromTransfer(transfer));
-                          setFormError(""); setStep("review");
-                        }}
                         onSync={() => syncMutation.mutate(transfer.id)}
                         onCancel={() => cancelMutation.mutate(transfer.id)}
+                        onOpen={() => {
+                          void getTransfer({ userId: String(user!.id), token: token!, transferId: transfer.id })
+                            .then((current) => { setCreatedTransfer(current); setFormError(""); setStep("result"); })
+                            .catch((failure) => setFormError(String(failure)));
+                        }}
                       />
                     ))}
                   </div>
@@ -915,17 +1054,17 @@ export const ResultStep = ({
   onNewPayment: () => void;
 }) => (
   <div className="mx-auto max-w-2xl space-y-6 text-center">
-    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
-      <CheckCircle2 className="h-8 w-8" />
+    <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${transfer?.status === "completed"
+      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+      : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"}`}>
+      {transfer?.status === "completed" ? <CheckCircle2 className="h-8 w-8" /> : <AlertCircle className="h-8 w-8" />}
     </div>
     <div>
       <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#0f2442] sm:text-3xl dark:text-white">
-        Payment request created
+        {paymentPresentation(transfer).title}
       </h2>
       <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-        {isNiumProvider(provider?.code) && transfer?.target_currency === "SGD"
-          ? "Your payment instruction is saved in Origin Wallet. Admin Approve & submit initiates the payout."
-          : "The request is saved in Origin Wallet. Submit it when approval rules allow."}
+        {paymentPresentation(transfer).message}
       </p>
     </div>
 
@@ -989,8 +1128,9 @@ export const ResultStep = ({
         variant="outline"
         className="h-12 rounded-full border-[#d7d7d2] bg-white px-7 text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white"
         onClick={onNewPayment}
+        disabled={!transfer || !canLeavePayment(transfer)}
       >
-        New payment
+        Start a separate payment
       </Button>
     </div>
   </div>
@@ -1038,10 +1178,9 @@ export const TransferRow = ({
   syncing,
   canceling,
   onSubmit,
-  onReview,
-  reviewDisabled = false,
   onSync,
   onCancel,
+  onOpen,
 }: {
   transfer: Transfer;
   provider?: ProviderSummary;
@@ -1050,10 +1189,9 @@ export const TransferRow = ({
   syncing: boolean;
   canceling: boolean;
   onSubmit: () => void;
-  onReview?: () => void;
-  reviewDisabled?: boolean;
   onSync: () => void;
   onCancel: () => void;
+  onOpen?: () => void;
 }) => (
   <div className="space-y-4 px-5 py-5">
     <div className="flex flex-col gap-4">
@@ -1094,8 +1232,7 @@ export const TransferRow = ({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {isNiumProvider(provider?.code) && transfer.target_currency === "SGD" && transfer.payout_workflow && onReview &&
-          <Button size="sm" variant="outline" disabled={reviewDisabled} onClick={onReview}>Review payment</Button>}
+        {onOpen && <Button size="sm" variant="outline" onClick={onOpen}>Open saved payment</Button>}
         {provider && !isNiumProvider(provider.code) ? <Button
           size="sm"
           disabled={!canSubmitProvider(transfer.status) || submitting}
@@ -1119,7 +1256,7 @@ export const TransferRow = ({
         <Button
           size="sm"
           variant="outline"
-          disabled={!canCancel(transfer.status) || canceling}
+          disabled={!canCancelPayment(transfer) || canceling}
           onClick={onCancel}
           className="rounded-full border-red-200 bg-white px-4 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-[#10141b] dark:text-red-300"
         >

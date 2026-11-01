@@ -82,7 +82,7 @@ export const recipientAmountPresentation = (providerCode?: string | null, target
 
 export const payoutFeePresentation = (payoutMethod?: string | null) =>
   payoutMethod === "LOCAL"
-    ? "Provider fees are not yet available"
+    ? "Provider fees must be verified before Submit"
     : "Provider and intermediary bank fees may apply (SHA)";
 
 export const buildTransferPayload = (values: TransferPayloadValues): TransferPayload => {
@@ -215,7 +215,7 @@ export const beneficiaryTransferOption = (beneficiary: Beneficiary, provider?: P
   // the user chooses from the fetched provider list on the details screen.
   if (isNiumProvider(provider.code) && isSgdLocalBeneficiary(beneficiary)) {
     if (provider.supports_transfers && beneficiary.provider_id === provider.id && hasSgdLocalPreparation(beneficiary)) {
-      return { visible: true, selectable: true, reason: "Preparation only — provider fees and release approval are pending." };
+      return { visible: true, selectable: true, reason: "Payment terms and fees must be verified before Submit." };
     }
     const admissionReason = !provider.supports_transfers ? "The selected provider does not support transfers."
       : beneficiary.provider_id !== provider.id ? "The selected beneficiary is not associated with this provider."
