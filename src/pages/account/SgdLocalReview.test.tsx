@@ -17,9 +17,9 @@ const terms = (): TransferReview => ({ id: 50, transfer_no: "SYNTHETIC-50", prov
     dispatch_owner: "checker_approval", customer_accepted_at: null, recovery_required: false },
   review_token: "bound-review", source_amount: "5.00000000",
   source_currency: "USD", destination_currency: "SGD", fx_rate: "1.32",
-  fx_expires_at: new Date(Date.now() + 60_000).toISOString(), conversion_amount: null,
+  fx_expires_at: new Date(Date.now() + 15 * 60_000).toISOString(), conversion_amount: null,
   terms: { currency: "USD", fee_amount: "0",
-    total_wallet_debit: "5", expires_at: new Date(Date.now() + 60_000).toISOString() } });
+    total_wallet_debit: "5", expires_at: new Date(Date.now() + 15 * 60_000).toISOString() } });
 const consent = async () => {
   await waitFor(() => expect(screen.getByRole("checkbox", { name: /I authorize/ })).toBeEnabled());
   fireEvent.click(screen.getByRole("checkbox", { name: /I authorize/ }));
@@ -39,7 +39,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 
 describe("SGD standard review", () => {
   it("prepares once in StrictMode and submits once through standard creation after consent", async () => {
-    render(<StrictMode><SgdLocalReview {...props} /></StrictMode>);
+    render(<StrictMode><SgdLocalReview {...props} onInspect={vi.fn()} /></StrictMode>);
     await consent();
     const submit = screen.getByRole("button", { name: "Submit" });
     fireEvent.click(submit); fireEvent.click(submit);
@@ -50,7 +50,7 @@ describe("SGD standard review", () => {
       source_amount: "5", target_currency: "SGD", review_token: "bound-review",
       client_reference: "new-instruction", accept_payment_terms: true, purpose_confirmed: true,
     });
-    expect(screen.queryByRole("button", { name: /Lock|Refresh|Approval/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Lock|Refresh|Approval|Save Draft|Resume|Check saved payment/ })).not.toBeInTheDocument();
   });
   it("reports the genuine financial blocker and cannot accept unavailable terms", async () => {
     api.reviewTransfer.mockRejectedValue(new Error("Verified NIUM fees and total wallet debit are unavailable."));
@@ -72,16 +72,27 @@ describe("SGD standard review", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: /I authorize/ })).toBeDisabled();
   });
-  it("does not replace FX when it expires during review", async () => {
+  it("blocks Submit exactly at the fifteen-minute expiry without replacing FX", async () => {
     let now = Date.now();
     vi.spyOn(Date, "now").mockImplementation(() => now);
     render(<SgdLocalReview {...props} />);
     await consent();
-    now += 120_000;
+    now += 15 * 60_000;
     await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 1100)); });
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
     expect(api.createTransfer).not.toHaveBeenCalled();
+  });
+  it("rechecks expiry after asynchronous identity verification before accepting terms", async () => {
+    let now = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const verifyIdentity = vi.fn().mockResolvedValueOnce(undefined).mockImplementationOnce(async () => { now += 15 * 60_000; });
+    render(<SgdLocalReview {...props} verifyIdentity={verifyIdentity} />);
+    await consent();
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("FX or financial terms expired before acceptance. A new review is required.");
+    expect(api.createTransfer).not.toHaveBeenCalled();
+    expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
   });
   it("retries uncertain acceptance using exactly the same reference and review", async () => {
     let now = Date.now();
@@ -91,7 +102,7 @@ describe("SGD standard review", () => {
     await consent();
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByText("Response lost");
-    now += 120_000; // An identical recorded acceptance may be replayed even after terms expire.
+    now += 15 * 60_000; // An identical recorded acceptance may be replayed even after terms expire.
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(onSubmitted).toHaveBeenCalledTimes(1));
     expect(api.createTransfer.mock.calls[1][0]).toEqual(api.createTransfer.mock.calls[0][0]);

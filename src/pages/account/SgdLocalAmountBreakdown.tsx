@@ -36,7 +36,8 @@ export const SgdLocalAmountBreakdown = ({ sourceAmount, amounts }: {
     ["USD total wallet debit", amount(verified?.total_wallet_debit, "USD", "Unavailable — fees not confirmed")],
     ["FX rate", rate !== null && rate !== "0" ? `${rate} SGD per USD` : "Unavailable pending provider confirmation"],
     ["FX lock expiry", lockActive ? new Date(expiresAt).toISOString() : Number.isFinite(expiresAt) ? "Expired — a new FX lock and review are required" : "Unavailable — no confirmed FX lock"],
-    ["SGD conversion amount", amount(lockActive ? verified?.conversion_amount : null, "SGD", "SGD amount unavailable — FX confirmation pending")],
+    ["SGD conversion amount", amount(lockActive ? verified?.conversion_amount : null, "SGD", lockActive
+      ? "Unavailable — provider conversion amount not supplied" : "SGD amount unavailable — FX confirmation pending")],
     ...(verified?.estimated_conversion_amount !== undefined ? [["Estimated SGD amount", lockActive && decimal(verified.estimated_conversion_amount) !== null
       ? `SGD ${decimal(verified.estimated_conversion_amount)} (estimate)` : "Unavailable — a current FX lock is required"]] : []),
     ["NIUM transfer fee", verified?.transfer_fee && /^[A-Z]{3}$/.test(verified.transfer_fee.currency)

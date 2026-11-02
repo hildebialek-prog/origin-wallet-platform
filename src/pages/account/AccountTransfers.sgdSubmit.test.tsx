@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
@@ -67,21 +67,93 @@ beforeEach(() => {
   api.reviewTransfer.mockImplementation(async ({ payload }) => ({
     ...transferResponse(payload),
     review_token: "new-reviewed-instruction", source_amount: "5", source_currency: "USD", destination_currency: "SGD",
-    fx_rate: "1.32", fx_expires_at: new Date(Date.now() + 60_000).toISOString(), conversion_amount: null,
+    fx_rate: "1.32", fx_expires_at: new Date(Date.now() + 15 * 60_000).toISOString(), conversion_amount: null,
     terms: { currency: "USD", fee_amount: "0", total_wallet_debit: "5",
-      expires_at: new Date(Date.now() + 60_000).toISOString() },
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString() },
   }));
   api.createTransfer.mockImplementation(async ({ payload }) => transferResponse(payload, "approval_required"));
 });
 afterEach(() => { clients.splice(0).forEach((client) => client.clear()); vi.unstubAllGlobals(); });
 
 describe("customer standard SGD transfer lifecycle", () => {
+  const confirmedAmounts = () => ({ source_currency: "USD", destination_currency: "SGD", source_amount: "5.00000000",
+    fx_rate: "1.276738080", fx_lock_expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    total_wallet_debit: "5", transfer_fee: { amount: "0", currency: "USD" },
+    estimated_conversion_amount: "6.3836904", conversion_amount: null, beneficiary_credit: null });
+
+  it("shares backend terms between Review, summary and details, then invalidates them when the amount changes", async () => {
+    api.reviewTransfer.mockImplementation(async ({ payload }) => {
+      const amounts = confirmedAmounts();
+      return { ...transferResponse(payload), review_token: "confirmed-review", source_amount: "5", destination_currency: "SGD",
+        fx_rate: amounts.fx_rate, fx_expires_at: amounts.fx_lock_expires_at, conversion_amount: null,
+        terms: { currency: "USD", fee_amount: "0", total_wallet_debit: "5", expires_at: amounts.fx_lock_expires_at },
+        payout_amounts: amounts };
+    });
+    mount(); await details();
+    const summary = () => within(screen.getByRole("region", { name: "Payment summary" }));
+    await waitFor(() => expect(summary().getByText("1.276738080 SGD per USD")).toBeVisible());
+    expect(summary().getByText("USD 0.00")).toBeVisible();
+    expect(summary().getByText("SGD 6.3836904 (estimate)")).toBeVisible();
+    expect(summary().getByText("Unavailable — final credit not confirmed")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "SGD LOCAL payment review" })).getByText("SGD 6.3836904 (estimate)")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByText("Complete payment details");
+    expect(screen.getAllByText("1.276738080 SGD per USD")).toHaveLength(2);
+    expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByPlaceholderText("Enter an amount"), { target: { value: "6" } });
+    expect(screen.queryByText("1.276738080 SGD per USD")).not.toBeInTheDocument();
+    expect(screen.queryByText("SGD 6.3836904 (estimate)")).not.toBeInTheDocument();
+    expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates displayed terms when the receiving account changes", async () => {
+    mount(); await details();
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Payment summary" })).getByText("1.32 SGD per USD")).toBeVisible());
+    api.getBeneficiaries.mockResolvedValue([{ ...payee, account_number: "changed-account" }]);
+    await act(async () => { await clients[0].invalidateQueries({ queryKey: ["money-beneficiaries"] }); });
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Payment summary" })).queryByText("1.32 SGD per USD")).not.toBeInTheDocument());
+    expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
+    expect(api.createTransfer).not.toHaveBeenCalled();
+  });
+
+  it("blocks an incomplete review without fabricating a persisted transfer identity", async () => {
+    const original = api.reviewTransfer.getMockImplementation()!;
+    api.reviewTransfer.mockImplementation(async (request) => {
+      const { id, transfer_no, status, payout_workflow, ...review } = await original(request);
+      return review;
+    });
+    mount(); await details();
+    await screen.findByText("Review did not return a saved payment. Refresh the saved payment status before continuing.");
+    expect(readPaymentIdentity("12")?.transferId).toBeUndefined();
+    expect(screen.getByRole("checkbox", { name: /I authorize/ })).toBeDisabled();
+    expect(api.createTransfer).not.toHaveBeenCalled();
+    expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores authoritative amounts from a saved draft into summary and reopened details without acquiring FX", async () => {
+    const view = mount(); await details();
+    await waitFor(() => expect(readPaymentIdentity("12")?.transferId).toBe(50));
+    const payload = api.reviewTransfer.mock.calls[0][0].payload;
+    api.getTransfer.mockResolvedValue({ ...transferResponse(payload), payout_amounts: confirmedAmounts() });
+    view.unmount(); mount();
+    await screen.findByRole("heading", { name: "Payment draft saved" });
+    expect(within(screen.getByRole("region", { name: "Payment summary" })).getByText("SGD 6.3836904 (estimate)")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Review saved instruction" }));
+    await screen.findByText("Complete payment details");
+    expect(screen.getAllByText("SGD 6.3836904 (estimate)")).toHaveLength(2);
+    expect(api.reviewTransfer).toHaveBeenCalledTimes(1);
+    expect(api.createTransfer).not.toHaveBeenCalled();
+  });
+
   it("Select → Review → Submit creates one approval_required instruction without provider submission", async () => {
     mount(); await details();
     const review = await screen.findByRole("region", { name: "SGD LOCAL payment review" });
     await waitFor(() => expect(within(review).getByRole("checkbox", { name: /I authorize/ })).toBeEnabled());
     fireEvent.click(within(review).getByRole("checkbox", { name: /I authorize/ }));
     fireEvent.click(within(review).getByRole("checkbox", { name: /purpose is truthful/ }));
+    expect(screen.queryByRole("button", { name: /Save Draft|Resume|Check saved payment|Refresh pricing|FX Lock/i })).not.toBeInTheDocument();
+    expect(api.requestSgdRecoveryReview).not.toHaveBeenCalled();
+    expect(api.recoverSgdCapturedOutcome).not.toHaveBeenCalled();
     const submit = within(review).getByRole("button", { name: "Submit" });
     fireEvent.click(submit); fireEvent.click(submit);
     await screen.findByRole("heading", { name: "Payment awaiting Admin processing" });

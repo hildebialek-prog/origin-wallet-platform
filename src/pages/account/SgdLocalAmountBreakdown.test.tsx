@@ -63,7 +63,7 @@ describe("SGD payout amount distinctions", () => {
     const view = render(<SgdLocalAmountBreakdown sourceAmount="10" amounts={props} />);
     view.rerender(<SgdLocalAmountBreakdown sourceAmount="10" amounts={{ ...props }} />);
     expect(screen.getByText("1.275939120 SGD per USD")).toBeVisible();
-    expect(screen.getByText("SGD amount unavailable — FX confirmation pending")).toBeVisible();
+    expect(screen.getByText("Unavailable — provider conversion amount not supplied")).toBeVisible();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });

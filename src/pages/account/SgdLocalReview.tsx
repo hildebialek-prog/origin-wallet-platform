@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { createTransfer, reviewTransfer, type StandardSgdSubmitPayload, type Transfer, type TransferReview } from "@/services/moneyMovementService";
 import { ApiRequestError } from "@/services/apiClient";
 import { paymentUncertain, structuredTransfer } from "./paymentSafety";
+import { SgdLocalAmountBreakdown } from "./SgdLocalAmountBreakdown";
+import { reviewPayoutAmounts } from "./sgdFinancialTerms";
 
 type Props = {
   userId: string;
@@ -18,6 +20,7 @@ type Props = {
   accountIdentity?: string;
   verifyIdentity?: () => Promise<void>;
   onPrepared?: (transfer: Transfer) => void;
+  onTermsConfirmed?: (review: TransferReview) => void;
   onRecovery?: (transfer: Transfer) => void;
   onInspect?: () => void;
   validationError: string;
@@ -30,6 +33,25 @@ const decimal = (value: unknown) => {
   const [whole, fraction = ""] = value.split(".");
   return (whole.replace(/^0+(?=\d)/, "") || "0") + (fraction.replace(/0+$/, "") ? "." + fraction.replace(/0+$/, "") : "");
 };
+
+const matchesReview = (review: TransferReview, props: Props) => review.source_currency === "USD" && review.destination_currency === "SGD"
+  && decimal(review.source_amount) !== null && decimal(review.source_amount) === decimal(props.sourceAmount)
+  && Number.isFinite(Number(review.fx_rate)) && Number(review.fx_rate) > 0
+  && review.target_currency === "SGD" && review.provider_id === props.providerId && review.beneficiary_id === props.beneficiaryId
+  && review.client_reference === props.preparationReference
+  && Number.isInteger(review.id)
+  && review.transfer_type === "payout" && review.purpose_code === props.purposeCode && review.reference_text === props.referenceText.trim()
+  && typeof review.review_token === "string" && review.review_token.length > 0
+  && review.terms?.currency === "USD" && decimal(review.terms?.fee_amount) === "0"
+  && decimal(review.terms?.total_wallet_debit) !== null
+  && decimal(review.terms?.total_wallet_debit) === decimal(props.sourceAmount)
+  && (!review.payout_amounts || (review.payout_amounts.source_currency === "USD" && review.payout_amounts.destination_currency === "SGD"
+    && decimal(String(review.payout_amounts.source_amount)) === decimal(review.source_amount)
+    && decimal(String(review.payout_amounts.fx_rate)) === decimal(review.fx_rate)
+    && Date.parse(review.payout_amounts.fx_lock_expires_at ?? "") === Date.parse(review.fx_expires_at)
+    && decimal(String(review.payout_amounts.transfer_fee?.amount)) === decimal(review.terms.fee_amount)
+    && review.payout_amounts.transfer_fee?.currency === "USD"
+    && decimal(String(review.payout_amounts.total_wallet_debit)) === decimal(review.terms.total_wallet_debit)));
 
 // Review prepares evidence only. Submit uses the same transfer endpoint as USD.
 export default function SgdLocalReview(props: Props) {
@@ -73,11 +95,17 @@ export default function SgdLocalReview(props: Props) {
     } }); })());
     void preparations.current.get(intent)!.then((result) => {
       if (generation.current === version) {
+        if (!Number.isInteger(result.id) || result.id <= 0 || typeof result.transfer_no !== "string" || !result.transfer_no) {
+          throw new Error("Review did not return a saved payment. Refresh the saved payment status before continuing.");
+        }
         callbacks.current.onPrepared?.(result);
         if (paymentUncertain(result)) {
           setBlocked(true); setError("The saved payment requires recovery before continuing.");
           callbacks.current.onRecovery?.(result);
-        } else setReview(result);
+        } else {
+          setReview(result);
+          if (matchesReview(result, callbacks.current)) callbacks.current.onTermsConfirmed?.(result);
+        }
       }
     }).catch((failure: unknown) => {
       if (generation.current === version) {
@@ -98,16 +126,7 @@ export default function SgdLocalReview(props: Props) {
 
   const fresh = !!review && Date.parse(review.fx_expires_at) > Math.max(now, Date.now())
     && Date.parse(review.terms?.expires_at) > Math.max(now, Date.now());
-  const matches = !!review && review.source_currency === "USD" && review.destination_currency === "SGD"
-    && decimal(review.source_amount) !== null && decimal(review.source_amount) === decimal(props.sourceAmount)
-    && Number.isFinite(Number(review.fx_rate)) && Number(review.fx_rate) > 0
-    && review.target_currency === "SGD" && review.provider_id === props.providerId && review.beneficiary_id === props.beneficiaryId
-    && review.client_reference === props.preparationReference && Number.isInteger(review.id)
-    && review.transfer_type === "payout" && review.purpose_code === props.purposeCode && review.reference_text === props.referenceText
-    && typeof review.review_token === "string" && review.review_token.length > 0
-    && review.terms?.currency === "USD" && decimal(review.terms?.fee_amount) === "0"
-    && decimal(review.terms?.total_wallet_debit) !== null
-    && decimal(review.terms?.total_wallet_debit) === decimal(props.sourceAmount);
+  const matches = !!review && matchesReview(review, props);
   const ready = !blocked && !props.validationError && matches && accepted && purposeConfirmed && (fresh || uncertain);
 
   const submit = async () => {
@@ -115,6 +134,9 @@ export default function SgdLocalReview(props: Props) {
     started.current = true; setBusy(true); props.onBusyChange?.(true); setError("");
     try {
       await props.verifyIdentity?.();
+      if (!uncertain && (Date.parse(review.fx_expires_at) <= Date.now() || Date.parse(review.terms.expires_at) <= Date.now())) {
+        throw new Error("FX or financial terms expired before acceptance. A new review is required.");
+      }
       const payload: StandardSgdSubmitPayload = {
         provider_id: props.providerId, beneficiary_id: props.beneficiaryId, transfer_type: "payout",
         source_currency: "USD", target_currency: "SGD", source_amount: props.sourceAmount,
@@ -149,9 +171,8 @@ export default function SgdLocalReview(props: Props) {
       <div><dt>NIUM transfer fee (USD)</dt><dd>{review.terms?.fee_amount ?? "Unavailable"}</dd></div>
       <div><dt>Total wallet debit (USD)</dt><dd>{review.terms?.total_wallet_debit ?? "Unavailable"}</dd></div>
       <div><dt>Pricing expires</dt><dd>{review.terms?.expires_at ?? "Unavailable"}</dd></div>
-      <div><dt>Conversion amount (SGD)</dt><dd>{review.conversion_amount ?? "Unavailable"}</dd></div>
-      <div><dt>Final beneficiary credit (SGD)</dt><dd>Unavailable pending provider confirmation</dd></div>
     </dl>}
+    {review && matches && <SgdLocalAmountBreakdown sourceAmount={props.sourceAmount} amounts={reviewPayoutAmounts(review)} />}
     {!busy && !review && !error && <p role="status">Current payment terms are unavailable.</p>}
     {review && !fresh && <p role="status">FX or financial terms expired. Return to payment details and review again. Accepted terms will not be replaced automatically.</p>}
     {props.validationError && <p role="alert">{props.validationError}</p>}
@@ -164,6 +185,6 @@ export default function SgdLocalReview(props: Props) {
     <label className="flex gap-2 text-sm"><input type="checkbox" checked={accepted} disabled={busy || !matches || !fresh || uncertain || blocked}
       onChange={(event) => setAccepted(event.target.checked)} />I authorize this beneficiary and receiving account, USD amount, SGD LOCAL payout, purpose, FX rate and verified financial terms.</label>
     <Button disabled={busy || !ready} onClick={() => void submit()}>Submit</Button>
-    {props.onInspect && <Button variant="outline" disabled={busy} onClick={props.onInspect}>Check saved payment</Button>}
+    {props.onInspect && (blocked || uncertain || (!!review && !fresh)) && <Button variant="outline" disabled={busy} onClick={props.onInspect}>Check saved payment</Button>}
   </section>;
 }

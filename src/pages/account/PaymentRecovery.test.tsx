@@ -20,6 +20,23 @@ function Harness({ initial = unknown }: { initial?: Transfer }) {
 beforeEach(() => { vi.resetAllMocks(); api.getTransfer.mockResolvedValue(unknown); });
 
 describe("saved payment recovery", () => {
+  it("offers cancellation rather than reusing a draft when the backend explicitly denies replacement review", () => {
+    const draft = { ...unknown, status: "draft", payout_workflow: { state: "draft", can_refresh_review: false } };
+    render(<Harness initial={draft} />);
+    expect(screen.queryByRole("button", { name: "Review saved instruction" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel saved instruction before editing" })).toBeEnabled();
+    expect(api.getTransfer).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+  });
+  it("honors a fresh denial of draft re-review before resuming the saved instruction", async () => {
+    const draft = { ...unknown, status: "draft", payout_workflow: { state: "draft", can_refresh_review: true } };
+    api.getTransfer.mockResolvedValue({ ...draft, payout_workflow: { ...draft.payout_workflow, can_refresh_review: false } });
+    render(<Harness initial={draft} />);
+    fireEvent.click(screen.getByRole("button", { name: "Review saved instruction" }));
+    await screen.findByRole("alert");
+    expect(resume).not.toHaveBeenCalled();
+    expect(api.cancelTransfer).not.toHaveBeenCalled();
+  });
   it("performs no automatic operation and blocks blind reconciliation, cancellation and review", () => {
     render(<Harness />);
     expect(api.getTransfer).not.toHaveBeenCalled();

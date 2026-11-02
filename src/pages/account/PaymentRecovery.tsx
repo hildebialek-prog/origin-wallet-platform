@@ -24,7 +24,7 @@ export default function PaymentRecovery({ userId, token, transfer, onUpdated, on
       const capabilities = current.payout_workflow;
       if (action === "refresh") return;
       if (action === "resume") {
-        if (paymentUncertain(current) || !(current.status === "draft" || capabilities?.can_refresh_review === true)) {
+        if (paymentUncertain(current) || !(current.status === "draft" && capabilities?.can_refresh_review !== false || capabilities?.can_refresh_review === true)) {
           throw new Error("This instruction cannot be reviewed again. Check its saved status.");
         }
         onResume(current); return;
@@ -53,7 +53,7 @@ export default function PaymentRecovery({ userId, token, transfer, onUpdated, on
       {workflow?.can_reconcile_status === true && <Button disabled={busy} onClick={() => void act("sync")}>Reconcile status</Button>}
       {workflow?.can_request_recovery_review === true && <Button disabled={busy || !!workflow.recovery_review_requested_at} onClick={() => void act("review")}>Request recovery review</Button>}
       {workflow?.can_recover_captured_outcome === true && <Button disabled={busy} onClick={() => void act("recover")}>Recover captured outcome</Button>}
-      {!paymentUncertain(transfer) && (transfer.status === "draft" || workflow?.can_refresh_review === true)
+      {!paymentUncertain(transfer) && (transfer.status === "draft" && workflow?.can_refresh_review !== false || workflow?.can_refresh_review === true)
         && <Button disabled={busy} onClick={() => void act("resume")}>Review saved instruction</Button>}
       {canCancelPayment(transfer) && <Button variant="outline" disabled={busy} onClick={() => void act("cancel")}>Cancel saved instruction before editing</Button>}
     </div>
