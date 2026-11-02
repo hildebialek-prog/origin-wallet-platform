@@ -48,6 +48,7 @@ import {
   type Balance,
   type Beneficiary,
   type Transfer,
+  type NiumPayoutAmounts,
 } from "@/services/moneyMovementService";
 import {
   currencyOptions,
@@ -59,9 +60,10 @@ import {
 import { isVerifiedKycStatus, normalizeStatus } from "@/lib/status";
 import { SgdLocalAmountBreakdown } from "./SgdLocalAmountBreakdown";
 import SgdLocalReview from "./SgdLocalReview";
+import { reviewPayoutAmounts, sgdFinancialKey } from "./sgdFinancialTerms";
 import PaymentRecovery from "./PaymentRecovery";
 import { belongsToIdentity, canCancelPayment, canLeavePayment, claimPaymentIdentity, clearPaymentIdentity,
-  paymentFingerprint, paymentPresentation, paymentUncertain, readPaymentIdentity, rememberPaymentTransfer,
+  isBlockedDraft, leaveBlockedDraftSession, paymentFingerprint, paymentPresentation, paymentUncertain, readPaymentIdentity, rememberPaymentTransfer,
   structuredTransfer, writePaymentIdentity, type PaymentIdentity } from "./paymentSafety";
 import {
   buildTransferPayload,
@@ -112,9 +114,15 @@ const AccountTransfers = () => {
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
   const [createdTransfer, setCreatedTransfer] = useState<Transfer | null>(null);
+  const [confirmedSgdTerms, setConfirmedSgdTerms] = useState<{ key: string; amounts: NiumPayoutAmounts | null } | null>(null);
   const [sgdBusy, setSgdBusy] = useState(false);
   const [identity, setIdentity] = useState<PaymentIdentity | null>(null);
   const [identityReady, setIdentityReady] = useState(false);
+  const [previousBlockedTransfer, setPreviousBlockedTransfer] = useState<Transfer | null>(null);
+  const [resettingSession, setResettingSession] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const resetting = useRef(false);
+  const recoveryRunning = useRef(false);
   const preparing = useRef(false);
   const creating = useRef(false);
 
@@ -141,7 +149,7 @@ const AccountTransfers = () => {
 
   useEffect(() => {
     let active = true;
-    setIdentityReady(false); setIdentity(null); setCreatedTransfer(null); setFormError(""); setForm(defaultForm); setStep("payee");
+    setIdentityReady(false); setIdentity(null); setCreatedTransfer(null); setConfirmedSgdTerms(null); setFormError(""); setForm(defaultForm); setStep("payee"); setPreviousBlockedTransfer(null);
     if (!user?.id || !token) return;
     void (async () => {
       try {
@@ -196,6 +204,10 @@ const AccountTransfers = () => {
   const beneficiaries = useMemo(() => beneficiariesQuery.data ?? [], [beneficiariesQuery.data]);
   const balances = balancesQuery.data ?? [];
   const transfers = transfersQuery.data ?? [];
+  const activityTransfers = transfers.slice(0, 5);
+  if (previousBlockedTransfer && !activityTransfers.some((transfer) => transfer.id === previousBlockedTransfer.id)) {
+    activityTransfers.push(transfers.find((transfer) => transfer.id === previousBlockedTransfer.id) ?? previousBlockedTransfer);
+  }
 
   const providerById = useMemo(() => {
     const map = new Map<number, ProviderSummary>();
@@ -287,6 +299,7 @@ const AccountTransfers = () => {
     setSearch("");
     setFormError("");
     setCreatedTransfer(null);
+    setConfirmedSgdTerms(null);
     setIdentity(null);
     setStep("payee");
   };
@@ -391,6 +404,7 @@ const AccountTransfers = () => {
         beneficiaryId: transfer.beneficiary_id!, transferId: transfer.id, clientReference: transfer.client_reference,
         preparationId: crypto.randomUUID(), fingerprint };
       writePaymentIdentity(String(user!.id), reopened); setIdentity(reopened);
+      setConfirmedSgdTerms({ key: sgdFinancialKey(restored, current), amounts: transfer.payout_amounts ?? null });
       queryClient.setQueryData<Beneficiary[]>(["money-beneficiaries", user?.id, token], (items) =>
         (items ?? []).map((item) => item.id === current.id ? current : item));
       setForm(restored); setFormError(""); setStep("details");
@@ -539,6 +553,22 @@ const AccountTransfers = () => {
     },
   });
 
+  const sessionActionBusy = resettingSession || recoveryBusy || sgdBusy || createMutation.isPending
+    || submitMutation.isPending || syncMutation.isPending || cancelMutation.isPending;
+  const startNewTransfer = async () => {
+    if (!user?.id || !identityReady || !createdTransfer || !isBlockedDraft(createdTransfer)
+      || resetting.current || recoveryRunning.current || preparing.current || creating.current || sessionActionBusy) return;
+    resetting.current = true; setResettingSession(true);
+    try {
+      await leaveBlockedDraftSession(String(user.id), createdTransfer);
+      setPreviousBlockedTransfer(createdTransfer);
+      setForm(defaultForm); setSearch(""); setFormError(""); setCreatedTransfer(null);
+      setConfirmedSgdTerms(null); setIdentity(null); setStep("payee");
+    } catch (failure) {
+      setFormError(failure instanceof Error ? failure.message : "Unable to reset the saved wizard session.");
+    } finally { resetting.current = false; setResettingSession(false); }
+  };
+
   return (
     <div className="wallet-ui bg-[#f8f8f6] px-4 py-8 sm:px-7 sm:py-10 dark:bg-[#10141b]">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -590,6 +620,11 @@ const AccountTransfers = () => {
           />
         )}
 
+        {previousBlockedTransfer && <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+          Transfer {previousBlockedTransfer.transfer_no} remains pending investigation. Starting a new transfer does not cancel or retry it.{" "}
+          <a href="#transfer-activity" className="font-semibold underline">View the previous transfer in Transfer activity</a>.
+        </div>}
+
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <Card className="wallet-card overflow-hidden rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
             <CardContent className="p-0">
@@ -624,6 +659,7 @@ const AccountTransfers = () => {
                     selectedBalance={selectedBalance}
                     sourceCurrencies={sourceCurrencies}
                     effectiveSourceAmount={effectiveSourceAmount}
+                    payoutAmounts={confirmedSgdTerms?.key === sgdFinancialKey(form, selectedBeneficiary) ? confirmedSgdTerms.amounts : null}
                     onBack={() => setStep("payee")}
                     onContinue={() => void continueToReview()}
                     onChange={setForm}
@@ -657,9 +693,14 @@ const AccountTransfers = () => {
                       preparationReference={identity.clientReference} preparationId={identity.preparationId}
                       transferId={identity.transferId} accountIdentity={identity.fingerprint} referenceText={form.referenceText}
                       verifyIdentity={verifyIdentity} onPrepared={saveTransfer}
+                      onTermsConfirmed={(review) => setConfirmedSgdTerms({
+                        key: sgdFinancialKey(form, selectedBeneficiary), amounts: reviewPayoutAmounts(review),
+                      })}
                       onRecovery={(transfer) => { try { showSavedTransfer(transfer); } catch (failure) { setFormError(String(failure)); } }}
                       onInspect={() => { void inspectSavedPayment().catch((failure) => setFormError(String(failure))); }}
-                      validationError={validateDetails()} onBusyChange={setSgdBusy}
+                      validationError={confirmedSgdTerms && confirmedSgdTerms.key !== sgdFinancialKey(form, selectedBeneficiary)
+                        ? "Payment details or receiving account changed. Return to payment details before reviewing again."
+                        : validateDetails()} onBusyChange={setSgdBusy}
                       onSubmitted={(transfer) => {
                         showSavedTransfer(transfer);
                       }} /> : undefined}
@@ -677,9 +718,13 @@ const AccountTransfers = () => {
                     submitting={submitMutation.isPending}
                     onSubmitToProvider={() => createdTransfer && submitMutation.mutate(createdTransfer.id)}
                     onNewPayment={() => void resetPayment()}
+                    onStartNewTransfer={() => void startNewTransfer()}
+                    sessionActionDisabled={!identityReady || sessionActionBusy}
                   />
                   {createdTransfer && <PaymentRecovery userId={String(user?.id)} token={token!}
                     transfer={createdTransfer} onUpdated={updateOpenedTransfer}
+                    disabled={resettingSession}
+                    onBusyChange={(busy) => { recoveryRunning.current = busy; setRecoveryBusy(busy); }}
                     onResume={(transfer) => void resumeSavedTransfer(transfer)} />}
                 </>}
               </div>
@@ -688,14 +733,16 @@ const AccountTransfers = () => {
 
           <div className="space-y-6">
             <PaymentSummary
-              provider={selectedProvider}
-              beneficiary={selectedBeneficiary}
+              provider={step === "result" && createdTransfer ? providerById.get(createdTransfer.provider_id) ?? null : selectedProvider}
+              beneficiary={step === "result" && createdTransfer ? createdTransfer.beneficiary ?? beneficiaryById.get(Number(createdTransfer.beneficiary_id)) ?? null : selectedBeneficiary}
               balance={selectedBalance}
-              sourceAmount={effectiveSourceAmount}
-              form={form}
+              sourceAmount={step === "result" && createdTransfer ? toNumber(createdTransfer.source_amount) : effectiveSourceAmount}
+              form={step === "result" && createdTransfer ? transferFormFromTransfer(createdTransfer) : form}
+              payoutAmounts={step === "result" && createdTransfer ? createdTransfer.payout_amounts
+                : confirmedSgdTerms?.key === sgdFinancialKey(form, selectedBeneficiary) ? confirmedSgdTerms.amounts : null}
             />
 
-            <Card className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+            <Card id="transfer-activity" className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-[#0f2442] dark:text-white">
                   <Clock3 className="h-5 w-5 text-[#15803d]" />
@@ -703,9 +750,9 @@ const AccountTransfers = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {transfers.length > 0 ? (
+                {activityTransfers.length > 0 ? (
                   <div className="divide-y divide-[#e8edf5] dark:divide-white/5">
-                    {transfers.slice(0, 5).map((transfer) => (
+                    {activityTransfers.map((transfer) => (
                       <TransferRow
                         key={transfer.id}
                         transfer={transfer}
@@ -859,6 +906,7 @@ export const DetailsStep = ({
   purposeCodesLoading,
   purposeCodesFailed,
   onPurposeChange,
+  payoutAmounts,
 }: {
   form: TransferForm;
   selectedProvider: ProviderSummary | null;
@@ -874,6 +922,7 @@ export const DetailsStep = ({
   purposeCodesLoading: boolean;
   purposeCodesFailed: boolean;
   onPurposeChange: (purposeCode: string) => void;
+  payoutAmounts?: NiumPayoutAmounts | null;
 }) => {
   const providerPurposeOptions = purposeOptions;
 
@@ -913,7 +962,7 @@ export const DetailsStep = ({
 
         <div className="rounded-2xl border border-[#e1e7f0] bg-[#f3fdf9] px-4 py-3 text-sm text-[#62708a] dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
           {isNiumProvider(selectedProvider?.code) && form.targetCurrency === "SGD" ? (
-            <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} />
+            <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} amounts={payoutAmounts} />
           ) : <>
           Estimated recipient amount: <strong className="text-[#0f2442] dark:text-white">{recipientAmountPresentation(selectedProvider?.code, form.targetCurrency) ?? "Unavailable"}</strong>
           <p className="mt-2">Destination currency: {form.targetCurrency}</p>
@@ -1045,6 +1094,8 @@ export const ResultStep = ({
   submitting,
   onSubmitToProvider,
   onNewPayment,
+  onStartNewTransfer,
+  sessionActionDisabled = false,
 }: {
   transfer: Transfer | null;
   provider?: ProviderSummary | null;
@@ -1052,6 +1103,8 @@ export const ResultStep = ({
   submitting: boolean;
   onSubmitToProvider: () => void;
   onNewPayment: () => void;
+  onStartNewTransfer?: () => void;
+  sessionActionDisabled?: boolean;
 }) => (
   <div className="mx-auto max-w-2xl space-y-6 text-center">
     <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${transfer?.status === "completed"
@@ -1117,21 +1170,27 @@ export const ResultStep = ({
       {provider && !isNiumProvider(provider.code) ? (
       <Button
         className="h-12 rounded-full bg-[#15803d] px-7 text-white hover:bg-[#166534]"
-        disabled={!transfer || !canSubmitProvider(transfer.status) || submitting}
+        disabled={!transfer || paymentUncertain(transfer) || !canSubmitProvider(transfer.status) || submitting}
         onClick={onSubmitToProvider}
       >
         {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SendHorizonal className="mr-2 h-4 w-4" />}
         Submit payment
       </Button>
       ) : null}
-      <Button
+      {transfer && isBlockedDraft(transfer) && onStartNewTransfer ? <Button
+        className="h-12 rounded-full bg-[#15803d] px-7 text-white hover:bg-[#166534]"
+        onClick={onStartNewTransfer}
+        disabled={sessionActionDisabled || submitting}
+      >
+        Start New Transfer
+      </Button> : <Button
         variant="outline"
         className="h-12 rounded-full border-[#d7d7d2] bg-white px-7 text-[#0f2442] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b] dark:text-white"
         onClick={onNewPayment}
         disabled={!transfer || !canLeavePayment(transfer)}
       >
         Start a separate payment
-      </Button>
+      </Button>}
     </div>
   </div>
 );
@@ -1142,14 +1201,16 @@ export const PaymentSummary = ({
   balance,
   sourceAmount,
   form,
+  payoutAmounts,
 }: {
   provider: ProviderSummary | null;
   beneficiary: Beneficiary | null;
   balance?: Balance;
   sourceAmount: number;
   form: TransferForm;
+  payoutAmounts?: NiumPayoutAmounts | null;
 }) => (
-  <Card className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
+  <Card role="region" aria-label="Payment summary" className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
     <CardHeader>
       <CardTitle className="text-lg text-[#0f2442] dark:text-white">Payment summary</CardTitle>
     </CardHeader>
@@ -1160,7 +1221,7 @@ export const PaymentSummary = ({
       <SummaryLine label="Available" value={balance ? <CurrencyDisplay currency={balance.currency}>{formatAmount(balance.available_balance, balance.currency)}</CurrencyDisplay> : "No synced balance"} />
       <SummaryLine label="Transfer amount" value={sourceAmount > 0 ? <CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(sourceAmount, form.sourceCurrency)}</CurrencyDisplay> : "-"} />
       <SummaryLine label="Destination currency" value={form.targetCurrency} />
-      {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} /> : <>
+      {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} amounts={payoutAmounts} /> : <>
       <SummaryLine label="Estimated recipient amount" value={recipientAmountPresentation(provider?.code, form.targetCurrency) ?? "-"} />
       {form.sourceCurrency !== form.targetCurrency ? <SummaryLine label="FX rate" value="Unavailable pending provider confirmation" /> : null}
       <SummaryLine label="Provider fee" value="Calculated during processing" />
@@ -1235,7 +1296,7 @@ export const TransferRow = ({
         {onOpen && <Button size="sm" variant="outline" onClick={onOpen}>Open saved payment</Button>}
         {provider && !isNiumProvider(provider.code) ? <Button
           size="sm"
-          disabled={!canSubmitProvider(transfer.status) || submitting}
+          disabled={paymentUncertain(transfer) || !canSubmitProvider(transfer.status) || submitting}
           onClick={onSubmit}
           className="rounded-full bg-[#15803d] px-4 text-white hover:bg-[#166534]"
         >

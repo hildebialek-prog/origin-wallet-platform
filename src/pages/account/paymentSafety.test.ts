@@ -2,7 +2,7 @@ import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Beneficiary, Transfer } from "@/services/moneyMovementService";
 import { canCancelPayment, canLeavePayment, claimPaymentIdentity, clearPaymentIdentity, paymentFingerprint,
-  paymentPresentation, readPaymentIdentity, rememberPaymentTransfer } from "./paymentSafety";
+  isBlockedDraft, leaveBlockedDraftSession, paymentPresentation, readPaymentIdentity, rememberPaymentTransfer } from "./paymentSafety";
 
 const beneficiary: Beneficiary = { id: 9, provider_id: 10, full_name: "Synthetic payee", beneficiary_type: "individual",
   country_code: "SG", currency: "SGD", payout_method: "LOCAL", status: "active", account_number: "1234567890",
@@ -17,7 +17,7 @@ beforeEach(() => {
   localStorage.clear(); vi.stubGlobal("crypto", webcrypto);
   vi.stubGlobal("navigator", { locks: { request: async (_name: string, callback: () => unknown) => callback() } });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("durable payment identity", () => {
   it("retains the same reference and preparation across reload and equivalent decimal formatting", async () => {
@@ -69,14 +69,57 @@ describe("durable payment identity", () => {
 });
 
 describe("status presentation and edit safety", () => {
-  it.each(["locking", "lock_unknown"])("blocks cancellation and separate payments during %s", (state) => {
+  it.each(["locking", "lock_unknown", "submitting", "submission_unknown", "pending", "provider_pending"])("blocks cancellation and retry of a draft during %s", (state) => {
     const transfer = saved("OW-saved", { payout_workflow: { state } });
     expect(canCancelPayment(transfer)).toBe(false); expect(canLeavePayment(transfer)).toBe(false);
     expect(paymentPresentation(transfer).title).toBe("Payment outcome needs review");
+    expect(isBlockedDraft(transfer)).toBe(true);
   });
   it.each([
     ["submission_unknown", "Payment outcome needs review"], ["submitting", "Payment outcome needs review"],
     ["pending", "Payment processing"], ["failed", "Payment failed"], ["cancelled", "Payment cancelled"],
     ["approval_required", "Payment awaiting Admin processing"], ["completed", "Payment completed"],
   ])("presents %s accurately", (status, title) => expect(paymentPresentation(saved("OW-saved", { status })).title).toBe(title));
+});
+
+describe("leaving a blocked draft wizard", () => {
+  it("releases only the matching user's wizard pointer under the same identity lock", async () => {
+    const identity = await claimPaymentIdentity("12", 10, 9, "a".repeat(64));
+    const transfer = saved(identity.clientReference, { payout_workflow: { state: "lock_unknown" } });
+    rememberPaymentTransfer("12", identity, transfer);
+    localStorage.setItem("unrelated-session", "keep");
+    const other = await claimPaymentIdentity("other-user", 10, 9, "b".repeat(64));
+    const request = vi.spyOn(navigator.locks, "request");
+    await leaveBlockedDraftSession("12", transfer);
+    expect(request).toHaveBeenCalledWith("ow-payment-identity-v1:12", expect.any(Function));
+    expect(readPaymentIdentity("12")).toBeNull();
+    expect(readPaymentIdentity("other-user")).toEqual(other);
+    expect(localStorage.getItem("unrelated-session")).toBe("keep");
+    expect(transfer.payout_workflow?.state).toBe("lock_unknown");
+    const next = await claimPaymentIdentity("12", 10, 9, identity.fingerprint);
+    expect(next.clientReference).not.toBe(identity.clientReference);
+    expect(next.preparationId).not.toBe(identity.preparationId);
+    expect(next.transferId).toBeUndefined();
+  });
+  it("can leave a blocked draft opened from history when no wizard identity is active", async () => {
+    await leaveBlockedDraftSession("12", saved("OW-history", { payout_workflow: { state: "pending" } }));
+    expect(readPaymentIdentity("12")).toBeNull();
+  });
+  it("does not clear another tab's identity or bypass unavailable browser coordination", async () => {
+    const active = await claimPaymentIdentity("12", 10, 9, "a".repeat(64));
+    const old = saved("OW-old", { payout_workflow: { state: "lock_unknown" } });
+    await expect(leaveBlockedDraftSession("12", old)).rejects.toThrow(/Another payment is active/);
+    expect(readPaymentIdentity("12")).toEqual(active);
+    vi.stubGlobal("navigator", {});
+    await expect(leaveBlockedDraftSession("12", old)).rejects.toThrow(/Web Locks/);
+    expect(readPaymentIdentity("12")).toEqual(active);
+  });
+  it.each([
+    saved("OW-healthy"), saved("OW-accepted", { status: "approval_required", payout_workflow: { state: "lock_unknown" } }),
+    saved("OW-unsaved", { id: 0, payout_workflow: { state: "lock_unknown" } }),
+  ])("rejects an ineligible transfer without clearing the active identity ($client_reference)", async (transfer) => {
+    const identity = await claimPaymentIdentity("12", 10, 9, "a".repeat(64));
+    await expect(leaveBlockedDraftSession("12", transfer)).rejects.toThrow(/Only a blocked saved draft/);
+    expect(readPaymentIdentity("12")).toEqual(identity);
+  });
 });

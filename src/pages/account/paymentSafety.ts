@@ -102,8 +102,26 @@ export function structuredTransfer(failure: unknown): Transfer | null {
 
 export function paymentUncertain(transfer: Transfer) {
   return transfer.payout_workflow?.recovery_required === true
-    || ["locking", "lock_unknown"].includes(transfer.payout_workflow?.state ?? "")
+    || ["locking", "lock_unknown", "submitting", "submission_unknown"].includes(transfer.payout_workflow?.state ?? "")
+    || (transfer.status === "draft" && ["pending", "processing", "submitted", "sent", "provider_pending"].includes(transfer.payout_workflow?.state ?? ""))
     || ["locking", "lock_unknown", "submitting", "submission_unknown"].includes(transfer.status);
+}
+
+export function isBlockedDraft(transfer: Transfer) {
+  return Number.isInteger(transfer.id) && transfer.id > 0 && transfer.status === "draft" && paymentUncertain(transfer);
+}
+
+// Release only the browser's active wizard pointer. The saved transfer and its operation keys
+// remain owned by the backend; this action must never call a transfer or recovery API.
+export async function leaveBlockedDraftSession(userId: string, transfer: Transfer) {
+  if (!isBlockedDraft(transfer)) throw new Error("Only a blocked saved draft can be left with this action.");
+  if (!navigator.locks) throw new Error("Use a secure browser with Web Locks support to start a new transfer safely.");
+  await navigator.locks.request(key(userId), () => {
+    const current = readPaymentIdentity(userId);
+    if (!current) return;
+    if (!belongsToIdentity(transfer, current)) throw new Error("Another payment is active. Reopen its saved status before starting a new transfer.");
+    clearPaymentIdentity(userId, current);
+  });
 }
 
 export function canLeavePayment(transfer: Transfer) {
@@ -117,6 +135,7 @@ export function canCancelPayment(transfer: Transfer) {
 
 export function paymentPresentation(transfer: Transfer | null) {
   if (!transfer) return { title: "Payment status unavailable", message: "Refresh the saved instruction before continuing." };
+  if (isBlockedDraft(transfer)) return { title: "Payment outcome needs review", message: "This transfer remains pending investigation because a provider operation is pending or its outcome is unknown. Do not retry or submit this transfer. Start New Transfer opens a separate payment and leaves this transfer unchanged in Transfer activity." };
   if (paymentUncertain(transfer)) return { title: "Payment outcome needs review", message: "An operation may still be in progress. Do not create or submit another instruction. Refresh status or use the available recovery actions." };
   switch (transfer.status) {
     case "completed": return { title: "Payment completed", message: "The backend reports this payment completed." };
