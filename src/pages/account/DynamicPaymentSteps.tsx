@@ -14,12 +14,13 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
     <h2 className="text-center text-2xl font-bold">Complete payment details</h2>
     <div className="grid gap-4">
       <label className="grid gap-2">Recipient currency<select aria-label="Recipient currency" className={field}
-        value={p.currency} disabled={p.locked || !p.options} onChange={(e) => p.changeCurrency(e.target.value)}>
+        value={p.currency} disabled={p.locked || !p.available} onChange={(e) => p.changeCurrency(e.target.value)}>
         <option value="">Select recipient currency</option>
-        {p.options?.quote_availability.destination_currencies.map((code) => <option key={code} value={code}>{code}</option>)}
+        {p.currencies.map((code) => <option key={code} value={code}>{code}</option>)}
       </select></label>
-      {p.options && p.options.quote_availability.destination_currencies.length === 0
-        && <p role="status">This beneficiary currently has no available recipient currency.</p>}
+      {p.availabilityReason && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+        <p>This beneficiary currently has no available recipient currency.</p><p>{p.availabilityReason}</p>
+      </div>}
       <label className="grid gap-2">Amount mode<select aria-label="Amount mode" className={field}
         value={p.mode} disabled={p.locked || !p.currency} onChange={(e) => p.changeMode(e.target.value as DynamicMode)}>
         <option value="SOURCE_AMOUNT">USD wallet debit, including provider fee</option>
@@ -29,7 +30,7 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
         <Input aria-label="Payment amount" className={field} inputMode="decimal" value={p.amount}
           disabled={p.locked || !p.currency} onChange={(e) => p.changeAmount(e.target.value)} />
       </label>
-      <Button className={button} disabled={p.locked || !p.currency || !p.amount} onClick={() => void p.getQuote()}>Request Nium quote</Button>
+      <Button className={button} disabled={p.locked || !p.available || !p.currency || !p.amount} onClick={() => void p.getQuote()}>Request Nium quote</Button>
     </div>
     {p.quote && <section aria-label="Quoted payment" className="space-y-3 rounded-xl border p-5">
       <p>Principal: {p.quote.quoted_principal.currency} {p.quote.quoted_principal.amount}</p>

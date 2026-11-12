@@ -83,13 +83,15 @@ import {
 import { isDynamicBeneficiaryCandidate, useDynamicPayment } from "./useDynamicPayment";
 import { DynamicActivity, DynamicDetails, DynamicResult, DynamicReviewStep, DynamicSummary } from "./DynamicPaymentSteps";
 
-// This permits selecting a candidate for an authoritative options lookup, not submission.
-const wizardBeneficiaryOption = (beneficiary: Beneficiary, provider?: ProviderSummary) =>
-  isDynamicBeneficiaryCandidate(beneficiary, provider)
-    ? { visible: true, selectable: true, reason: "Recipient currencies and payment terms will be verified before Submit." }
-    : beneficiaryTransferOption(beneficiary, provider);
+// Preserve existing legacy admission; every valid Nium recipient can also request a Dynamic check.
+const wizardBeneficiaryOption = (beneficiary: Beneficiary, provider?: ProviderSummary) => {
+  const legacy = beneficiaryTransferOption(beneficiary, provider);
+  return legacy.selectable || !isDynamicBeneficiaryCandidate(beneficiary, provider) ? legacy
+    : { visible: true, selectable: true, reason: "Dynamic availability and recipient currencies will be checked after selection." };
+};
 
 type WizardStep = "payee" | "details" | "review" | "result";
+type PaymentFlow = "legacy" | "dynamic";
 
 type TransferForm = ReturnType<typeof transferFormFromTransfer>;
 
@@ -119,7 +121,7 @@ const AccountTransfers = () => {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<TransferForm>(defaultForm);
-  const [paymentFlow, setPaymentFlow] = useState<"legacy" | "dynamic">("legacy");
+  const [paymentFlow, setPaymentFlow] = useState<PaymentFlow>("legacy");
   const [step, setStep] = useState<WizardStep>("payee");
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
@@ -233,6 +235,7 @@ const AccountTransfers = () => {
 
   const selectedProvider = transferProviders.find((provider) => String(provider.id) === form.providerId) ?? null;
   const selectedBeneficiary = beneficiaryById.get(Number(form.beneficiaryId)) ?? null;
+  const legacyEligibility = selectedBeneficiary ? beneficiaryTransferOption(selectedBeneficiary, selectedProvider ?? undefined) : null;
   const providerBalances = balances.filter((balance) => String(balance.provider_id) === form.providerId);
   const balanceCurrencies = Array.from(new Set(providerBalances.map((balance) => balance.currency))).sort();
   const sourceCurrencies = isNiumProvider(selectedProvider?.code) ? ["USD"] : balanceCurrencies.length ? balanceCurrencies : currencyOptions;
@@ -340,11 +343,12 @@ const AccountTransfers = () => {
     const provider = providerById.get(beneficiary.provider_id);
     if (!wizardBeneficiaryOption(beneficiary, provider).selectable) return;
     const dynamicCandidate = isDynamicBeneficiaryCandidate(beneficiary, provider);
-    if (dynamicCandidate && (!identityReady || identity)) {
+    const nextFlow: PaymentFlow = beneficiaryTransferOption(beneficiary, provider).selectable ? "legacy" : "dynamic";
+    if (dynamicCandidate && nextFlow === "dynamic" && (!identityReady || identity)) {
       setFormError("Resolve the saved payment before starting a Dynamic instruction."); return;
     }
     dynamic.invalidate();
-    setPaymentFlow(dynamicCandidate ? "dynamic" : "legacy");
+    setPaymentFlow(nextFlow);
     const nextBalance = balances.find(
       (balance) => String(balance.provider_id) === providerId && (!isNiumProvider(provider?.code) || balance.currency === "USD"),
     );
@@ -596,6 +600,16 @@ const AccountTransfers = () => {
 
   const sessionActionBusy = resettingSession || recoveryBusy || sgdBusy || createMutation.isPending
     || submitMutation.isPending || syncMutation.isPending || cancelMutation.isPending;
+  const changePaymentMethod = (next: PaymentFlow) => {
+    if (next === paymentFlow || !selectedBeneficiary || !identityReady || !dynamic.ready
+      || identity || dynamic.saved || dynamic.busy || sessionActionBusy || preparing.current || creating.current) return;
+    if (next === "legacy" && !legacyEligibility?.selectable) return;
+    if (next === "dynamic" && !isDynamicBeneficiaryCandidate(selectedBeneficiary, selectedProvider ?? undefined)) return;
+    dynamic.invalidate();
+    setConfirmedSgdTerms(null);
+    setForm((current) => ({ ...current, sourceAmount: "", purposeCode: "", referenceText: "" }));
+    setFormError(""); setPaymentFlow(next); setStep("details");
+  };
   const startNewTransfer = async () => {
     if (!user?.id || !identityReady || !createdTransfer || !isBlockedDraft(createdTransfer)
       || resetting.current || recoveryRunning.current || preparing.current || creating.current || sessionActionBusy) return;
@@ -693,6 +707,14 @@ const AccountTransfers = () => {
                     onSelect={pickBeneficiary}
                   />
                 )}
+
+                {(step === "details" || step === "review") && selectedBeneficiary
+                  && isDynamicBeneficiaryCandidate(selectedBeneficiary, selectedProvider ?? undefined)
+                  && <PaymentMethodChoice value={paymentFlow} onChange={changePaymentMethod}
+                    legacyLabel={legacyEligibility?.selectable || (paymentFlow === "legacy" && identity)
+                      ? `Existing ${selectedBeneficiary.currency} ${selectedBeneficiary.payout_method ?? ""} payment` : null}
+                    disabled={!identityReady || !dynamic.ready || !!identity || !!dynamic.saved || dynamic.busy || sessionActionBusy}
+                    lockedReason={identity || dynamic.saved ? "Resolve the saved payment before changing payment methods." : undefined} />}
 
                 {paymentFlow === "dynamic" && step !== "payee" && <>
                   {step !== "result" && <div className="mb-6"><SelectedPayee provider={selectedProvider} beneficiary={selectedBeneficiary}
@@ -1449,6 +1471,29 @@ const Notice = ({ title, description }: { title: string; description: ReactNode 
       </div>
     </div>
   </div>
+);
+
+export const PaymentMethodChoice = ({ value, legacyLabel, disabled, lockedReason, onChange }: {
+  value: PaymentFlow;
+  legacyLabel: string | null;
+  disabled: boolean;
+  lockedReason?: string;
+  onChange: (method: PaymentFlow) => void;
+}) => (
+  <fieldset disabled={disabled} className="mb-6 space-y-3 rounded-2xl border border-[#d7d7d2] p-4 dark:border-white/10">
+    <legend className="px-2 font-semibold text-[#0f2442] dark:text-white">Payment method</legend>
+    {legacyLabel && <label className="flex cursor-pointer items-center gap-3 text-sm">
+      <input type="radio" name="payment-method" value="legacy" checked={value === "legacy"}
+        className="accent-emerald-700" onChange={() => onChange("legacy")} />{legacyLabel}
+    </label>}
+    <label className="flex cursor-pointer items-center gap-3 text-sm">
+      <input type="radio" name="payment-method" value="dynamic" checked={value === "dynamic"}
+        className="accent-emerald-700" onChange={() => onChange("dynamic")} />Dynamic Multi-Currency
+    </label>
+    <p className="text-sm text-[#62708a] dark:text-gray-400">
+      {lockedReason ?? "Dynamic availability and recipient currencies are verified with the provider when you select Dynamic."}
+    </p>
+  </fieldset>
 );
 
 const SelectedPayee = ({

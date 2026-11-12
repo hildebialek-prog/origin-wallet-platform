@@ -12,6 +12,7 @@ import { amountError, matchesQuote, matchesReview } from "./dynamicPaymentTerms"
 type Saved = { request: DynamicSubmission; id?: string };
 const terminal = new Set(["paid", "failed", "returned", "requires_attention", "cancelled"]);
 const reasonText: Record<string, string> = {
+  dynamic_corridor_unsupported: "Dynamic is unavailable for this beneficiary's corridor.",
   dynamic_quote_expired: "This quote expired. Request a new quote and review it again.",
   dynamic_quote_already_consumed: "This quote already belongs to a payment. Recover that payment before starting another.",
   dynamic_quote_binding_changed: "The beneficiary or payment details changed. Request a new quote.",
@@ -23,22 +24,22 @@ const reasonText: Record<string, string> = {
   dynamic_customer_corridor_ambiguous: "Nium could not establish an unambiguous payment corridor for your account.",
   dynamic_payout_instruction_rejected: "Nium could not validate these payment instructions. Check the payment purpose and source of funds.",
 };
+const describeReasons = (reasons: string[]) => reasons.map((reason) => reasonText[reason]
+  ?? `The provider cannot currently verify these payment terms (${reason}).`).filter((v, i, all) => all.indexOf(v) === i).join(" ");
 function errorText(error: unknown) {
   if (error instanceof ApiRequestError) {
     const reasons = error.payload?.reason_codes;
-    if (Array.isArray(reasons)) {
-      return reasons.map((reason) => reasonText[String(reason)] ?? "The provider cannot currently verify these payment terms.").filter((v, i, all) => all.indexOf(v) === i).join(" ");
+    if (Array.isArray(reasons) && reasons.length > 0) {
+      return describeReasons(reasons.map(String));
     }
   }
   return error instanceof Error ? error.message : "Payment information is temporarily unavailable.";
 }
 
-// Candidate screening mirrors the customer boundary; only options/quote/review grant availability.
-// USD and SGD retain their existing transfer workflows.
+// All valid Nium recipients may request an options check. Only the backend grants corridor availability.
 export const isDynamicBeneficiaryCandidate = (beneficiary: Beneficiary, provider?: ProviderSummary) =>
   provider?.code === "nium" && provider.status === "active" && provider.supports_transfers
-  && beneficiary.provider_id === provider.id && ["active", "approved", "verified"].includes(normalizeStatus(beneficiary.status))
-  && beneficiary.payout_method === "LOCAL" && !["USD", "SGD"].includes(beneficiary.currency);
+  && beneficiary.provider_id === provider.id && ["active", "approved", "verified"].includes(normalizeStatus(beneficiary.status));
 
 export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolean) {
   const { user, token } = useAuth();
@@ -69,6 +70,13 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const expired = !!quote && Date.parse(quote.quote_expires_at) <= now;
   const reviewExpired = !!review && Date.parse(review.review_expires_at ?? review.quote_expires_at) <= now;
   const locked = busy || saved !== null;
+  const availabilityReasons = [...new Set([...(options?.reason_codes ?? []), ...(options?.quote_availability.reason_codes ?? [])])];
+  const available = options?.beneficiary.id === beneficiaryId && options?.status === "QUOTE_REFERENCE_ONLY" && options.quote_availability.status === "QUOTE_REFERENCE_ONLY"
+    && availabilityReasons.length === 0 && options.quote_availability.destination_currencies.length > 0;
+  const currencies = available ? options.quote_availability.destination_currencies : [];
+  const availabilityReason = options && !available
+    ? describeReasons(availabilityReasons) || "Dynamic is currently unavailable for this beneficiary."
+    : "";
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -132,7 +140,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const invalidate = () => { ++generation.current; setQuote(null); setReview(null); setAccepted(false); setError(""); };
   const getQuote = async () => {
     if (sending.current || busy || saved || !ready || !canWrite || !currency
-      || !options?.quote_availability.destination_currencies.includes(currency)) return;
+      || !available || !currencies.includes(currency)) return;
     const validation = amountError(mode, amount);
     if (validation) { setError(validation); return; }
     const version = ++generation.current;
@@ -146,12 +154,15 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     finally { if (generation.current === version) setBusy(false); }
   };
   const getReview = async () => {
-    if (busy || saved || !ready || !canWrite || !quote || Date.parse(quote.quote_expires_at) <= Date.now()) return;
+    if (busy || saved || !ready || !canWrite || !available || !quote || Date.parse(quote.quote_expires_at) <= Date.now()) return;
     const version = ++generation.current;
     setBusy(true); setReview(null); setAccepted(false); setError("");
     try {
       const result = await dynamicReview(auth, { beneficiary_id: beneficiaryId, dynamic_quote_id: quote.dynamic_quote_id, instruction });
       if (generation.current !== version) return;
+      if (result.status === "UNAVAILABLE" || result.reason_codes?.length) {
+        throw new Error(describeReasons(result.reason_codes ?? []) || "Dynamic Review is currently unavailable.");
+      }
       if (!matchesReview(result, quote, instruction)) throw new Error("The server cannot currently authorize these payment terms. Submission is unavailable.");
       setReview(result);
       return true;
@@ -162,7 +173,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     if (sending.current || !ready || saved?.id) return;
     let recovery = saved;
     if (!recovery) {
-      if (!canWrite || !review || !quote || !accepted || Date.parse(quote.quote_expires_at) <= Date.now() || Date.parse(review.review_expires_at ?? review.quote_expires_at) <= Date.now() || !matchesReview(review, quote, instruction)) return;
+      if (!canWrite || !available || !review || !quote || !accepted || Date.parse(quote.quote_expires_at) <= Date.now() || Date.parse(review.review_expires_at ?? review.quote_expires_at) <= Date.now() || !matchesReview(review, quote, instruction)) return;
       recovery = { request: { provider_account_id: review.provider_account_id, beneficiary_id: review.beneficiary_id,
         balance_id: review.balance_id, client_reference: `DYN-${review.accepted_fingerprint!}`, accepted_fingerprint: review.accepted_fingerprint! } };
     }
@@ -203,7 +214,8 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   };
 
   return { selected, currency, mode, amount, instruction, options, quote, review, accepted, saved, transfer,
-    activity, busy, error, ready, expired, reviewExpired, locked: locked || !ready || !canWrite,
+    available, currencies, availabilityReason,
+    activity, busy, error, ready, expired, reviewExpired, locked: locked || !ready || !canWrite || !available,
     getQuote, getReview, submit, startAnother, invalidate, clearReview, setAccepted,
     refreshStatus: () => setStatusRefresh((value) => value + 1),
     changeCurrency: (value: string) => { invalidate(); setCurrency(value); },
