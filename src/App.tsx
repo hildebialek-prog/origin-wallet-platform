@@ -35,6 +35,7 @@ import AccountDashboard from "./pages/account/AccountDashboard";
 import AccountBalances from "./pages/account/AccountBalances";
 import AccountTransactions from "./pages/account/AccountTransactions";
 import AccountTransfers from "./pages/account/AccountTransfers";
+import AccountDynamicTransfer from "./pages/account/AccountDynamicTransfer";
 import AccountVirtualAccounts from "./pages/account/AccountVirtualAccounts";
 import AccountBeneficiaries from "./pages/account/AccountBeneficiaries";
 import AccountTeam from "./pages/account/AccountTeam";
@@ -89,6 +90,7 @@ const App = () => (
                   <Route index element={<AccountDashboard />} />
                   <Route path="balances" element={<AccountBalances />} />
                   <Route path="transfers" element={<AccountTransfers />} />
+                  <Route path="transfers/dynamic" element={<AccountDynamicTransfer />} />
                   <Route path="transactions" element={<AccountTransactions />} />
                   <Route path="virtual-accounts" element={<AccountVirtualAccounts />} />
                   <Route path="virtual-accounts/request" element={<AccountVirtualAccountRequest />} />

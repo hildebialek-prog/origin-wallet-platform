@@ -577,6 +577,7 @@ const AccountTransfers = () => {
             <h1 className="text-[2.2rem] font-bold tracking-[-0.04em] text-[#0f2442] sm:text-[3rem] dark:text-white">
               Move funds
             </h1>
+            <Link to="/account/transfers/dynamic" className="mt-2 inline-block font-semibold underline">Multi-currency payment</Link>
             <p className="mt-2 max-w-3xl text-[1.02rem] leading-7 text-[#62708a] dark:text-gray-400">
               Send a single payment with balance, beneficiary, approval, and submission checks.
             </p>
