@@ -1,14 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import AccountTransfers from "./AccountTransfers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AccountDynamicTransfer from "./AccountDynamicTransfer";
 import { ApiRequestError } from "@/services/apiClient";
 import type { DynamicMode, DynamicQuote, DynamicReview, DynamicTransfer } from "@/services/niumDynamicService";
 
-const api = vi.hoisted(() => ({ getProviders: vi.fn(), getBeneficiaries: vi.fn(), dynamicOptions: vi.fn(),
+const api = vi.hoisted(() => ({ getProviders: vi.fn(), getBeneficiaries: vi.fn(), getNiumPurposeCodes: vi.fn(),
+  getBalances: vi.fn(), getTransfers: vi.fn(), getTransfer: vi.fn(), getBeneficiary: vi.fn(),
+  createTransfer: vi.fn(), submitTransfer: vi.fn(), syncTransferStatus: vi.fn(), cancelTransfer: vi.fn(), dynamicOptions: vi.fn(),
   dynamicQuote: vi.fn(), dynamicReview: vi.fn(), dynamicSubmit: vi.fn(), dynamicStatus: vi.fn() }));
-vi.mock("@/services/moneyMovementService", () => ({ getBeneficiaries: api.getBeneficiaries }));
-vi.mock("@/services/fxOrderService", () => ({ getProviders: api.getProviders }));
+vi.mock("@/services/moneyMovementService", () => api);
+vi.mock("@/services/fxOrderService", () => api);
 vi.mock("@/services/niumDynamicService", () => api);
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "12", kycStatus: "approved" }, token: "customer-token" }) }));
 const fingerprint = "a".repeat(64);
@@ -30,10 +34,18 @@ const makeTransfer = (status: DynamicTransfer["status"] = "processing"): Dynamic
   amount_mode: "SOURCE_AMOUNT", total_usd_debit: "1000", principal: { currency: "USD", amount: "980" },
   included_fee: { currency: "USD", amount: "20" }, destination_amount: { currency: "GBP", amount: "784" },
   status, financial_reconciled: status === "paid", message: `Provider state: ${status}`, quote_expires_at: makeQuote().quote_expires_at });
-const mount = () => render(<MemoryRouter><AccountDynamicTransfer /></MemoryRouter>);
+const clients: QueryClient[] = [];
+const Location = () => <output aria-label="Current route">{useLocation().pathname}</output>;
+const mount = (path = "/account/transfers") => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  clients.push(client);
+  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Location /><Routes>
+    <Route path="/account/transfers" element={<AccountTransfers />} />
+    <Route path="/account/transfers/dynamic" element={<AccountDynamicTransfer />} />
+  </Routes></MemoryRouter></QueryClientProvider>);
+};
 async function quotePayment(mode: DynamicMode = "SOURCE_AMOUNT") {
-  await screen.findByRole("option", { name: "GBP Payee (GBP)" });
-  fireEvent.change(screen.getByLabelText("Beneficiary"), { target: { value: "4" } });
+  fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
   await screen.findByRole("option", { name: "GBP" });
   fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "GBP" } });
   fireEvent.change(screen.getByLabelText("Amount mode"), { target: { value: mode } });
@@ -48,9 +60,12 @@ async function reviewPayment() {
   fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
 }
 beforeEach(() => {
-  vi.resetAllMocks(); sessionStorage.clear();
-  api.getProviders.mockResolvedValue({ data: [{ id: 10, code: "nium", status: "active" }] });
+  vi.resetAllMocks(); sessionStorage.clear(); localStorage.clear();
+  api.getProviders.mockResolvedValue({ data: [{ id: 10, code: "nium", name: "Nium", status: "active", supports_transfers: true }] });
   api.getBeneficiaries.mockResolvedValue([{ id: 4, provider_id: 10, full_name: "GBP Payee", currency: "GBP", payout_method: "LOCAL", status: "active", country_code: "GB" }]);
+  api.getBalances.mockResolvedValue([{ id: 3, provider_id: 10, currency: "USD", available_balance: "5000" }]);
+  api.getTransfers.mockResolvedValue([]);
+  api.getNiumPurposeCodes.mockResolvedValue({ data: [{ code: "IR005", label: "Payment purpose" }] });
   api.dynamicOptions.mockResolvedValue({ beneficiary: { id: 4, name: "GBP Payee", currency: "GBP", country_code: "GB" },
     status: "QUOTE_REFERENCE_ONLY", reason_codes: [], quote_availability: { status: "QUOTE_REFERENCE_ONLY", destination_currencies: ["GBP"], reason_codes: [] } });
   api.dynamicQuote.mockImplementation(async (_auth, body) => makeQuote(body.amount_mode));
@@ -62,9 +77,111 @@ beforeEach(() => {
   });
   api.dynamicSubmit.mockResolvedValue(makeTransfer()); api.dynamicStatus.mockResolvedValue(makeTransfer());
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); clients.splice(0).forEach((client) => client.clear()); sessionStorage.clear(); localStorage.clear(); vi.restoreAllMocks(); });
 
-describe("Dynamic customer payment", () => {
+describe("Move funds Dynamic payment", () => {
+  it("uses the existing recipient cards before requesting authoritative currencies", async () => {
+    mount();
+    const payee = await screen.findByRole("button", { name: /GBP Payee/ });
+    expect(screen.getByRole("heading", { name: "Move funds" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /GBP Payee/ })).toHaveLength(1);
+    expect(screen.queryByLabelText("Beneficiary")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Recipient currency")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Multi-currency payment" })).not.toBeInTheDocument();
+    expect(api.dynamicOptions).not.toHaveBeenCalled();
+    fireEvent.click(payee);
+    await screen.findByRole("option", { name: "GBP" });
+    expect(api.getBeneficiaries).toHaveBeenCalledTimes(1);
+    expect(api.dynamicOptions).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, 4);
+    expect(within(screen.getByLabelText("Recipient currency")).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["Select recipient currency", "GBP"]);
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent("Payment details");
+  });
+
+  it("shows no invented currencies when the backend reports an unavailable corridor", async () => {
+    api.dynamicOptions.mockResolvedValueOnce({ beneficiary: { id: 4, name: "GBP Payee", currency: "GBP", country_code: "GB" },
+      status: "UNAVAILABLE", reason_codes: ["dynamic_customer_corridor_not_permitted"],
+      quote_availability: { status: "UNAVAILABLE", destination_currencies: [], reason_codes: ["dynamic_customer_corridor_not_permitted"] } });
+    mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
+    await screen.findByText("This beneficiary currently has no available recipient currency.");
+    expect(within(screen.getByLabelText("Recipient currency")).getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Request Nium quote" })).toBeDisabled();
+    expect(api.dynamicQuote).not.toHaveBeenCalled();
+  });
+
+  it.each(["approved", "verified"])("lets a backend-eligible %s recipient reach the currency check", async (status) => {
+    api.getBeneficiaries.mockResolvedValueOnce([{ id: 4, provider_id: 10, full_name: "GBP Payee", currency: "GBP", payout_method: "LOCAL", status, country_code: "GB" }]);
+    mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
+    await screen.findByRole("option", { name: "GBP" });
+    expect(api.dynamicOptions).toHaveBeenCalledTimes(1);
+  });
+
+  it("redirects old Dynamic links to Move funds and recovers their saved operation", async () => {
+    sessionStorage.setItem("origin-dynamic-payment:12", JSON.stringify({ request }));
+    mount("/account/transfers/dynamic");
+    expect(await screen.findByRole("button", { name: "Recover same submission" })).toBeEnabled();
+    expect(screen.getByLabelText("Current route")).toHaveTextContent(/^\/account\/transfers$/);
+    expect(screen.getByRole("heading", { name: "Move funds" })).toBeVisible();
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["HK", "USD", "SWIFT"], ["SG", "SGD", "LOCAL"],
+  ])("keeps existing %s %s %s selection on its original details step", async (country, currency, method) => {
+    api.getBeneficiaries.mockResolvedValueOnce([{ id: 4, provider_id: 10, full_name: "Legacy payee", beneficiary_type: "individual",
+      currency, payout_method: method, status: "active", country_code: country,
+      payout_admission: currency === "SGD" ? { allowed: false, reason: "financial_terms_unverified", preparation_allowed: true,
+        beneficiary_id: 4, provider_id: 10, source_currency: "USD", destination_country: "SG", destination_currency: "SGD", payout_method: "LOCAL" } : null }]);
+    mount(); fireEvent.click(await screen.findByRole("button", { name: /Legacy payee/ }));
+    expect(await screen.findByPlaceholderText("Enter an amount")).toBeVisible();
+    expect(screen.queryByLabelText("Amount mode")).not.toBeInTheDocument();
+    expect(api.dynamicOptions).not.toHaveBeenCalled();
+    expect(api.dynamicQuote).not.toHaveBeenCalled();
+    expect(api.dynamicReview).not.toHaveBeenCalled();
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("rejects a changed quote identity or entered amount before Review", async () => {
+    api.dynamicQuote.mockResolvedValueOnce({ ...makeQuote(), beneficiary_id: 99 });
+    mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
+    await screen.findByRole("option", { name: "GBP" });
+    fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "GBP" } });
+    fireEvent.change(screen.getByLabelText("Payment amount"), { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("quoted amounts do not match");
+    expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
+    api.dynamicQuote.mockResolvedValueOnce({ ...makeQuote(), entered_amount: "1001" });
+    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("quoted amounts do not match");
+    expect(api.dynamicReview).not.toHaveBeenCalled();
+  });
+
+  it("clears the quote, Review and consent when the entered amount changes", async () => {
+    mount(); await quotePayment(); await reviewPayment();
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.change(screen.getByLabelText("Payment amount"), { target: { value: "1200" } });
+    expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Authoritative payment review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Payment summary" })).queryByText("USD 1000")).not.toBeInTheDocument();
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("retains legacy transfer history alongside the Dynamic payment", async () => {
+    api.getTransfers.mockResolvedValue([{ id: 55, transfer_no: "LEGACY-HK-55", provider_id: 10, beneficiary_id: 9,
+      transfer_type: "payout", source_currency: "USD", target_currency: "USD", source_amount: "100", status: "completed" }]);
+    mount(); await quotePayment(); await reviewPayment();
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit payment" }));
+    await screen.findByRole("region", { name: "Payment status" });
+    const activity = document.getElementById("transfer-activity")!;
+    expect(within(activity).getByText("LEGACY-HK-55")).toBeVisible();
+    await waitFor(() => expect(within(activity).getByText(makeTransfer().id)).toBeVisible());
+    expect(api.createTransfer).not.toHaveBeenCalled();
+    expect(api.submitTransfer).not.toHaveBeenCalled();
+  });
+
   it.each(["SOURCE_AMOUNT", "DESTINATION_AMOUNT"] as const)("quotes, reviews and submits %s with one included fee", async (mode) => {
     mount(); await quotePayment(mode);
     expect(within(screen.getByRole("region", { name: "Quoted payment" })).getByText("Principal: USD 980")).toBeVisible();
@@ -72,6 +189,9 @@ describe("Dynamic customer payment", () => {
     const review = await screen.findByRole("region", { name: "Authoritative payment review" });
     expect(within(review).getByText("Total wallet debit: USD 1000")).toBeVisible();
     expect(within(review).getByText("Included fee: USD 20")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Payment summary" })).getByText("USD 1000")).toBeVisible();
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent("Review");
+    expect(screen.getByLabelText("Current route")).toHaveTextContent("/account/transfers");
     expect(api.dynamicQuote).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, expect.objectContaining({ amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784" }));
     fireEvent.click(screen.getByRole("checkbox"));
     const submit = screen.getByRole("button", { name: "Submit payment" });
@@ -79,6 +199,10 @@ describe("Dynamic customer payment", () => {
     await screen.findByRole("region", { name: "Payment status" });
     await waitFor(() => expect(api.dynamicSubmit).toHaveBeenCalledTimes(1));
     expect(api.dynamicSubmit).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, request);
+    expect(document.querySelector('[aria-current="step"]')).toHaveTextContent("Submit");
+    expect(screen.getByText("Transfer activity")).toBeVisible();
+    expect(api.createTransfer).not.toHaveBeenCalled();
+    expect(api.submitTransfer).not.toHaveBeenCalled();
     expect(screen.queryByText(/Admin Approve/i)).not.toBeInTheDocument();
   });
 
@@ -108,8 +232,7 @@ describe("Dynamic customer payment", () => {
     api.dynamicQuote.mockRejectedValueOnce(new ApiRequestError("Insufficient balance", 409, undefined,
       { reason_codes: ["dynamic_insufficient_available_funds"] }));
     mount();
-    await screen.findByRole("option", { name: "GBP Payee (GBP)" });
-    fireEvent.change(screen.getByLabelText("Beneficiary"), { target: { value: "4" } });
+    fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
     await screen.findByRole("option", { name: "GBP" });
     fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "GBP" } });
     fireEvent.change(screen.getByLabelText("Payment amount"), { target: { value: "1000" } });
@@ -125,6 +248,7 @@ describe("Dynamic customer payment", () => {
   it("invalidates consent when instructions change and refuses changed server terms", async () => {
     mount(); await quotePayment(); await reviewPayment(); await screen.findByRole("checkbox");
     fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     fireEvent.change(screen.getByLabelText("Payment reference"), { target: { value: "Changed invoice" } });
     expect(screen.queryByRole("button", { name: "Submit payment" })).not.toBeInTheDocument();
     api.dynamicReview.mockResolvedValueOnce({ ...makeReview(), total_usd_debit: "1020" });
@@ -136,9 +260,12 @@ describe("Dynamic customer payment", () => {
   it("discards Review and consent when the selected beneficiary changes", async () => {
     mount(); await quotePayment(); await reviewPayment();
     fireEvent.click(await screen.findByRole("checkbox"));
-    fireEvent.change(screen.getByLabelText("Beneficiary"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
     expect(screen.queryByRole("region", { name: "Authoritative payment review" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Recipient currency")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
+    await screen.findByRole("option", { name: "GBP" });
     expect(screen.getByLabelText("Recipient currency")).toHaveValue("");
     expect(api.dynamicSubmit).not.toHaveBeenCalled();
   });
@@ -160,17 +287,31 @@ describe("Dynamic customer payment", () => {
     expect(api.dynamicSubmit).not.toHaveBeenCalled();
   });
 
-  it("returns to Review after a definitive pre-admission balance refusal", async () => {
+  it("requires a fresh Review after a definitive pre-admission balance refusal", async () => {
     api.dynamicSubmit.mockRejectedValueOnce(new ApiRequestError("Insufficient funds", 409, undefined,
       { reason_codes: ["dynamic_insufficient_available_funds"] }));
     mount(); await quotePayment(); await reviewPayment();
     fireEvent.click(await screen.findByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Submit payment" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("cannot cover");
+    await screen.findByRole("button", { name: "Review payment" });
     expect(screen.queryByRole("region", { name: "Payment status" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Submit payment" })).not.toBeInTheDocument();
     expect(sessionStorage.getItem("origin-dynamic-payment:12")).toBeNull();
     expect(api.dynamicSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns to recipient selection when recovery definitively refuses an expired operation after reload", async () => {
+    sessionStorage.setItem("origin-dynamic-payment:12", JSON.stringify({ request }));
+    api.dynamicSubmit.mockRejectedValueOnce(new ApiRequestError("Quote expired", 409, undefined,
+      { reason_codes: ["dynamic_quote_expired"] }));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Recover same submission" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("quote expired");
+    expect(await screen.findByRole("button", { name: /GBP Payee/ })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Payment status" })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem("origin-dynamic-payment:12")).toBeNull();
+    expect(api.dynamicSubmit).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, request);
   });
 
   it("blocks consent when authenticated Review observations expire before the quote", async () => {

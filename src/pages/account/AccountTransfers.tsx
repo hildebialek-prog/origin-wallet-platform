@@ -80,6 +80,15 @@ import {
   validateTransferAmount,
 } from "./transferForm";
 
+import { isDynamicBeneficiaryCandidate, useDynamicPayment } from "./useDynamicPayment";
+import { DynamicActivity, DynamicDetails, DynamicResult, DynamicReviewStep, DynamicSummary } from "./DynamicPaymentSteps";
+
+// This permits selecting a candidate for an authoritative options lookup, not submission.
+const wizardBeneficiaryOption = (beneficiary: Beneficiary, provider?: ProviderSummary) =>
+  isDynamicBeneficiaryCandidate(beneficiary, provider)
+    ? { visible: true, selectable: true, reason: "Recipient currencies and payment terms will be verified before Submit." }
+    : beneficiaryTransferOption(beneficiary, provider);
+
 type WizardStep = "payee" | "details" | "review" | "result";
 
 type TransferForm = ReturnType<typeof transferFormFromTransfer>;
@@ -110,6 +119,7 @@ const AccountTransfers = () => {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<TransferForm>(defaultForm);
+  const [paymentFlow, setPaymentFlow] = useState<"legacy" | "dynamic">("legacy");
   const [step, setStep] = useState<WizardStep>("payee");
   const [search, setSearch] = useState("");
   const [formError, setFormError] = useState("");
@@ -149,7 +159,7 @@ const AccountTransfers = () => {
 
   useEffect(() => {
     let active = true;
-    setIdentityReady(false); setIdentity(null); setCreatedTransfer(null); setConfirmedSgdTerms(null); setFormError(""); setForm(defaultForm); setStep("payee"); setPreviousBlockedTransfer(null);
+    setPaymentFlow("legacy"); setIdentityReady(false); setIdentity(null); setCreatedTransfer(null); setConfirmedSgdTerms(null); setFormError(""); setForm(defaultForm); setStep("payee"); setPreviousBlockedTransfer(null);
     if (!user?.id || !token) return;
     void (async () => {
       try {
@@ -228,7 +238,7 @@ const AccountTransfers = () => {
   const sourceCurrencies = isNiumProvider(selectedProvider?.code) ? ["USD"] : balanceCurrencies.length ? balanceCurrencies : currencyOptions;
   const selectedBalance = providerBalances.find((balance) => balance.currency === form.sourceCurrency);
   const effectiveSourceAmount = toNumber(form.sourceAmount);
-  const niumPurposeCodesEnabled = !!user?.id && !!token && shouldFetchNiumPurposeCodes(selectedProvider?.code);
+  const niumPurposeCodesEnabled = paymentFlow === "legacy" && !!user?.id && !!token && shouldFetchNiumPurposeCodes(selectedProvider?.code);
   const purposeCodesQuery = useQuery({
     queryKey: ["nium-purpose-codes", user?.id, token],
     enabled: niumPurposeCodesEnabled,
@@ -242,8 +252,27 @@ const AccountTransfers = () => {
   );
   const selectedPurpose = purposeOptions.find((purpose) => purpose.code === form.purposeCode);
   const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
+  const dynamic = useDynamicPayment(paymentFlow === "dynamic" ? selectedBeneficiary : null,
+    verifiedForTransfers && identityReady && !identity);
 
   useEffect(() => {
+    if (dynamic.saved) { setPaymentFlow("dynamic"); setStep("result"); }
+    else if (paymentFlow === "dynamic" && step === "result") {
+      if (dynamic.quote) setStep("details");
+      else { setForm(defaultForm); setPaymentFlow("legacy"); setStep("payee"); }
+    }
+  }, [dynamic.saved, dynamic.quote, paymentFlow, step]);
+
+  useEffect(() => {
+    if (dynamic.transfer) {
+      void queryClient.invalidateQueries({ queryKey: ["money-transfers", user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ["money-transactions", user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ["money-balances", user?.id] });
+    }
+  }, [dynamic.transfer, queryClient, user?.id]);
+
+  useEffect(() => {
+    if (paymentFlow === "dynamic") return;
     const purposeCodeIsCompatible = purposeOptions.some((purpose) => purpose.code === form.purposeCode);
     if (isNiumProvider(selectedProvider?.code)) {
       // Wait for the authoritative allowlist before clearing an unsupported purpose.
@@ -253,11 +282,11 @@ const AccountTransfers = () => {
     } else if (!purposeCodeIsCompatible && (purposeOptions.length > 0 || form.purposeCode)) {
       setForm((current) => ({ ...current, purposeCode: purposeOptions[0]?.code ?? "" }));
     }
-  }, [form.purposeCode, form.providerId, form.beneficiaryId, purposeOptions, selectedProvider?.code, purposeCodesQuery.isSuccess]);
+  }, [form.purposeCode, form.providerId, form.beneficiaryId, purposeOptions, selectedProvider?.code, purposeCodesQuery.isSuccess, paymentFlow]);
 
   const filteredBeneficiaries = beneficiaries.filter((beneficiary) => {
     const provider = providerById.get(beneficiary.provider_id);
-    if (!beneficiaryTransferOption(beneficiary, provider).visible) return false;
+    if (!wizardBeneficiaryOption(beneficiary, provider).visible) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return [
@@ -295,6 +324,7 @@ const AccountTransfers = () => {
         clearPaymentIdentity(String(user!.id), saved);
       }
     } catch (failure) { setFormError(failure instanceof Error ? failure.message : "Unable to confirm saved payment."); return; }
+    setPaymentFlow("legacy");
     setForm(defaultForm);
     setSearch("");
     setFormError("");
@@ -305,9 +335,16 @@ const AccountTransfers = () => {
   };
 
   const pickBeneficiary = (beneficiary: Beneficiary) => {
+    if (!dynamic.ready || dynamic.saved) { setFormError("Resolve the saved Dynamic payment before starting another instruction."); return; }
     const providerId = String(beneficiary.provider_id);
     const provider = providerById.get(beneficiary.provider_id);
-    if (!beneficiaryTransferOption(beneficiary, provider).selectable) return;
+    if (!wizardBeneficiaryOption(beneficiary, provider).selectable) return;
+    const dynamicCandidate = isDynamicBeneficiaryCandidate(beneficiary, provider);
+    if (dynamicCandidate && (!identityReady || identity)) {
+      setFormError("Resolve the saved payment before starting a Dynamic instruction."); return;
+    }
+    dynamic.invalidate();
+    setPaymentFlow(dynamicCandidate ? "dynamic" : "legacy");
     const nextBalance = balances.find(
       (balance) => String(balance.provider_id) === providerId && (!isNiumProvider(provider?.code) || balance.currency === "USD"),
     );
@@ -327,6 +364,8 @@ const AccountTransfers = () => {
   const updateSourceCurrency = (currency: string) => setForm({ ...form, sourceCurrency: currency });
 
   const validateDetails = () => {
+    if (paymentFlow === "dynamic") return "Use the Dynamic quote and confirmation steps for this instruction.";
+    if (!dynamic.ready || dynamic.saved) return "Resolve the saved Dynamic payment before starting another instruction.";
     if (!verifiedForTransfers) return "KYC/KYB must be approved before creating transfers.";
     if (!selectedProvider) return "Transfer rail is not available yet.";
     if (!selectedBeneficiary) return "Select a beneficiary before continuing.";
@@ -364,6 +403,7 @@ const AccountTransfers = () => {
   };
 
   const prepareIdentity = async () => {
+    if (!dynamic.ready || dynamic.saved) throw new Error("Resolve the saved Dynamic payment before starting another instruction.");
     if (!identityReady) throw new Error("Saved payment identity must be checked before continuing. Reload to retry the status check.");
     const current = await getBeneficiary({ userId: String(user!.id), token: token!, beneficiaryId: Number(form.beneficiaryId) });
     if (!selectedBeneficiary || current.id !== selectedBeneficiary.id || current.provider_id !== Number(form.providerId)
@@ -393,6 +433,7 @@ const AccountTransfers = () => {
 
   const resumeSavedTransfer = async (transfer: Transfer) => {
     try {
+      if (!dynamic.ready || dynamic.saved) throw new Error("Resolve the saved Dynamic payment before reopening another instruction.");
       const saved = readPaymentIdentity(String(user!.id));
       if (saved && !belongsToIdentity(transfer, saved)) throw new Error("Resolve the active saved payment before reviewing another instruction.");
       if (!transfer.client_reference || paymentUncertain(transfer)) throw new Error("This instruction needs status recovery before review.");
@@ -407,7 +448,7 @@ const AccountTransfers = () => {
       setConfirmedSgdTerms({ key: sgdFinancialKey(restored, current), amounts: transfer.payout_amounts ?? null });
       queryClient.setQueryData<Beneficiary[]>(["money-beneficiaries", user?.id, token], (items) =>
         (items ?? []).map((item) => item.id === current.id ? current : item));
-      setForm(restored); setFormError(""); setStep("details");
+      setPaymentFlow("legacy"); setForm(restored); setFormError(""); setStep("details");
     } catch (failure) { setFormError(failure instanceof Error ? failure.message : "Unable to reopen payment."); }
   };
 
@@ -577,7 +618,6 @@ const AccountTransfers = () => {
             <h1 className="text-[2.2rem] font-bold tracking-[-0.04em] text-[#0f2442] sm:text-[3rem] dark:text-white">
               Move funds
             </h1>
-            <Link to="/account/transfers/dynamic" className="mt-2 inline-block font-semibold underline">Multi-currency payment</Link>
             <p className="mt-2 max-w-3xl text-[1.02rem] leading-7 text-[#62708a] dark:text-gray-400">
               Send a single payment with balance, beneficiary, approval, and submission checks.
             </p>
@@ -641,6 +681,8 @@ const AccountTransfers = () => {
                   </div>
                 ) : null}
 
+                {dynamic.error && <div role="alert" className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">{dynamic.error}</div>}
+
                 {step === "payee" && (
                   <PayeeStep
                     search={search}
@@ -652,7 +694,21 @@ const AccountTransfers = () => {
                   />
                 )}
 
-                {step === "details" && (
+                {paymentFlow === "dynamic" && step !== "payee" && <>
+                  {step !== "result" && <div className="mb-6"><SelectedPayee provider={selectedProvider} beneficiary={selectedBeneficiary}
+                    changeDisabled={dynamic.busy || !!dynamic.saved}
+                    onChangePayee={() => { dynamic.invalidate(); setForm(defaultForm); setPaymentFlow("legacy"); setStep("payee"); }} /></div>}
+                  {step === "details" && <DynamicDetails payment={dynamic}
+                    onBack={() => { dynamic.invalidate(); setForm(defaultForm); setPaymentFlow("legacy"); setStep("payee"); }}
+                    onReview={() => { void dynamic.getReview().then((reviewed) => { if (reviewed) setStep("review"); }); }} />}
+                  {step === "review" && <DynamicReviewStep payment={dynamic}
+                    onBack={() => { dynamic.clearReview(); setStep("details"); }} />}
+                  {step === "result" && <DynamicResult payment={dynamic} onNewPayment={() => {
+                    if (dynamic.startAnother()) { setForm(defaultForm); setPaymentFlow("legacy"); setStep("payee"); }
+                  }} />}
+                </>}
+
+                {paymentFlow === "legacy" && step === "details" && (
                   <DetailsStep
                     form={form}
                     selectedProvider={selectedProvider}
@@ -675,7 +731,7 @@ const AccountTransfers = () => {
                   />
                 )}
 
-                {step === "review" && (
+                {paymentFlow === "legacy" && step === "review" && (
                   <ReviewStep
                     form={form}
                     provider={selectedProvider}
@@ -708,7 +764,7 @@ const AccountTransfers = () => {
                   />
                 )}
 
-                {step === "result" && <>
+                {paymentFlow === "legacy" && step === "result" && <>
                   <ResultStep
                     transfer={createdTransfer}
                     provider={createdTransfer ? providerById.get(createdTransfer.provider_id) : selectedProvider}
@@ -734,8 +790,9 @@ const AccountTransfers = () => {
 
           <div className="space-y-6">
             <PaymentSummary
-              provider={step === "result" && createdTransfer ? providerById.get(createdTransfer.provider_id) ?? null : selectedProvider}
-              beneficiary={step === "result" && createdTransfer ? createdTransfer.beneficiary ?? beneficiaryById.get(Number(createdTransfer.beneficiary_id)) ?? null : selectedBeneficiary}
+              dynamicPayment={paymentFlow === "dynamic" ? <DynamicSummary payment={dynamic} /> : undefined}
+              provider={paymentFlow === "dynamic" && dynamic.saved ? providerById.get(beneficiaryById.get(dynamic.saved.request.beneficiary_id)?.provider_id) ?? null : step === "result" && createdTransfer ? providerById.get(createdTransfer.provider_id) ?? null : selectedProvider}
+              beneficiary={paymentFlow === "dynamic" && dynamic.saved ? beneficiaryById.get(dynamic.saved.request.beneficiary_id) ?? null : step === "result" && createdTransfer ? createdTransfer.beneficiary ?? beneficiaryById.get(Number(createdTransfer.beneficiary_id)) ?? null : selectedBeneficiary}
               balance={selectedBalance}
               sourceAmount={step === "result" && createdTransfer ? toNumber(createdTransfer.source_amount) : effectiveSourceAmount}
               form={step === "result" && createdTransfer ? transferFormFromTransfer(createdTransfer) : form}
@@ -751,8 +808,10 @@ const AccountTransfers = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {activityTransfers.length > 0 ? (
+                {activityTransfers.length > 0 || dynamic.activity.length > 0 ? (
                   <div className="divide-y divide-[#e8edf5] dark:divide-white/5">
+                    {dynamic.activity.map((transfer) => <DynamicActivity key={transfer.id} transfer={transfer}
+                      name={beneficiaryById.get(transfer.beneficiary.id)?.full_name} />)}
                     {activityTransfers.map((transfer) => (
                       <TransferRow
                         key={transfer.id}
@@ -766,8 +825,11 @@ const AccountTransfers = () => {
                         onSync={() => syncMutation.mutate(transfer.id)}
                         onCancel={() => cancelMutation.mutate(transfer.id)}
                         onOpen={() => {
+                          if (dynamic.busy || dynamic.saved) {
+                            setFormError("Resolve the active Dynamic payment before opening another instruction."); return;
+                          }
                           void getTransfer({ userId: String(user!.id), token: token!, transferId: transfer.id })
-                            .then((current) => { setCreatedTransfer(current); setFormError(""); setStep("result"); })
+                            .then((current) => { dynamic.invalidate(); setPaymentFlow("legacy"); setCreatedTransfer(current); setFormError(""); setStep("result"); })
                             .catch((failure) => setFormError(String(failure)));
                         }}
                       />
@@ -839,7 +901,7 @@ export const PayeeStep = ({
         <div className="divide-y divide-[#e8edf5] rounded-2xl border border-[#d7d7d2] bg-white dark:divide-white/5 dark:border-white/10 dark:bg-[#10141b]">
           {beneficiaries.map((beneficiary) => {
             const provider = providerById.get(beneficiary.provider_id);
-            const eligibility = beneficiaryTransferOption(beneficiary, provider);
+            const eligibility = wizardBeneficiaryOption(beneficiary, provider);
             return (
               <button
                 key={beneficiary.id}
@@ -881,7 +943,7 @@ export const PayeeStep = ({
             {loading ? "Loading beneficiaries..." : "No usable beneficiary found"}
           </p>
           <p className="mt-2 text-sm text-[#62708a] dark:text-gray-400">
-            Only active Nium HK beneficiaries receiving USD by SWIFT are currently available for transfers.
+            Select an available recipient to check payment terms and supported currencies.
           </p>
           <Button asChild className="mt-5 h-11 rounded-full bg-[#15803d] px-6 text-white hover:bg-[#166534]">
             <Link to="/account/beneficiaries">Add beneficiary</Link>
@@ -1203,6 +1265,7 @@ export const PaymentSummary = ({
   sourceAmount,
   form,
   payoutAmounts,
+  dynamicPayment,
 }: {
   provider: ProviderSummary | null;
   beneficiary: Beneficiary | null;
@@ -1210,6 +1273,7 @@ export const PaymentSummary = ({
   sourceAmount: number;
   form: TransferForm;
   payoutAmounts?: NiumPayoutAmounts | null;
+  dynamicPayment?: ReactNode;
 }) => (
   <Card role="region" aria-label="Payment summary" className="wallet-card rounded-2xl border border-[#d7d7d2] bg-white shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-[#151b24]">
     <CardHeader>
@@ -1220,6 +1284,7 @@ export const PaymentSummary = ({
       <SummaryLine label="Payee" value={beneficiary?.full_name ?? "Not selected"} />
       <SummaryLine label="Funding" value={isNiumProvider(provider?.code) ? "Nium wallet balance" : "Provider funding account"} />
       <SummaryLine label="Available" value={balance ? <CurrencyDisplay currency={balance.currency}>{formatAmount(balance.available_balance, balance.currency)}</CurrencyDisplay> : "No synced balance"} />
+      {dynamicPayment ?? <>
       <SummaryLine label="Transfer amount" value={sourceAmount > 0 ? <CurrencyDisplay currency={form.sourceCurrency}>{formatAmount(sourceAmount, form.sourceCurrency)}</CurrencyDisplay> : "-"} />
       <SummaryLine label="Destination currency" value={form.targetCurrency} />
       {isNiumProvider(provider?.code) && form.targetCurrency === "SGD" ? <SgdLocalAmountBreakdown sourceAmount={form.sourceAmount} amounts={payoutAmounts} /> : <>
@@ -1228,6 +1293,7 @@ export const PaymentSummary = ({
       <SummaryLine label="Provider fee" value="Calculated during processing" />
       </>}
       <SummaryLine label="Fee handling" value={payoutFeePresentation(beneficiary?.payout_method)} />
+      </>}
     </CardContent>
   </Card>
 );
@@ -1389,10 +1455,12 @@ const SelectedPayee = ({
   provider,
   beneficiary,
   onChangePayee,
+  changeDisabled = false,
 }: {
   provider: ProviderSummary | null;
   beneficiary: Beneficiary | null;
   onChangePayee: () => void;
+  changeDisabled?: boolean;
 }) => (
   <div className="flex flex-col gap-4 rounded-2xl border border-[#d7d7d2] bg-[#f3fdf9] p-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/5">
     <div className="flex min-w-0 items-center gap-3">
@@ -1415,6 +1483,7 @@ const SelectedPayee = ({
       variant="outline"
       className="h-10 rounded-full border-[#d7d7d2] bg-white text-[#15803d] hover:bg-[#f3fdf9] dark:border-white/10 dark:bg-[#10141b]"
       onClick={onChangePayee}
+      disabled={changeDisabled}
     >
       Change
     </Button>
