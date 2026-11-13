@@ -81,7 +81,7 @@ import {
 } from "./transferForm";
 
 import { isDynamicBeneficiaryCandidate, useDynamicPayment } from "./useDynamicPayment";
-import { DynamicActivity, DynamicDetails, DynamicResult, DynamicReviewStep, DynamicSummary } from "./DynamicPaymentSteps";
+import { DynamicActivity, DynamicDetails, DynamicRecovery, DynamicResult, DynamicReviewStep, DynamicSummary } from "./DynamicPaymentSteps";
 
 // Preserve existing legacy admission; every valid Nium recipient can also request a Dynamic check.
 const wizardBeneficiaryOption = (beneficiary: Beneficiary, provider?: ProviderSummary) => {
@@ -256,7 +256,7 @@ const AccountTransfers = () => {
   const selectedPurpose = purposeOptions.find((purpose) => purpose.code === form.purposeCode);
   const verifiedForTransfers = isVerifiedKycStatus(user?.kycStatus);
   const dynamic = useDynamicPayment(paymentFlow === "dynamic" ? selectedBeneficiary : null,
-    verifiedForTransfers && identityReady && !identity);
+    verifiedForTransfers && identityReady && !identity, balances);
 
   useEffect(() => {
     if (dynamic.saved) { setPaymentFlow("dynamic"); setStep("result"); }
@@ -696,6 +696,7 @@ const AccountTransfers = () => {
                 ) : null}
 
                 {dynamic.error && <div role="alert" className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">{dynamic.error}</div>}
+                {dynamic.refusalCodes.length > 0 && <p className="mb-4 text-sm">Refusal codes: {dynamic.refusalCodes.join(", ")}</p>}
 
                 {step === "payee" && (
                   <PayeeStep
@@ -813,8 +814,8 @@ const AccountTransfers = () => {
           <div className="space-y-6">
             <PaymentSummary
               dynamicPayment={paymentFlow === "dynamic" ? <DynamicSummary payment={dynamic} /> : undefined}
-              provider={paymentFlow === "dynamic" && dynamic.saved ? providerById.get(beneficiaryById.get(dynamic.saved.request.beneficiary_id)?.provider_id) ?? null : step === "result" && createdTransfer ? providerById.get(createdTransfer.provider_id) ?? null : selectedProvider}
-              beneficiary={paymentFlow === "dynamic" && dynamic.saved ? beneficiaryById.get(dynamic.saved.request.beneficiary_id) ?? null : step === "result" && createdTransfer ? createdTransfer.beneficiary ?? beneficiaryById.get(Number(createdTransfer.beneficiary_id)) ?? null : selectedBeneficiary}
+              provider={paymentFlow === "dynamic" && dynamic.saved ? providerById.get(beneficiaryById.get(dynamic.recoveryBeneficiaryId)?.provider_id) ?? null : step === "result" && createdTransfer ? providerById.get(createdTransfer.provider_id) ?? null : selectedProvider}
+              beneficiary={paymentFlow === "dynamic" && dynamic.saved ? beneficiaryById.get(dynamic.recoveryBeneficiaryId) ?? null : step === "result" && createdTransfer ? createdTransfer.beneficiary ?? beneficiaryById.get(Number(createdTransfer.beneficiary_id)) ?? null : selectedBeneficiary}
               balance={selectedBalance}
               sourceAmount={step === "result" && createdTransfer ? toNumber(createdTransfer.source_amount) : effectiveSourceAmount}
               form={step === "result" && createdTransfer ? transferFormFromTransfer(createdTransfer) : form}
@@ -830,6 +831,7 @@ const AccountTransfers = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
+                <DynamicRecovery key={String(user?.id)} payment={dynamic} disabled={!!identity || sessionActionBusy} />
                 {activityTransfers.length > 0 || dynamic.activity.length > 0 ? (
                   <div className="divide-y divide-[#e8edf5] dark:divide-white/5">
                     {dynamic.activity.map((transfer) => <DynamicActivity key={transfer.id} transfer={transfer}

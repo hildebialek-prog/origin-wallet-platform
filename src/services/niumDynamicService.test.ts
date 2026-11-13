@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestApi } from "./apiClient";
-import { dynamicOptions, dynamicQuote, dynamicReview, dynamicSubmit, dynamicStatus } from "./niumDynamicService";
+import { dynamicOptions, dynamicQuote, dynamicReview, dynamicSubmit, dynamicStatus, dynamicTransfers } from "./niumDynamicService";
 
 vi.mock("./apiClient", () => ({ requestApi: vi.fn() }));
 const call = vi.mocked(requestApi);
@@ -19,6 +19,13 @@ describe("authenticated Dynamic API contract", () => {
     const body = { beneficiary_id: 4, destination_currency: "GBP", amount_mode: mode, entered_amount: "1000.01" };
     await dynamicQuote(auth, body);
     expect(call).toHaveBeenLastCalledWith(`${base}/quotes`, { method: "POST", token: auth.token, body });
+  });
+  it("uses authenticated GET collection recovery with the exact reference and bounded pagination fields", async () => {
+    await dynamicTransfers(auth);
+    expect(call).toHaveBeenLastCalledWith(base, { token: auth.token });
+    await dynamicTransfers(auth, { client_reference: "DYN-exact:case", page: 2, per_page: 20 });
+    expect(call).toHaveBeenLastCalledWith(`${base}?client_reference=DYN-exact%3Acase&page=2&per_page=20`, { token: auth.token });
+    expect(call.mock.calls.every(([, options]) => options.method === undefined && options.body === undefined)).toBe(true);
   });
   it("binds review and submit without any Admin endpoint or added fee", async () => {
     const review = { beneficiary_id: 4, dynamic_quote_id: "quote-id",
