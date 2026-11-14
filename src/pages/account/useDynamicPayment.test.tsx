@@ -12,8 +12,13 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => session }));
 const beneficiary: Beneficiary = { id: 4, provider_id: 10, beneficiary_type: "individual", full_name: "Payee", country_code: "GB", currency: "GBP", payout_method: "LOCAL", status: "active" };
 const wallet: Balance = { id: 3, user_id: 12, provider_id: 10, currency: "USD", available_balance: "1000.00000000" };
 const instruction = { purpose_code: "IR005", source_of_funds: "Salary", comment: "Invoice" };
-const pricing: DynamicCustomerPricing = { version: "origin-nium-contracted-local-usd-inclusive-v3", funding: "USD", country: "GB", destination: "GBP", method: "LOCAL",
-  margin_percent: "0.13", fee: "20", fee_currency: "USD", origin_service_fee_usd: "20", fee_payer: "SENDER",
+const feeClassification = {
+  fee_owner: "NIUM", fee_type: "TRANSACTION_FEE", fee_basis: "CONTRACT_SCHEDULE", fx_margin_owner: "NIUM",
+  fee_collection: "UNVERIFIED", origin_revenue: "NOT_RECOGNIZED",
+};
+const pricing: DynamicCustomerPricing = { version: "nium-contracted-local-usd-inclusive-v4", funding: "USD", country: "GB", destination: "GBP", method: "LOCAL",
+  ...feeClassification,
+  margin_percent: "0.13", fee: "20", fee_currency: "USD", contracted_nium_transaction_fee_usd: "20", fee_payer: "SENDER",
   fee_treatment: "INCLUDED_IN_TOTAL_USD_DEBIT", rate_treatment: "PRESERVE_NIUM_QUOTED_RATE_NO_ADDITIONAL_MARGIN",
   provider_settlement: "INDEPENDENT_AUTHENTICATED_RECONCILIATION" };
 const optionAuthority = {
@@ -25,20 +30,20 @@ const optionAuthority = {
 const options = (currencies = ["GBP"]): DynamicOptions => ({ ...optionAuthority, currency_scales: { USD: 2, ...Object.fromEntries(currencies.map((code) => [code, 2])) }, beneficiary: { id: 4, name: "Payee", currency: "GBP", country_code: "GB" },
   status: "QUOTE_REFERENCE_ONLY", reason_codes: [], quote_availability: { supported_amount_modes: ["SOURCE_AMOUNT", "DESTINATION_AMOUNT"], payout_rail: "LOCAL", status: "QUOTE_REFERENCE_ONLY", destination_currencies: currencies, reason_codes: [] } });
 const quote = (mode: DynamicMode = "SOURCE_AMOUNT", id = "quote-1"): DynamicQuote => ({ status: "QUOTE_REFERENCE_ONLY", dynamic_quote_id: id, provider_quote_id: `provider-${id}`,
-  customer_pricing: pricing, origin_service_fee: { currency: "USD", amount: "20" }, pricing_status: "CONTRACTUAL_CUSTOMER_TERMS",
+  customer_pricing: pricing, contracted_nium_transaction_fee: { currency: "USD", amount: "20" }, pricing_status: "CONTRACTUAL_CUSTOMER_TERMS",
   financial_verification: "CUSTOMER_PRICING_AUTHORIZED_PROVIDER_SETTLEMENT_UNVERIFIED",
   beneficiary_id: 4, payout_rail: "LOCAL", source_currency: "USD", destination_currency: "GBP", amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784",
   quoted_principal: { currency: "USD", amount: "980" }, planned_included_fee: { currency: "USD", amount: "20" }, planned_total_usd_debit: "1000",
   quoted_destination_amount: { currency: "GBP", amount: "784" }, nium_quoted_fx_rate: "0.8", quote_expires_at: new Date(Date.now() + 300000).toISOString() });
 const review = (q: DynamicQuote): DynamicReview => ({ status: "READY", review_id: "a".repeat(64), accepted_fingerprint: "a".repeat(64),
-  provider_quote_id: q.provider_quote_id, nium_quoted_fx_rate: q.nium_quoted_fx_rate, customer_pricing: q.customer_pricing, origin_service_fee: q.origin_service_fee,
+  provider_quote_id: q.provider_quote_id, nium_quoted_fx_rate: q.nium_quoted_fx_rate, customer_pricing: q.customer_pricing, contracted_nium_transaction_fee: q.contracted_nium_transaction_fee,
   beneficiary_id: 4, provider_account_id: 2, balance_id: 3, dynamic_quote_id: q.dynamic_quote_id, amount_mode: q.amount_mode, entered_amount: q.entered_amount,
   principal: q.quoted_principal, included_fee: q.planned_included_fee, total_usd_debit: q.planned_total_usd_debit,
   payout_rail: q.payout_rail, destination_amount: q.quoted_destination_amount, review_expires_at: q.quote_expires_at, quote_expires_at: q.quote_expires_at, instruction, reason_codes: [] });
 const transfer = (status: DynamicTransfer["status"] = "pending_provider_confirmation"): DynamicTransfer => ({
   id: "22222222-2222-4222-8222-222222222222", beneficiary: { id: 4, country_code: "GB" }, source_currency: "USD", destination_currency: "GBP",
   amount_mode: "SOURCE_AMOUNT", total_usd_debit: "1000.00000000", principal: { currency: "USD", amount: "980" },
-  included_fee: { currency: "USD", amount: "20" }, destination_amount: { currency: "GBP", amount: "784" },
+  fee_classification: feeClassification, included_fee: { currency: "USD", amount: "20" }, destination_amount: { currency: "GBP", amount: "784" },
   status, financial_reconciled: ["paid", "reconciled"].includes(status), message: "Provider outcome pending. Do not submit again.",
   quote_expires_at: "2020-01-01T00:00:00Z" });
 const page = (data: DynamicTransfer[] = [], number = 1, next: number | null = null) => ({ data, page: number, per_page: 20, has_more: next !== null, next_page: next });

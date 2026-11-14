@@ -3,9 +3,13 @@ import { requestApi } from "./apiClient";
 export type DynamicMode = "SOURCE_AMOUNT" | "DESTINATION_AMOUNT";
 export type DynamicMoney = { currency: string; amount: string };
 export type DynamicInstruction = { purpose_code: string; source_of_funds: string; comment: string };
-export type DynamicCustomerPricing = {
+export type DynamicFeeClassification = {
+  fee_owner: string; fee_type: string; fee_basis: string; fx_margin_owner: string;
+  fee_collection: string; origin_revenue: string;
+};
+export type DynamicCustomerPricing = DynamicFeeClassification & {
   version: string; funding: string; country: string; destination: string; method: string;
-  margin_percent: string; fee: string; fee_currency: string; origin_service_fee_usd: string;
+  margin_percent: string; fee: string; fee_currency: string; contracted_nium_transaction_fee_usd: string;
   fee_payer: string; fee_treatment: string; rate_treatment: string; provider_settlement: string;
 };
 export type DynamicOptions = {
@@ -29,7 +33,7 @@ export type DynamicQuote = {
   quote_expires_at: string; quoted_principal: DynamicMoney; planned_included_fee: DynamicMoney;
   planned_total_usd_debit: string; quoted_destination_amount: DynamicMoney; nium_quoted_fx_rate: string;
   pricing_status?: string; financial_verification?: string;
-  customer_pricing?: DynamicCustomerPricing; origin_service_fee?: DynamicMoney; payout_rail?: string;
+  customer_pricing?: DynamicCustomerPricing; contracted_nium_transaction_fee?: DynamicMoney; payout_rail?: string;
 };
 export type DynamicReview = {
   status: "READY" | "UNAVAILABLE"; review_id: string; accepted_fingerprint?: string;
@@ -39,7 +43,7 @@ export type DynamicReview = {
   provider_quote_id: string; nium_quoted_fx_rate: string;
   principal: DynamicMoney; included_fee: DynamicMoney; total_usd_debit: string;
   destination_amount: DynamicMoney; instruction: DynamicInstruction; reason_codes: string[];
-  customer_pricing?: DynamicCustomerPricing; origin_service_fee?: DynamicMoney; payout_rail?: string;
+  customer_pricing?: DynamicCustomerPricing; contracted_nium_transaction_fee?: DynamicMoney; payout_rail?: string;
 };
 export type DynamicSubmission = {
   provider_account_id: number; beneficiary_id: number; balance_id: number;
@@ -49,6 +53,8 @@ export type DynamicTransfer = {
   id: string; beneficiary: { id: number; country_code: string }; source_currency: string;
   destination_currency: string; amount_mode: DynamicMode; total_usd_debit: string;
   principal: DynamicMoney; included_fee: DynamicMoney; destination_amount: DynamicMoney;
+  fee_classification?: DynamicFeeClassification | null;
+  provider_fee_observation?: { status: "SETTLED_FEE_RECORDS" | "UNVERIFIED"; fees: DynamicMoney[] | null };
   status: "queued" | "processing" | "pending_provider_confirmation" | "reconciled" | "paid" | "failed" | "returned" | "requires_attention" | "cancelled";
   financial_reconciled: boolean; message: string; quote_expires_at: string;
   created_at?: string; consented_at?: string; submission_started_at?: string | null; reconciled_at?: string | null;

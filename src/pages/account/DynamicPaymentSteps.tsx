@@ -55,15 +55,15 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
       </div>
       <p className="text-sm">Edit an available amount field, then request a quote. {p.mode === "SOURCE_AMOUNT"
         ? "Nium will quote the recipient amount from your USD spend."
-        : "Nium will quote the USD wallet debit for the recipient amount."}</p>
+        : "Nium will quote the USD conversion principal. The planned debit also includes the contracted Nium fee."}</p>
       <p>Available USD balance: {p.availableUsdBalance === null ? "Unavailable" : `USD ${p.availableUsdBalance}`}</p>
       <Button className={button} disabled={p.locked || p.busy || !p.available || !p.currency || !p.amount} onClick={() => void p.getQuote()}>Request Nium quote</Button>
       {p.busy && <p role="status">{p.quote ? "Checking payment terms…" : "Requesting Nium terms…"}</p>}
     </div>
     {p.quote && <section aria-label="Quoted payment" className="space-y-3 rounded-xl border p-5">
       <p>USD transfer principal: {p.quote.quoted_principal.currency} {p.quote.quoted_principal.amount}</p>
-      <p>Included Origin fee: {p.quote.planned_included_fee.currency} {p.quote.planned_included_fee.amount}</p>
-      <p>The Origin fee is already included in the total USD debit. No additional FX margin is applied. Provider charges and settlement are verified separately.</p>
+      <p>Included Nium transaction fee (contract): {p.quote.planned_included_fee.currency} {p.quote.planned_included_fee.amount}</p>
+      <p>The contracted Nium fee is allocated within the planned USD debit. Nium's quoted rate is used without adding another FX margin. Actual Nium fee collection and settlement remain unverified.</p>
       <p>Quoted total wallet debit: USD {p.quote.planned_total_usd_debit}</p>
       <p>Quoted recipient amount: {p.quote.quoted_destination_amount.currency} {p.quote.quoted_destination_amount.amount}</p>
       {p.quote.pricing_status === "UNAUTHORIZED_PLANNING_ONLY" && <p role="status">
@@ -99,8 +99,8 @@ export function DynamicReviewStep({ payment: p, onBack }: { payment: DynamicPaym
     <p>Amount mode: {r.amount_mode === "SOURCE_AMOUNT" ? "SEND USD — total spend" : "RECEIVE — recipient amount"}</p>
     <p>Entered amount: {r.amount_mode === "SOURCE_AMOUNT" ? "USD" : r.destination_amount.currency} {r.entered_amount}</p>
     <p>USD transfer principal: {r.principal.currency} {r.principal.amount}</p>
-    <p>Included Origin fee: {r.included_fee.currency} {r.included_fee.amount}</p>
-    <p>This fee is included in the total USD debit below; it is not an additional charge.</p>
+    <p>Included Nium transaction fee (contract): {r.included_fee.currency} {r.included_fee.amount}</p>
+    <p>The contracted Nium fee is included in your confirmed debit. The actual settlement fee is verified separately.</p>
     {r.payout_rail && <p>Payout rail: {r.payout_rail}</p>}
     <p>Total wallet debit: USD {r.total_usd_debit}</p>
     <p>Recipient amount: {r.destination_amount.currency} {r.destination_amount.amount}</p>
@@ -131,7 +131,10 @@ export function DynamicResult({ payment: p, onNewPayment }: { payment: DynamicPa
   return <section aria-label="Payment status" className="mx-auto max-w-3xl space-y-4">
     <h2 className="text-2xl font-bold">{p.transfer ? dynamicStatusLabel[p.transfer.status] ?? "Status unavailable" : "Submission recovery"}</h2>
     {p.transfer && <><p role="status">{p.transfer.message}</p><p>Wallet debit: USD {p.transfer.total_usd_debit}</p>
-      <p>Recipient amount: {p.transfer.destination_amount.currency} {p.transfer.destination_amount.amount}</p><p>Payment: {p.transfer.id}</p></>}
+      <p>Recipient amount: {p.transfer.destination_amount.currency} {p.transfer.destination_amount.amount}</p><p>Payment: {p.transfer.id}</p>
+      {p.transfer.provider_fee_observation?.status === "SETTLED_FEE_RECORDS"
+        ? <p>Observed Nium settlement fees: {p.transfer.provider_fee_observation.fees?.map((fee) => `${fee.currency} ${fee.amount}`).join(", ")}</p>
+        : <p>Actual Nium settlement fee: unverified.</p>}</>}
     {p.saved?.id && !p.transfer && <p role="status">Payment status is unavailable and the outcome may be unknown. Refresh this payment's status before starting another payment.</p>}
     {p.saved?.id && <Button variant="outline" onClick={p.refreshStatus}>Refresh payment status</Button>}
     {p.saved?.id && p.transfer && ["paid", "cancelled"].includes(p.transfer.status)
@@ -155,7 +158,8 @@ export function DynamicSummary({ payment: p }: { payment: DynamicPayment }) {
   const rows = [
     ["Payment", "Dynamic Multi-Currency"],
     ["USD transfer principal", principal && `${principal.currency} ${principal.amount}`],
-    [p.transfer ? "Included customer fee" : "Included Origin fee", fee && `${fee.currency} ${fee.amount}`],
+    [p.transfer && p.transfer.fee_classification?.fee_owner !== "NIUM"
+      ? "Included fee (ownership unverified)" : "Included Nium transaction fee (contract)", fee && `${fee.currency} ${fee.amount}`],
     [terms ? "Confirmed wallet debit" : "Quoted wallet debit", debit && `USD ${debit}`],
     ["Recipient amount", credit && `${credit.currency} ${credit.amount}`],
     ["FX rate", p.quote?.nium_quoted_fx_rate],

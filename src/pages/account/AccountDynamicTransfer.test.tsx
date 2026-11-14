@@ -24,12 +24,17 @@ const optionAuthority = {
 const fingerprint = "a".repeat(64);
 const request = { beneficiary_id: 4, provider_account_id: 2, balance_id: 3, accepted_fingerprint: fingerprint, client_reference: `DYN-${fingerprint}` };
 const instruction = { purpose_code: "IR005", source_of_funds: "Salary", comment: "Invoice" };
-const pricing: DynamicCustomerPricing = { version: "origin-nium-contracted-local-usd-inclusive-v3", funding: "USD", country: "GB", destination: "GBP", method: "LOCAL",
-  margin_percent: "0.13", fee: "20", fee_currency: "USD", origin_service_fee_usd: "20", fee_payer: "SENDER",
+const feeClassification = {
+  fee_owner: "NIUM", fee_type: "TRANSACTION_FEE", fee_basis: "CONTRACT_SCHEDULE", fx_margin_owner: "NIUM",
+  fee_collection: "UNVERIFIED", origin_revenue: "NOT_RECOGNIZED",
+};
+const pricing: DynamicCustomerPricing = { version: "nium-contracted-local-usd-inclusive-v4", funding: "USD", country: "GB", destination: "GBP", method: "LOCAL",
+  ...feeClassification,
+  margin_percent: "0.13", fee: "20", fee_currency: "USD", contracted_nium_transaction_fee_usd: "20", fee_payer: "SENDER",
   fee_treatment: "INCLUDED_IN_TOTAL_USD_DEBIT", rate_treatment: "PRESERVE_NIUM_QUOTED_RATE_NO_ADDITIONAL_MARGIN",
   provider_settlement: "INDEPENDENT_AUTHENTICATED_RECONCILIATION" };
 const makeQuote = (mode: DynamicMode = "SOURCE_AMOUNT"): DynamicQuote => ({ status: "QUOTE_REFERENCE_ONLY",
-  customer_pricing: pricing, origin_service_fee: { currency: "USD", amount: "20" }, pricing_status: "CONTRACTUAL_CUSTOMER_TERMS",
+  customer_pricing: pricing, contracted_nium_transaction_fee: { currency: "USD", amount: "20" }, pricing_status: "CONTRACTUAL_CUSTOMER_TERMS",
   financial_verification: "CUSTOMER_PRICING_AUTHORIZED_PROVIDER_SETTLEMENT_UNVERIFIED",
   dynamic_quote_id: "11111111-1111-4111-8111-111111111111", provider_quote_id: "provider-quote", beneficiary_id: 4,
   payout_rail: "LOCAL", amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784", source_currency: "USD", destination_currency: "GBP",
@@ -42,11 +47,11 @@ const makeReview = (quote = makeQuote()): DynamicReview => ({ status: "READY", r
   amount_mode: quote.amount_mode, entered_amount: quote.entered_amount, review_expires_at: quote.quote_expires_at, quote_expires_at: quote.quote_expires_at,
   principal: quote.quoted_principal, included_fee: quote.planned_included_fee, total_usd_debit: quote.planned_total_usd_debit,
   destination_amount: quote.quoted_destination_amount, instruction, reason_codes: [],
-  customer_pricing: quote.customer_pricing, origin_service_fee: quote.origin_service_fee, payout_rail: quote.payout_rail });
+  customer_pricing: quote.customer_pricing, contracted_nium_transaction_fee: quote.contracted_nium_transaction_fee, payout_rail: quote.payout_rail });
 const makeTransfer = (status: DynamicTransfer["status"] = "processing"): DynamicTransfer => ({
   id: "22222222-2222-4222-8222-222222222222", beneficiary: { id: 4, country_code: "GB" }, source_currency: "USD", destination_currency: "GBP",
   amount_mode: "SOURCE_AMOUNT", total_usd_debit: "1000", principal: { currency: "USD", amount: "980" },
-  included_fee: { currency: "USD", amount: "20" }, destination_amount: { currency: "GBP", amount: "784" },
+  fee_classification: feeClassification, included_fee: { currency: "USD", amount: "20" }, destination_amount: { currency: "GBP", amount: "784" },
   status, financial_reconciled: ["paid", "reconciled"].includes(status), message: `Provider state: ${status}`, quote_expires_at: makeQuote().quote_expires_at });
 const clients: QueryClient[] = [];
 const Location = () => <output aria-label="Current route">{useLocation().pathname}</output>;
@@ -133,7 +138,7 @@ describe("Move funds Dynamic payment", () => {
     expect(screen.getByLabelText("Recipient gets")).toHaveValue("784"); expect(screen.getByLabelText("You send")).toHaveValue("2019.37");
     const quoted = within(screen.getByRole("region", { name: "Quoted payment" }));
     expect(quoted.getByText("USD transfer principal: USD 1999.37")).toBeVisible();
-    expect(quoted.getByText("Included Origin fee: USD 20")).toBeVisible();
+    expect(quoted.getByText("Included Nium transaction fee (contract): USD 20")).toBeVisible();
     expect(quoted.getByText("Quoted total wallet debit: USD 2019.37")).toBeVisible();
     await reviewPayment();
     const reviewed = within(await screen.findByRole("region", { name: "Authoritative payment review" }));
@@ -149,7 +154,7 @@ describe("Move funds Dynamic payment", () => {
     fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
     await screen.findByRole("alert");
     expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Included Origin fee: USD 20")).not.toBeInTheDocument();
+    expect(screen.queryByText("Included Nium transaction fee (contract): USD 20")).not.toBeInTheDocument();
     expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
   });
   it("uses the existing recipient cards before requesting authoritative currencies", async () => {
@@ -174,20 +179,20 @@ describe("Move funds Dynamic payment", () => {
     expect(document.querySelector('[aria-current="step"]')).toHaveTextContent("Payment details");
   });
 
-  it("shows one included Origin fee and inclusive debit through customer Review", async () => {
+  it("shows one contracted Nium transaction fee and inclusive debit through customer Review", async () => {
     api.dynamicOptions.mockResolvedValueOnce({ ...optionAuthority, beneficiary: { id: 4, name: "GBP Payee", currency: "GBP", country_code: "GB" },
       status: "QUOTE_REFERENCE_ONLY", dynamic_available: true, eligible_payout_rails: ["LOCAL"], reason_codes: [],
       quote_availability: { supported_amount_modes: ["SOURCE_AMOUNT", "DESTINATION_AMOUNT"], payout_rail: "LOCAL", status: "QUOTE_REFERENCE_ONLY", destination_currencies: ["GBP"], reason_codes: [] } });
     api.dynamicQuote.mockResolvedValueOnce({ ...makeQuote(), customer_pricing: pricing,
-      origin_service_fee: { currency: "USD", amount: "20" }, payout_rail: "LOCAL" });
+      contracted_nium_transaction_fee: { currency: "USD", amount: "20" }, payout_rail: "LOCAL" });
     mount(); await quotePayment();
     expect(screen.getByLabelText("Payout rail")).toHaveValue("LOCAL");
     expect(screen.getByLabelText("Payout rail")).toBeDisabled();
     const quoted = within(screen.getByRole("region", { name: "Quoted payment" }));
     expect(quoted.getByText("USD transfer principal: USD 980")).toBeVisible();
-    expect(quoted.getByText("Included Origin fee: USD 20")).toBeVisible();
-    expect(quoted.getAllByText("Included Origin fee: USD 20")).toHaveLength(1);
-    expect(quoted.queryByText(/Nium contractual fee|Origin service fee:/)).not.toBeInTheDocument();
+    expect(quoted.getByText("Included Nium transaction fee (contract): USD 20")).toBeVisible();
+    expect(quoted.getAllByText("Included Nium transaction fee (contract): USD 20")).toHaveLength(1);
+    expect(quoted.queryByText(/Origin fee|Origin service fee|platform fee/i)).not.toBeInTheDocument();
     expect(quoted.getByText("Quoted total wallet debit: USD 1000")).toBeVisible();
     expect(screen.getByLabelText("You send")).toHaveValue("1000");
     expect(screen.getByLabelText("Recipient gets")).toHaveValue("784");
@@ -198,11 +203,37 @@ describe("Move funds Dynamic payment", () => {
     expect(reviewed.getByText("Amount mode: SEND USD — total spend")).toBeVisible();
     expect(reviewed.getByText("Entered amount: USD 1000")).toBeVisible();
     expect(reviewed.getByText("Nium quoted rate: 0.8")).toBeVisible();
-    expect(reviewed.getAllByText("Included Origin fee: USD 20")).toHaveLength(1);
+    expect(reviewed.getAllByText("Included Nium transaction fee (contract): USD 20")).toHaveLength(1);
     expect(reviewed.queryByText(/Origin service fee:/)).not.toBeInTheDocument();
     expect(reviewed.getByText("Payout rail: LOCAL")).toBeVisible();
     expect(reviewed.getByText("Total wallet debit: USD 1000")).toBeVisible();
     expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", "0", "21", "EUR"])("shows settlement observation %s separately without repricing or Origin revenue", async (value) => {
+    const observedTransfer: DynamicTransfer = {
+      ...makeTransfer(value === "missing" ? "processing" : "requires_attention"),
+      provider_fee_observation: value === "missing" ? { status: "UNVERIFIED", fees: null }
+        : { status: "SETTLED_FEE_RECORDS", fees: [{ currency: value === "EUR" ? "EUR" : "USD", amount: value === "EUR" ? "7.25" : value }] },
+    };
+    // Submit has no settlement receipt yet. Status GETs supply backend evidence.
+    api.dynamicSubmit.mockResolvedValueOnce(makeTransfer());
+    api.dynamicStatus.mockResolvedValue(observedTransfer);
+    mount(); await quotePayment(); await reviewPayment();
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit payment" }));
+    const result = within(await screen.findByRole("region", { name: "Payment status" }));
+    await waitFor(() => expect(api.dynamicStatus).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, observedTransfer.id));
+    expect(result.getByText("Wallet debit: USD 1000")).toBeVisible();
+    expect(await result.findByText(value === "missing" ? "Actual Nium settlement fee: unverified."
+      : `Observed Nium settlement fees: ${value === "EUR" ? "EUR 7.25" : `USD ${value}`}`)).toBeVisible();
+    if (value !== "missing") {
+      expect(result.queryByText("Actual Nium settlement fee: unverified.")).not.toBeInTheDocument();
+      expect(result.getByRole("heading", { name: "Exception — support review required" })).toBeVisible();
+    }
+    expect(screen.getByText("Included Nium transaction fee (contract)")).toBeVisible();
+    expect(screen.queryByText(/Included Origin fee|platform fee|Origin revenue/i)).not.toBeInTheDocument();
+    expect(api.dynamicSubmit).toHaveBeenCalledTimes(1);
   });
 
   it("keeps provider listing, customer entitlement and pricing distinct from execution", async () => {
@@ -475,7 +506,7 @@ describe("Move funds Dynamic payment", () => {
     await reviewPayment();
     const review = await screen.findByRole("region", { name: "Authoritative payment review" });
     expect(within(review).getByText("Total wallet debit: USD 1000")).toBeVisible();
-    expect(within(review).getByText("Included Origin fee: USD 20")).toBeVisible();
+    expect(within(review).getByText("Included Nium transaction fee (contract): USD 20")).toBeVisible();
     expect(within(screen.getByRole("region", { name: "Payment summary" })).getByText("USD 1000")).toBeVisible();
     expect(document.querySelector('[aria-current="step"]')).toHaveTextContent("Review");
     expect(screen.getByLabelText("Current route")).toHaveTextContent("/account/transfers");

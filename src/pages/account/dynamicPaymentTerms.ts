@@ -1,4 +1,4 @@
-import type { DynamicCustomerPricing, DynamicInstruction, DynamicMode, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer, DynamicTransferPage } from "@/services/niumDynamicService";
+import type { DynamicCustomerPricing, DynamicFeeClassification, DynamicInstruction, DynamicMode, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer, DynamicTransferPage } from "@/services/niumDynamicService";
 
 export const reasonCodes = (value: unknown): string[] => Array.isArray(value)
   ? value.filter((code): code is string => typeof code === "string" && code.length > 0) : [];
@@ -64,18 +64,23 @@ export function amountError(mode: DynamicMode, amount: string, scale: number | u
   }
   return "";
 }
+function niumContractFee(value: DynamicFeeClassification | null | undefined) {
+  return !!value && value.fee_owner === "NIUM" && value.fee_type === "TRANSACTION_FEE" && value.fee_basis === "CONTRACT_SCHEDULE"
+    && value.fx_margin_owner === "NIUM" && value.fee_collection === "UNVERIFIED" && value.origin_revenue === "NOT_RECOGNIZED";
+}
 function customerPriceMatches(quote: DynamicQuote) {
   const p = quote.customer_pricing;
   return !!p && Object.values(p).every((value) => typeof value === "string" && value.length > 0)
-    && typeof p.version === "string" && p.version.length > 0 && p.funding === "USD" && /^[A-Z]{2}$/.test(p.country)
+    && p.version === "nium-contracted-local-usd-inclusive-v4" && p.funding === "USD" && /^[A-Z]{2}$/.test(p.country)
+    && niumContractFee(p)
     && p.destination === quote.destination_currency && p.method === quote.payout_rail
     && p.fee_currency === "USD" && p.fee_payer === "SENDER" && p.fee_treatment === "INCLUDED_IN_TOTAL_USD_DEBIT"
     && p.rate_treatment === "PRESERVE_NIUM_QUOTED_RATE_NO_ADDITIONAL_MARGIN"
     && p.provider_settlement === "INDEPENDENT_AUTHENTICATED_RECONCILIATION"
     && exactDecimal(p.margin_percent) !== null
     && exactDecimal(p.fee) !== null && exactDecimal(p.fee) === exactDecimal(quote.planned_included_fee?.amount)
-    && exactDecimal(p.origin_service_fee_usd) === exactDecimal(p.fee)
-    && quote.origin_service_fee?.currency === "USD" && exactDecimal(quote.origin_service_fee.amount) === exactDecimal(p.fee)
+    && exactDecimal(p.contracted_nium_transaction_fee_usd) === exactDecimal(p.fee)
+    && quote.contracted_nium_transaction_fee?.currency === "USD" && exactDecimal(quote.contracted_nium_transaction_fee.amount) === exactDecimal(p.fee)
     && quote.pricing_status === "CONTRACTUAL_CUSTOMER_TERMS"
     && quote.financial_verification === "CUSTOMER_PRICING_AUTHORIZED_PROVIDER_SETTLEMENT_UNVERIFIED";
 }
@@ -107,10 +112,10 @@ export function matchesReview(review: DynamicReview, quote: DynamicQuote, instru
   const pricingMatches = customerPriceMatches(quote) && !!review.customer_pricing && typeof review.customer_pricing === "object"
     && Object.entries(quote.customer_pricing).every(([key, value]) => review.customer_pricing![key as keyof DynamicCustomerPricing] === value)
     && Object.keys(review.customer_pricing).length === Object.keys(quote.customer_pricing).length;
-  const serviceFeeMatches = review.origin_service_fee?.currency === quote.origin_service_fee?.currency
-    && exactDecimal(review.origin_service_fee?.amount) !== null
-    && exactDecimal(review.origin_service_fee?.amount) === exactDecimal(quote.origin_service_fee?.amount);
-  return pricingMatches && serviceFeeMatches && (quote.payout_rail === undefined || review.payout_rail === quote.payout_rail) && review.status === "READY" && /^[a-f0-9]{64}$/.test(review.accepted_fingerprint ?? "")
+  const contractedFeeMatches = review.contracted_nium_transaction_fee?.currency === quote.contracted_nium_transaction_fee?.currency
+    && exactDecimal(review.contracted_nium_transaction_fee?.amount) !== null
+    && exactDecimal(review.contracted_nium_transaction_fee?.amount) === exactDecimal(quote.contracted_nium_transaction_fee?.amount);
+  return pricingMatches && contractedFeeMatches && (quote.payout_rail === undefined || review.payout_rail === quote.payout_rail) && review.status === "READY" && /^[a-f0-9]{64}$/.test(review.accepted_fingerprint ?? "")
     && Number.isFinite(Date.parse(review.review_expires_at))
     && Date.parse(review.review_expires_at) > Date.now() && Date.parse(review.quote_expires_at) > Date.now()
     && Date.parse(review.review_expires_at) <= Date.parse(review.quote_expires_at)
@@ -139,6 +144,14 @@ export function matchesTransfer(transfer: DynamicTransfer, beneficiaryId: number
     || (["paid", "reconciled"].includes(transfer.status) && !transfer.financial_reconciled)
     || transfer.principal?.currency !== "USD" || transfer.included_fee?.currency !== "USD"
     || transfer.destination_amount?.currency !== transfer.destination_currency) return false;
+  if ((transfer.fee_classification != null && !niumContractFee(transfer.fee_classification))
+    || (review && !niumContractFee(transfer.fee_classification))) return false;
+  const observation = transfer.provider_fee_observation;
+  if (observation !== undefined && (!observation
+    || !["UNVERIFIED", "SETTLED_FEE_RECORDS"].includes(observation.status)
+    || (observation.status === "UNVERIFIED" && observation.fees !== null)
+    || (observation.status === "SETTLED_FEE_RECORDS" && (!Array.isArray(observation.fees) || observation.fees.length === 0
+      || observation.fees.some((fee) => !/^[A-Z]{3}$/.test(fee?.currency) || exactDecimal(fee?.amount) === null))))) return false;
   const principal = cents(transfer.principal.amount);
   const fee = cents(transfer.included_fee.amount);
   const total = cents(transfer.total_usd_debit);

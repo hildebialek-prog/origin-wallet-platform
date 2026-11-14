@@ -3,8 +3,13 @@ import { amountError, instructionError, matchesQuote, matchesReview, matchesTran
 import type { DynamicCustomerPricing, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer } from "@/services/niumDynamicService";
 
 const scales = { USD: 2, GBP: 2 };
-const pricing: DynamicCustomerPricing = { version: "origin-nium-contracted-local-usd-inclusive-v3", funding: "USD", country: "GB", destination: "GBP", method: "LOCAL",
-  margin_percent: "0.13", fee: "20", fee_currency: "USD", origin_service_fee_usd: "20", fee_payer: "SENDER",
+const feeClassification = {
+  fee_owner: "NIUM", fee_type: "TRANSACTION_FEE", fee_basis: "CONTRACT_SCHEDULE", fx_margin_owner: "NIUM",
+  fee_collection: "UNVERIFIED", origin_revenue: "NOT_RECOGNIZED",
+};
+const pricing: DynamicCustomerPricing = { version: "nium-contracted-local-usd-inclusive-v4", funding: "USD", country: "GB", destination: "GBP", method: "LOCAL",
+  ...feeClassification,
+  margin_percent: "0.13", fee: "20", fee_currency: "USD", contracted_nium_transaction_fee_usd: "20", fee_payer: "SENDER",
   fee_treatment: "INCLUDED_IN_TOTAL_USD_DEBIT", rate_treatment: "PRESERVE_NIUM_QUOTED_RATE_NO_ADDITIONAL_MARGIN",
   provider_settlement: "INDEPENDENT_AUTHENTICATED_RECONCILIATION" };
 const quote: DynamicQuote = { status: "QUOTE_REFERENCE_ONLY", dynamic_quote_id: "quote-local", provider_quote_id: "provider-quote",
@@ -12,11 +17,11 @@ const quote: DynamicQuote = { status: "QUOTE_REFERENCE_ONLY", dynamic_quote_id: 
   quote_expires_at: "2035-01-01T00:00:00Z", quoted_principal: { currency: "USD", amount: "980" },
   planned_included_fee: { currency: "USD", amount: "20" }, planned_total_usd_debit: "1000",
   quoted_destination_amount: { currency: "GBP", amount: "784" }, nium_quoted_fx_rate: "0.8",
-  payout_rail: "LOCAL", customer_pricing: pricing, origin_service_fee: { currency: "USD", amount: "20" },
+  payout_rail: "LOCAL", customer_pricing: pricing, contracted_nium_transaction_fee: { currency: "USD", amount: "20" },
   pricing_status: "CONTRACTUAL_CUSTOMER_TERMS", financial_verification: "CUSTOMER_PRICING_AUTHORIZED_PROVIDER_SETTLEMENT_UNVERIFIED" };
 const instruction = { purpose_code: "IR005", source_of_funds: "Salary", comment: "Invoice" };
 const review: DynamicReview = { status: "READY", review_id: "a".repeat(64), accepted_fingerprint: "a".repeat(64),
-  customer_pricing: pricing, origin_service_fee: quote.origin_service_fee, payout_rail: quote.payout_rail,
+  customer_pricing: pricing, contracted_nium_transaction_fee: quote.contracted_nium_transaction_fee, payout_rail: quote.payout_rail,
   provider_quote_id: quote.provider_quote_id, nium_quoted_fx_rate: quote.nium_quoted_fx_rate,
   dynamic_quote_id: quote.dynamic_quote_id, beneficiary_id: 4, provider_account_id: 2, balance_id: 3,
   amount_mode: "SOURCE_AMOUNT", entered_amount: "1000", review_expires_at: quote.quote_expires_at, quote_expires_at: quote.quote_expires_at,
@@ -34,9 +39,13 @@ describe("Dynamic payment consent comparisons", () => {
     expect(matchesReview({ ...review, review_id: "different-review" }, quote, instruction)).toBe(false);
     expect(matchesReview({ ...review, review_expires_at: new Date(Date.now() - 1).toISOString() }, quote, instruction)).toBe(false);
   });
-  it.each([{ customer_pricing: undefined }, { customer_pricing: null }, { origin_service_fee: undefined }, { financial_verification: undefined },
+  it.each([{ customer_pricing: undefined }, { customer_pricing: null }, { contracted_nium_transaction_fee: undefined }, { financial_verification: undefined },
     { provider_quote_id: undefined }, { provider_quote_id: null }, { provider_quote_id: "quote\n" }, { provider_quote_id: "q".repeat(101) }, { dynamic_quote_id: undefined },
-    { customer_pricing: { ...pricing, origin_service_fee_usd: "0" } }, { origin_service_fee: { currency: "USD", amount: "0" } }])("refuses incomplete or inconsistent fee authority without inventing provider fees: %j", (change) => {
+    { customer_pricing: { ...pricing, contracted_nium_transaction_fee_usd: "0" } }, { contracted_nium_transaction_fee: { currency: "USD", amount: "0" } },
+    { customer_pricing: { ...pricing, fee_owner: "ORIGIN" } }, { customer_pricing: { ...pricing, fee_type: "PLATFORM_FEE" } },
+    { customer_pricing: { ...pricing, fx_margin_owner: "ORIGIN" } }, { customer_pricing: { ...pricing, origin_revenue: "RECOGNIZED" } },
+    { customer_pricing: { ...pricing, fee_collection: "ASSUMED_INCLUDED" } },
+    { customer_pricing: { ...pricing, version: "origin-nium-contracted-local-usd-inclusive-v3" } }])("refuses incomplete or inconsistent fee authority without inventing provider fees: %j", (change) => {
     expect(matchesQuote({ ...quote, ...change }, 4, "GBP", "SOURCE_AMOUNT", "1000", scales)).toBe(false);
   });
   it("uses only authoritative precision and leaves destination-to-USD pricing to the quote", () => {
@@ -80,9 +89,17 @@ describe("Dynamic payment consent comparisons", () => {
   it("requires complete transfer amounts and the reviewed identity before displaying a submission as confirmed", () => {
     const transfer: DynamicTransfer = { id: "intent-id", beneficiary: { id: 4, country_code: "GB" }, source_currency: "USD",
       destination_currency: "GBP", amount_mode: "SOURCE_AMOUNT", total_usd_debit: "1000", principal: review.principal,
-      included_fee: review.included_fee, destination_amount: review.destination_amount, quote_expires_at: review.quote_expires_at,
+      fee_classification: feeClassification, included_fee: review.included_fee, destination_amount: review.destination_amount, quote_expires_at: review.quote_expires_at,
       status: "processing", financial_reconciled: false, message: "The transfer is being processed." };
     expect(matchesTransfer(transfer, 4, review)).toBe(true);
+    expect(matchesTransfer({ ...transfer, fee_classification: null }, 4)).toBe(true); // Historical lookup only.
+    expect(matchesTransfer({ ...transfer, fee_classification: null }, 4, review)).toBe(false);
+    expect(matchesTransfer({ ...transfer, fee_classification: { ...feeClassification, fee_owner: "ORIGIN" } }, 4, review)).toBe(false);
+    expect(matchesTransfer({ ...transfer, provider_fee_observation: { status: "UNVERIFIED", fees: null } }, 4, review)).toBe(true);
+    expect(matchesTransfer({ ...transfer, provider_fee_observation: { status: "UNVERIFIED", fees: [{ currency: "USD", amount: "20" }] } }, 4, review)).toBe(false);
+    for (const amount of ["0", "20", "21"]) {
+      expect(matchesTransfer({ ...transfer, provider_fee_observation: { status: "SETTLED_FEE_RECORDS", fees: [{ currency: "USD", amount }] } }, 4, review)).toBe(true);
+    }
     for (const change of [{ total_usd_debit: "1020" }, { beneficiary: { id: 5, country_code: "GB" } },
       { destination_amount: { currency: "EUR", amount: "784" } }, { amount_mode: "DESTINATION_AMOUNT" },
       { principal: undefined }, { status: "paid", financial_reconciled: false }, { status: "unknown" }]) {
@@ -99,9 +116,9 @@ describe("Dynamic payment consent comparisons", () => {
   it.each(["0", "7.25", "20"])("checks the server-provided fee %s without inventing a pricing policy", (fee) => {
     const total = fee === "0" ? "980" : fee === "7.25" ? "987.25" : "1000";
     const quoted = { ...quote, entered_amount: total, planned_included_fee: { currency: "USD", amount: fee }, planned_total_usd_debit: total,
-      customer_pricing: { ...pricing, fee, origin_service_fee_usd: fee }, origin_service_fee: { currency: "USD", amount: fee } };
+      customer_pricing: { ...pricing, fee, contracted_nium_transaction_fee_usd: fee }, contracted_nium_transaction_fee: { currency: "USD", amount: fee } };
     expect(matchesQuote(quoted, 4, "GBP", "SOURCE_AMOUNT", total, scales)).toBe(true);
-    expect(matchesReview({ ...review, customer_pricing: quoted.customer_pricing, origin_service_fee: quoted.origin_service_fee,
+    expect(matchesReview({ ...review, customer_pricing: quoted.customer_pricing, contracted_nium_transaction_fee: quoted.contracted_nium_transaction_fee,
       entered_amount: total, included_fee: quoted.planned_included_fee, total_usd_debit: total }, quoted, instruction)).toBe(true);
     expect(matchesReview({ ...review, entered_amount: total, total_usd_debit: total, included_fee: { currency: "USD", amount: "999" } }, quoted, instruction)).toBe(false);
   });
@@ -132,12 +149,12 @@ describe("Dynamic payment consent comparisons", () => {
     }
   });
   it("binds the returned customer schedule, service fee and rail through Review", () => {
-    const pricedQuote = { ...quote, customer_pricing: pricing, origin_service_fee: { currency: "USD", amount: "20" }, payout_rail: "LOCAL" };
-    const pricedReview = { ...review, customer_pricing: { ...pricing }, origin_service_fee: { currency: "USD", amount: "20.00" }, payout_rail: "LOCAL" };
+    const pricedQuote = { ...quote, customer_pricing: pricing, contracted_nium_transaction_fee: { currency: "USD", amount: "20" }, payout_rail: "LOCAL" };
+    const pricedReview = { ...review, customer_pricing: { ...pricing }, contracted_nium_transaction_fee: { currency: "USD", amount: "20.00" }, payout_rail: "LOCAL" };
     expect(matchesReview(pricedReview, pricedQuote, instruction)).toBe(true);
     for (const change of [{ customer_pricing: undefined }, { customer_pricing: null }, { customer_pricing: { ...pricing, margin_percent: "0.30" } },
-      { customer_pricing: { ...pricing, version: "other" } }, { origin_service_fee: undefined },
-      { origin_service_fee: { currency: "USD", amount: "1" } }, { payout_rail: "SWIFT" }]) {
+      { customer_pricing: { ...pricing, version: "other" } }, { contracted_nium_transaction_fee: undefined },
+      { contracted_nium_transaction_fee: { currency: "USD", amount: "1" } }, { payout_rail: "SWIFT" }]) {
       expect(matchesReview({ ...pricedReview, ...change }, pricedQuote, instruction)).toBe(false);
     }
   });
