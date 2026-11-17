@@ -60,7 +60,7 @@ export function amountError(mode: DynamicMode, amount: string, scale: number | u
   if (!fitsScale(amount, scale)) return `Enter an exact amount with up to ${scale} decimal places.`;
   const value = cents(amount);
   if (value === null || value <= 0n) {
-    return mode === "SOURCE_AMOUNT" ? "USD send amount must be positive." : "Recipient amount must be positive.";
+    return mode === "SOURCE_AMOUNT" ? "Send amount must be positive." : "Recipient amount must be positive.";
   }
   return "";
 }
@@ -185,9 +185,9 @@ export function walletDebitError(debit: string, available: unknown): string {
   };
   const balance = units(available);
   const total = units(debit);
-  if (balance === null) return "An exact available USD wallet balance is unavailable. Refresh your balances before reviewing.";
-  if (total === null || total <= 0n) return "The server did not supply an exact positive USD wallet debit.";
-  return total > balance ? "The available USD balance cannot cover the total wallet debit, including applicable fees." : "";
+  if (balance === null) return "An exact available funding wallet balance is unavailable. Refresh your balances before reviewing.";
+  if (total === null || total <= 0n) return "The server did not supply an exact positive wallet debit.";
+  return total > balance ? "The available funding balance cannot cover the total wallet debit, including applicable fees." : "";
 }
 
 export const dynamicStatusLabel: Record<string, string> = {
@@ -195,3 +195,11 @@ export const dynamicStatusLabel: Record<string, string> = {
   reconciled: "Wallet accounting reconciled — delivery pending", paid: "Completed", failed: "Failed", returned: "Returned",
   requires_attention: "Exception — support review required", cancelled: "Cancelled",
 };
+
+// Presentation only: pad backend amounts to the declared scale, without rounding or FX arithmetic.
+export function quotedAmountDisplay(value: string | undefined, scale: number | undefined): string {
+  if (!fitsScale(value, scale)) return "";
+  const [whole, fraction = ""] = exactDecimal(value)!.split(".");
+  return scale === 0 ? whole : `${whole}.${fraction.padEnd(scale!, "0")}`;
+}
+export const amountPlaceholder = (scale: number | undefined) => scale === undefined ? "" : scale === 0 ? "0" : `0.${"0".repeat(scale)}`;

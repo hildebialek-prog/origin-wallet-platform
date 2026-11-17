@@ -39,3 +39,12 @@ describe("authenticated Dynamic API contract", () => {
     expect(call).toHaveBeenCalledTimes(2);
   });
 });
+
+
+it.each(["GBP", "EUR", "JPY", "SGD"])("forwards cancellation and exact %s input without adding a wallet or pricing contract", async (currency) => {
+  const controller = new AbortController();
+  const body = { beneficiary_id: 4, destination_currency: currency, amount_mode: "DESTINATION_AMOUNT" as const, entered_amount: "10.00" };
+  await dynamicQuote(auth, body, controller.signal);
+  expect(call).toHaveBeenLastCalledWith(`${base}/quotes`, { method: "POST", token: auth.token, body, signal: controller.signal });
+  expect(Object.keys(body).sort()).toEqual(["amount_mode", "beneficiary_id", "destination_currency", "entered_amount"]);
+});

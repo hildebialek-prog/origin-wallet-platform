@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountError, instructionError, matchesQuote, matchesReview, matchesTransfer, quoteOptionsAvailable, matchesTransferPage, walletDebitError } from "./dynamicPaymentTerms";
+import { amountError, amountPlaceholder, quotedAmountDisplay, instructionError, matchesQuote, matchesReview, matchesTransfer, quoteOptionsAvailable, matchesTransferPage, walletDebitError } from "./dynamicPaymentTerms";
 import type { DynamicCustomerPricing, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer } from "@/services/niumDynamicService";
 
 const scales = { USD: 2, GBP: 2 };
@@ -166,4 +166,17 @@ describe("Dynamic payment consent comparisons", () => {
     expect(matchesReview({ ...review, total_usd_debit: 1000 } as unknown as DynamicReview, quote, instruction)).toBe(false);
     expect(matchesQuote({ ...quote, planned_total_usd_debit: "1000\n" }, 4, "GBP", "SOURCE_AMOUNT", "1000", scales)).toBe(false);
   });
+});
+
+
+describe("backend currency precision presentation", () => {
+  it.each([
+    ["123", 0, "123", "0"], ["123", 1, "123.0", "0.0"], ["123.4", 2, "123.40", "0.00"],
+    ["123.00", 0, "123", "0"], ["9007199254740993.1", 2, "9007199254740993.10", "0.00"],
+  ] as const)("pads the backend amount %s to scale %s without floating point or rounding", (value, scale, display, placeholder) => {
+    expect(quotedAmountDisplay(value, scale)).toBe(display);
+    expect(amountPlaceholder(scale)).toBe(placeholder);
+  });
+  it.each([["123.01", 0], ["123.12", 1], ["1", undefined], [undefined, 2], ["invalid", 2]] as const)(
+    "does not guess unsupported precision for %s at %s", (value, scale) => expect(quotedAmountDisplay(value, scale)).toBe(""));
 });

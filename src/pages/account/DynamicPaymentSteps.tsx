@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import type { DynamicTransfer } from "@/services/niumDynamicService";
-import { dynamicStatusLabel, instructionError } from "./dynamicPaymentTerms";
+import { amountPlaceholder, dynamicStatusLabel, instructionError } from "./dynamicPaymentTerms";
 import type { DynamicPayment } from "./useDynamicPayment";
 
 const field = "h-12 rounded-xl border border-[#d7d7d2] bg-white px-3 text-[#0f2442] disabled:opacity-60 dark:border-white/10 dark:bg-[#10141b] dark:text-white";
@@ -35,36 +35,39 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
       </div>}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-3 rounded-2xl border border-[#d7d7d2] p-5 dark:border-white/10">
-          <span className="text-lg font-semibold">You send <span className="text-sm">USD</span></span>
+          <span className="text-lg font-semibold">You send <span className="text-sm">{p.sourceCurrency || "Unavailable"}</span></span>
           <Input aria-label="You send" aria-describedby="dynamic-send-help" className={`${field} text-2xl font-semibold`}
-            inputMode="decimal" autoComplete="off" value={p.sendAmount} placeholder={p.sourceScale === 0 ? "0" : "0.00"}
+            inputMode="decimal" autoComplete="off" value={p.sendAmount} placeholder={amountPlaceholder(p.sourceScale)}
             disabled={p.locked || !p.currency || !p.amountModes.includes("SOURCE_AMOUNT")}
             onChange={(e) => p.changeSendAmount(e.target.value)} />
-          <span id="dynamic-send-help" className="text-sm">Total USD wallet debit, including applicable fees.</span>
-          {p.sourceScale !== undefined && p.sourceScale < 2 && <span className="text-sm">{p.sourceScale === 0 ? "Whole USD amounts only." : `Up to ${p.sourceScale} decimal place.`}</span>}
+          <span id="dynamic-send-help" className="text-sm">Total {p.sourceCurrency} wallet debit, including applicable fees.</span>
+          {p.sourceScale !== undefined && p.sourceScale < 2 && <span className="text-sm">{p.sourceScale === 0 ? "Whole amounts only." : `Up to ${p.sourceScale} decimal place.`}</span>}
         </label>
         <label className="grid gap-3 rounded-2xl border border-[#d7d7d2] p-5 dark:border-white/10">
           <span className="text-lg font-semibold">Recipient gets <span className="text-sm">{p.currency || "Select currency"}</span></span>
           <Input aria-label="Recipient gets" aria-describedby="dynamic-receive-help" className={`${field} text-2xl font-semibold`}
-            inputMode="decimal" autoComplete="off" value={p.receiveAmount} placeholder={p.destinationScale === 0 ? "0" : "0.00"}
+            inputMode="decimal" autoComplete="off" value={p.receiveAmount} placeholder={amountPlaceholder(p.destinationScale)}
             disabled={p.locked || !p.currency || !p.amountModes.includes("DESTINATION_AMOUNT")}
             onChange={(e) => p.changeReceiveAmount(e.target.value)} />
           <span id="dynamic-receive-help" className="text-sm">Enter the amount to receive in {p.currency || "the selected currency"}.</span>
           {p.destinationScale !== undefined && <span className="text-sm">{p.destinationScale === 0 ? "Whole amounts only." : `Up to ${p.destinationScale} decimal places.`}</span>}
         </label>
       </div>
-      <p className="text-sm">Edit an available amount field, then request a quote. {p.mode === "SOURCE_AMOUNT"
-        ? "Nium will quote the recipient amount from your USD spend."
-        : "Nium will quote the USD conversion principal. The planned debit also includes the contracted Nium fee."}</p>
-      <p>Available USD balance: {p.availableUsdBalance === null ? "Unavailable" : `USD ${p.availableUsdBalance}`}</p>
-      <Button className={button} disabled={p.locked || p.busy || !p.available || !p.currency || !p.amount} onClick={() => void p.getQuote()}>Request Nium quote</Button>
-      {p.busy && <p role="status">{p.quote ? "Checking payment terms…" : "Requesting Nium terms…"}</p>}
+      <p className="text-sm">Edit either available amount field. Nium quotes automatically after you pause typing; the other amount comes from the verified quote.</p>
+      <p>Available {p.sourceCurrency || "funding"} balance: {p.availableBalance === null ? "Unavailable" : `${p.sourceCurrency} ${p.availableBalance}`}</p>
+      <p role="status" aria-live="polite">{{
+        idle: "Enter an amount to get a Nium quote.", debouncing: "Waiting for your amount…", loading: "Getting a quote from Nium…",
+        valid: "Quote valid.", unavailable: "Quote unavailable.", expired: "Quote expired. Edit an amount to get a new quote.",
+        insufficient_funds: "Insufficient available funds.", connection_error: "Connection failed. Edit an amount to try again.",
+        invalid_amount: "Enter a valid positive amount using the supported currency precision.",
+      }[p.quoteState]}</p>
+      {p.busy && p.quoteState !== "loading" && <p role="status">Checking payment terms…</p>}
     </div>
     {p.quote && <section aria-label="Quoted payment" className="space-y-3 rounded-xl border p-5">
-      <p>USD transfer principal: {p.quote.quoted_principal.currency} {p.quote.quoted_principal.amount}</p>
+      <p>{p.quote.source_currency} transfer principal: {p.quote.quoted_principal.currency} {p.quote.quoted_principal.amount}</p>
       <p>Included Nium transaction fee (contract): {p.quote.planned_included_fee.currency} {p.quote.planned_included_fee.amount}</p>
-      <p>The contracted Nium fee is allocated within the planned USD debit. Nium's quoted rate is used without adding another FX margin. Actual Nium fee collection and settlement remain unverified.</p>
-      <p>Quoted total wallet debit: USD {p.quote.planned_total_usd_debit}</p>
+      <p>The contracted Nium fee is allocated within the planned {p.quote.source_currency} debit. Nium's quoted rate is used without adding another FX margin. Actual Nium fee collection and settlement remain unverified.</p>
+      <p>Quoted total wallet debit: {p.quote.source_currency} {p.quote.planned_total_usd_debit}</p>
       <p>Quoted recipient amount: {p.quote.quoted_destination_amount.currency} {p.quote.quoted_destination_amount.amount}</p>
       {p.quote.pricing_status === "UNAUTHORIZED_PLANNING_ONLY" && <p role="status">
         These fees and the total debit are a preparation estimate. Submission requires authorized financial terms at Review.
@@ -73,7 +76,7 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
       <p>A quote reference does not authorize execution. Review must verify the exact payment instructions.</p>
       <p>Nium quoted rate: {p.quote.nium_quoted_fx_rate}</p>
       <p>Quote: {p.quote.dynamic_quote_id}</p><p>Provider quote: {p.quote.provider_quote_id}</p>
-      <p>{p.expired ? "Quote expired. Request a new quote." : `Quote expires: ${p.quote.quote_expires_at}`}</p>
+      <p>{p.expired ? "Quote expired. Edit an amount to get a new quote." : `Quote expires: ${p.quote.quote_expires_at}`}</p>
       {p.balanceError && <p role="alert">{p.balanceError}</p>}
       {([['purpose_code', 'Payment purpose code'], ['source_of_funds', 'Source of funds'], ['comment', 'Payment reference']] as const)
         .map(([key, label]) => <label key={key} className="grid gap-2">{label}
@@ -96,13 +99,13 @@ export function DynamicReviewStep({ payment: p, onBack }: { payment: DynamicPaym
     <h2 className="text-center text-2xl font-bold">Confirm payment</h2>
     <p>Beneficiary: {p.options?.beneficiary.id === r.beneficiary_id ? p.options.beneficiary.name : `#${r.beneficiary_id}`} (#{r.beneficiary_id})</p>
     <p>Recipient currency: {r.destination_amount.currency}</p>
-    <p>Amount mode: {r.amount_mode === "SOURCE_AMOUNT" ? "SEND USD — total spend" : "RECEIVE — recipient amount"}</p>
-    <p>Entered amount: {r.amount_mode === "SOURCE_AMOUNT" ? "USD" : r.destination_amount.currency} {r.entered_amount}</p>
-    <p>USD transfer principal: {r.principal.currency} {r.principal.amount}</p>
+    <p>Amount mode: {r.amount_mode === "SOURCE_AMOUNT" ? `SEND ${r.principal.currency} — total spend` : "RECEIVE — recipient amount"}</p>
+    <p>Entered amount: {r.amount_mode === "SOURCE_AMOUNT" ? r.principal.currency : r.destination_amount.currency} {r.entered_amount}</p>
+    <p>{r.principal.currency} transfer principal: {r.principal.currency} {r.principal.amount}</p>
     <p>Included Nium transaction fee (contract): {r.included_fee.currency} {r.included_fee.amount}</p>
     <p>The contracted Nium fee is included in your confirmed debit. The actual settlement fee is verified separately.</p>
     {r.payout_rail && <p>Payout rail: {r.payout_rail}</p>}
-    <p>Total wallet debit: USD {r.total_usd_debit}</p>
+    <p>Total wallet debit: {r.principal.currency} {r.total_usd_debit}</p>
     <p>Recipient amount: {r.destination_amount.currency} {r.destination_amount.amount}</p>
     <p>{r.amount_mode === "DESTINATION_AMOUNT" ? "This is the exact recipient amount instructed to Nium." : "The recipient amount is quoted; Nium confirms actual delivery after submission."}</p>
     <p>Nium quoted rate: {r.nium_quoted_fx_rate}</p>
@@ -112,9 +115,9 @@ export function DynamicReviewStep({ payment: p, onBack }: { payment: DynamicPaym
     <p>Payment purpose code: {r.instruction.purpose_code}</p>
     <p>Source of funds: {r.instruction.source_of_funds}</p>
     <p>Payment reference: {r.instruction.comment}</p>
-    <p>Your confirmed USD wallet debit is fixed. Provider settlement differences do not authorize an additional customer debit.</p>
+    <p>Your confirmed {r.principal.currency} wallet debit is fixed. Provider settlement differences do not authorize an additional customer debit.</p>
     {p.balanceError && <p role="alert">{p.balanceError}</p>}
-    {p.expired && <p role="status">Quote expired. Request a new quote.</p>}
+    {p.expired && <p role="status">Quote expired. Go back and edit an amount to get a new quote.</p>}
     {p.reviewExpired && <p role="status">Payment checks expired. Review the payment again before submitting.</p>}
     <label className="flex items-start gap-2"><input type="checkbox" checked={p.accepted}
       disabled={p.locked || !p.executableAmountModes.includes(r.amount_mode) || p.expired || p.reviewExpired || !!p.balanceError} onChange={(e) => p.setAccepted(e.target.checked)} />
@@ -130,7 +133,7 @@ export function DynamicReviewStep({ payment: p, onBack }: { payment: DynamicPaym
 export function DynamicResult({ payment: p, onNewPayment }: { payment: DynamicPayment; onNewPayment: () => void }) {
   return <section aria-label="Payment status" className="mx-auto max-w-3xl space-y-4">
     <h2 className="text-2xl font-bold">{p.transfer ? dynamicStatusLabel[p.transfer.status] ?? "Status unavailable" : "Submission recovery"}</h2>
-    {p.transfer && <><p role="status">{p.transfer.message}</p><p>Wallet debit: USD {p.transfer.total_usd_debit}</p>
+    {p.transfer && <><p role="status">{p.transfer.message}</p><p>Wallet debit: {p.transfer.source_currency} {p.transfer.total_usd_debit}</p>
       <p>Recipient amount: {p.transfer.destination_amount.currency} {p.transfer.destination_amount.amount}</p><p>Payment: {p.transfer.id}</p>
       {p.transfer.provider_fee_observation?.status === "SETTLED_FEE_RECORDS"
         ? <p>Observed Nium settlement fees: {p.transfer.provider_fee_observation.fees?.map((fee) => `${fee.currency} ${fee.amount}`).join(", ")}</p>
@@ -148,7 +151,7 @@ export function DynamicResult({ payment: p, onNewPayment }: { payment: DynamicPa
 export function DynamicSummary({ payment: p }: { payment: DynamicPayment }) {
   if (!p.transfer && !p.review && !p.quote) return <div className="space-y-3">
     <p className="font-semibold">Dynamic Multi-Currency</p>
-    <p>Enter either amount and request a Nium quote to see the exchange rate, fees and total USD wallet debit.</p>
+    <p>Enter either amount to automatically get a Nium quote with the exchange rate, fees and total wallet debit.</p>
   </div>;
   const terms = p.transfer ?? p.review;
   const principal = terms?.principal ?? p.quote?.quoted_principal;
@@ -157,10 +160,10 @@ export function DynamicSummary({ payment: p }: { payment: DynamicPayment }) {
   const credit = terms?.destination_amount ?? p.quote?.quoted_destination_amount;
   const rows = [
     ["Payment", "Dynamic Multi-Currency"],
-    ["USD transfer principal", principal && `${principal.currency} ${principal.amount}`],
+    [`${principal?.currency || p.sourceCurrency} transfer principal`, principal && `${principal.currency} ${principal.amount}`],
     [p.transfer && p.transfer.fee_classification?.fee_owner !== "NIUM"
       ? "Included fee (ownership unverified)" : "Included Nium transaction fee (contract)", fee && `${fee.currency} ${fee.amount}`],
-    [terms ? "Confirmed wallet debit" : "Quoted wallet debit", debit && `USD ${debit}`],
+    [terms ? "Confirmed wallet debit" : "Quoted wallet debit", debit && `${principal?.currency || p.sourceCurrency} ${debit}`],
     ["Recipient amount", credit && `${credit.currency} ${credit.amount}`],
     ["FX rate", p.quote?.nium_quoted_fx_rate],
     ["Quote", p.quote?.dynamic_quote_id ?? p.review?.dynamic_quote_id],
@@ -193,7 +196,7 @@ export function DynamicRecovery({ payment: p, disabled = false }: { payment: Dyn
       {p.recoveryPage.data.length === 0 && <p>No payments were found on this page. An unknown outcome still requires checking its original reference.</p>}
       {p.recoveryPage.data.map((item) => <div key={item.id} className="space-y-1 border-t pt-3">
         <p className="break-all">{item.id}</p><p>Beneficiary #{item.beneficiary.id} · {dynamicStatusLabel[item.status]}</p>
-        <p>USD {item.total_usd_debit} · {item.destination_amount.currency} {item.destination_amount.amount}</p>
+        <p>{item.source_currency} {item.total_usd_debit} · {item.destination_amount.currency} {item.destination_amount.amount}</p>
         {item.created_at && <p>Created: {item.created_at}</p>}
         <Button variant="outline" disabled={blocked || (!!p.saved && p.saved.id !== item.id)}
           onClick={() => void p.lookupId(item.id)}>Open payment {item.id}</Button>
@@ -211,7 +214,7 @@ export function DynamicActivity({ transfer, name }: { transfer: DynamicTransfer;
     <p className="break-all font-semibold">{transfer.id}</p>
     <p>{name ?? `Beneficiary #${transfer.beneficiary.id}`} · Dynamic Multi-Currency</p>
     <p>{dynamicStatusLabel[transfer.status] ?? "Status unavailable"}</p>
-    <p>Wallet debit: USD {transfer.total_usd_debit}</p>
+    <p>Wallet debit: {transfer.source_currency} {transfer.total_usd_debit}</p>
     <p>Recipient amount: {transfer.destination_amount.currency} {transfer.destination_amount.amount}</p>
   </div>;
 }

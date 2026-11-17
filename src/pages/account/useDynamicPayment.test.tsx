@@ -83,7 +83,7 @@ beforeEach(() => {
     return review(await results[results.length - 1]!.value);
   });
 });
-afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("bidirectional Dynamic quote state", () => {
   it.each([undefined, {}, { USD: 2 }, { USD: 2, GBP: "2" }, { USD: 2, GBP: 3 }, { USD: 2, GBP: -1 }])("refuses missing or unsupported authoritative scales: %j", async (scales) => {
@@ -209,7 +209,7 @@ describe("bidirectional Dynamic quote state", () => {
     await act(async () => { await result.current.getQuote(); });
     expect(api.dynamicQuote).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       amount_mode: "DESTINATION_AMOUNT", entered_amount: "784.00",
-    }));
+    }), expect.any(AbortSignal));
     expect(result.current.amount).toBe("784.00");
   });
 
@@ -234,9 +234,9 @@ describe("bidirectional Dynamic quote state", () => {
     expect(api.dynamicQuote).not.toHaveBeenCalled();
     expect(mode === "SOURCE_AMOUNT" ? result.current.receiveAmount : result.current.sendAmount).toBe("");
     await act(async () => { await result.current.getQuote(); });
-    expect(result.current.sendAmount).toBe("1000"); expect(result.current.receiveAmount).toBe("784");
+    expect(result.current.sendAmount).toBe(mode === "SOURCE_AMOUNT" ? "1000" : "1000.00"); expect(result.current.receiveAmount).toBe(mode === "DESTINATION_AMOUNT" ? "784" : "784.00");
     expect(result.current.mode).toBe(mode);
-    expect(api.dynamicQuote).toHaveBeenCalledWith(expect.anything(), { beneficiary_id: 4, destination_currency: "GBP", amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784" });
+    expect(api.dynamicQuote).toHaveBeenCalledWith(expect.anything(), { beneficiary_id: 4, destination_currency: "GBP", amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784" }, expect.any(AbortSignal));
   });
 
   it("discards an old quote when a newer request in the other direction finishes first", async () => {
@@ -278,10 +278,11 @@ describe("bidirectional Dynamic quote state", () => {
   it("only defaults the beneficiary currency when backend eligibility includes it", async () => {
     api.dynamicOptions.mockResolvedValueOnce(options(["EUR"]));
     const { result } = mount();
-    await waitFor(() => expect(result.current.available).toBe(true));
-    expect(result.current.currency).toBe(""); expect(result.current.currencies).toEqual(["EUR"]);
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    expect(result.current.available).toBe(false);
+    expect(result.current.currency).toBe(""); expect(result.current.currencies).toEqual([]);
     act(() => result.current.changeCurrency("JPY")); expect(result.current.currency).toBe("");
-    act(() => result.current.changeCurrency("EUR")); expect(result.current.currency).toBe("EUR");
+    act(() => result.current.changeCurrency("EUR")); expect(result.current.currency).toBe("");
     expect(api.dynamicQuote).not.toHaveBeenCalled();
   });
 
@@ -305,7 +306,7 @@ describe("bidirectional Dynamic quote state", () => {
     else act(() => {
       if (field === "send") result.current.changeSendAmount("1001");
       if (field === "receive") result.current.changeReceiveAmount("785");
-      if (field === "currency") result.current.changeCurrency("EUR");
+      if (field === "currency") result.current.changeCurrency("");
     });
     expect(result.current.quote).toBeNull(); expect(result.current.review).toBeNull(); expect(result.current.accepted).toBe(false);
     expect(api.dynamicSubmit).not.toHaveBeenCalled(); expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
@@ -327,9 +328,9 @@ describe("bidirectional Dynamic quote state", () => {
     const { result } = mount(); await ready(result);
     act(() => result.current.changeReceiveAmount("784")); let request: Promise<void>;
     act(() => { request = result.current.getQuote(); });
-    act(() => result.current.changeCurrency("EUR"));
+    act(() => result.current.changeCurrency(""));
     await act(async () => { response.resolve(quote("DESTINATION_AMOUNT")); await request; });
-    expect(result.current.currency).toBe("EUR"); expect(result.current.quote).toBeNull();
+    expect(result.current.currency).toBe(""); expect(result.current.quote).toBeNull();
     expect(result.current.sendAmount).toBe(""); expect(result.current.receiveAmount).toBe("");
     expect(result.current.busy).toBe(false);
   });
@@ -367,7 +368,9 @@ describe("bidirectional Dynamic quote state", () => {
       : [{ ...wallet, available_balance: 1000 }];
     rerender({ selected: beneficiary, balances });
     await enterAndQuote(result, "DESTINATION_AMOUNT");
-    expect(result.current.balanceError).toContain("exact available USD wallet balance");
+    if (kind === "ambiguous") {
+      expect(api.dynamicQuote).not.toHaveBeenCalled(); expect(result.current.quoteState).toBe("unavailable");
+    } else expect(result.current.balanceError).toContain("exact available funding wallet balance");
     await prepareReview(result); expect(api.dynamicReview).not.toHaveBeenCalled();
     expect(api.dynamicSubmit).not.toHaveBeenCalled();
   });
@@ -376,7 +379,7 @@ describe("bidirectional Dynamic quote state", () => {
     const { result, rerender } = mount(); await ready(result);
     rerender({ selected: beneficiary, balances: [{ ...wallet, available_balance: "999.99999999" }] });
     await enterAndQuote(result, "DESTINATION_AMOUNT");
-    expect(result.current.sendAmount).toBe("1000"); expect(result.current.balanceError).toContain("cannot cover");
+    expect(result.current.sendAmount).toBe("1000.00"); expect(result.current.balanceError).toContain("cannot cover");
     await prepareReview(result); expect(api.dynamicReview).not.toHaveBeenCalled();
   });
 
@@ -518,5 +521,167 @@ describe("read-only Dynamic recovery", () => {
     await act(async () => { await result.current.lookupRecent(); });
     expect(api.dynamicTransfers).toHaveBeenLastCalledWith({ userId: "13", token: "other-customer-token" }, { page: 1 });
     expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+});
+
+// Synthetic customer-authorized contracts exercise UI behavior only; they do not assert live corridor availability.
+const advanceQuoteClock = async (milliseconds: number) => {
+  await act(async () => { await vi.advanceTimersByTimeAsync(milliseconds); });
+};
+describe("500 ms Dynamic Auto-Quote", () => {
+  it.each([
+    ["GB", "GBP", 2, "784.12"], ["DE", "EUR", 1, "784.1"], ["JP", "JPY", 0, "784"], ["SG", "SGD", 2, "784.12"],
+  ] as const)("uses backend %s/%s precision %s in both directions without a projection loop", async (country, currency, scale, credit) => {
+    const payee = { ...beneficiary, country_code: country, currency };
+    api.dynamicOptions.mockResolvedValueOnce({ ...options([currency]), currency_scales: { USD: 2, [currency]: scale },
+      beneficiary: { ...options().beneficiary, country_code: country, currency } });
+    api.dynamicQuote.mockImplementation(async (_auth, body) => ({ ...quote(body.amount_mode), entered_amount: body.entered_amount,
+      customer_pricing: { ...pricing, country, destination: currency }, destination_currency: currency,
+      quoted_destination_amount: { currency, amount: credit } }));
+    const { result, rerender } = renderHook(() => useDynamicPayment(payee, true, [wallet]));
+    await waitFor(() => expect(result.current.currency).toBe(currency));
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    vi.useFakeTimers();
+    expect(result.current.sourceCurrency).toBe(wallet.currency);
+    await advanceQuoteClock(1000);
+    expect(api.dynamicQuote).not.toHaveBeenCalled(); // Opening details / expiry clock cannot quote.
+    act(() => result.current.changeSendAmount("1000.00"));
+    await advanceQuoteClock(499); expect(api.dynamicQuote).not.toHaveBeenCalled();
+    await advanceQuoteClock(1);
+    expect(result.current.quoteState).toBe("valid");
+    expect(result.current.sendAmount).toBe("1000.00"); expect(result.current.receiveAmount).toBe(credit);
+    expect(api.dynamicQuote).toHaveBeenLastCalledWith(expect.anything(), {
+      beneficiary_id: 4, destination_currency: currency, amount_mode: "SOURCE_AMOUNT", entered_amount: "1000.00",
+    }, expect.any(AbortSignal));
+    rerender(); await advanceQuoteClock(1000);
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
+    act(() => result.current.changeReceiveAmount(credit));
+    expect(result.current.sendAmount).toBe("");
+    await advanceQuoteClock(500);
+    expect(result.current.mode).toBe("DESTINATION_AMOUNT"); expect(result.current.receiveAmount).toBe(credit);
+    expect(result.current.sendAmount).toBe("1000.00");
+    expect(api.dynamicQuote).toHaveBeenLastCalledWith(expect.anything(), {
+      beneficiary_id: 4, destination_currency: currency, amount_mode: "DESTINATION_AMOUNT", entered_amount: credit,
+    }, expect.any(AbortSignal));
+    await advanceQuoteClock(10000);
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(2);
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("restarts the full debounce for each edit and preserves the final input bytes", async () => {
+    const { result } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeReceiveAmount("7")); await advanceQuoteClock(300);
+    act(() => result.current.changeReceiveAmount("78")); await advanceQuoteClock(300);
+    act(() => result.current.changeReceiveAmount("784.00")); await advanceQuoteClock(499);
+    expect(api.dynamicQuote).not.toHaveBeenCalled();
+    await advanceQuoteClock(1);
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
+    expect(result.current.receiveAmount).toBe("784.00"); expect(result.current.sendAmount).toBe("1000.00");
+  });
+
+  it.each(["", "0", "0.00", "-1", "1e3", " 10", "1.", "1.001", "1000000000000"])("does not request an invalid amount %j", async (value) => {
+    const { result } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeReceiveAmount(value)); await advanceQuoteClock(2000);
+    expect(result.current.receiveAmount).toBe(value); expect(result.current.sendAmount).toBe("");
+    expect(api.dynamicQuote).not.toHaveBeenCalled(); expect(api.dynamicReview).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new ApiRequestError("Unavailable", 503), "unavailable"],
+    [new ApiRequestError("Connection failed", 0), "connection_error"],
+    [new ApiRequestError("Funds", 409, undefined, { reason_codes: ["dynamic_insufficient_available_funds"] }), "insufficient_funds"],
+  ] as const)("clears stale terms on failure and never retries: %s", async (failure, state) => {
+    const { result, rerender } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000")); await advanceQuoteClock(500);
+    expect(result.current.receiveAmount).toBe("784.00");
+    api.dynamicQuote.mockRejectedValueOnce(failure);
+    act(() => result.current.changeReceiveAmount("784.00")); await advanceQuoteClock(500);
+    expect(result.current.quoteState).toBe(state); expect(result.current.quote).toBeNull();
+    expect(result.current.receiveAmount).toBe("784.00"); expect(result.current.sendAmount).toBe("");
+    rerender({ selected: { ...beneficiary }, balances: [{ ...wallet }] }); await advanceQuoteClock(60000);
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(2); expect(api.dynamicOptions).toHaveBeenCalledTimes(1);
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("aborts an obsolete request and ignores it even if transport still resolves", async () => {
+    const old = deferred<DynamicQuote>(); api.dynamicQuote.mockReturnValueOnce(old.promise);
+    const { result } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000")); await advanceQuoteClock(500);
+    const signal = api.dynamicQuote.mock.calls[0][2] as AbortSignal;
+    expect(result.current.quoteState).toBe("loading");
+    act(() => result.current.changeReceiveAmount("784.00")); expect(signal.aborted).toBe(true);
+    await advanceQuoteClock(500);
+    await act(async () => { old.resolve(quote("SOURCE_AMOUNT", "obsolete")); await old.promise; });
+    expect(result.current.quote?.dynamic_quote_id).toBe("quote-1"); expect(result.current.mode).toBe("DESTINATION_AMOUNT");
+    expect(result.current.receiveAmount).toBe("784.00"); expect(api.dynamicQuote).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["id", "external_account_id", "currency"] as const)("invalidates a pending quote when the existing source wallet %s changes", async (field) => {
+    const old = deferred<DynamicQuote>(); api.dynamicQuote.mockReturnValueOnce(old.promise);
+    const { result, rerender } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000")); await advanceQuoteClock(500);
+    const signal = api.dynamicQuote.mock.calls[0][2] as AbortSignal;
+    const changed = field === "id" ? { ...wallet, id: 99 } : field === "currency" ? { ...wallet, currency: "EUR" }
+      : { ...wallet, external_account_id: "changed-account" };
+    rerender({ selected: { ...beneficiary }, balances: [changed] });
+    expect(signal.aborted).toBe(true);
+    await act(async () => { old.resolve(quote()); await old.promise; });
+    expect(result.current.quote).toBeNull(); expect(result.current.review).toBeNull(); expect(result.current.accepted).toBe(false);
+    await advanceQuoteClock(5000); expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a debounce on beneficiary/rail switch and requires a fresh user edit", async () => {
+    const { result, rerender } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000")); await advanceQuoteClock(499);
+    api.dynamicOptions.mockResolvedValueOnce({ ...options(["EUR"]), beneficiary: { id: 5, name: "Other", country_code: "DE", currency: "EUR" } });
+    await act(async () => { rerender({ selected: { ...beneficiary, id: 5, country_code: "DE", currency: "EUR" }, balances: [wallet] }); });
+    await advanceQuoteClock(5000);
+    expect(result.current.currency).toBe("EUR"); expect(result.current.quote).toBeNull(); expect(api.dynamicQuote).not.toHaveBeenCalled();
+    api.dynamicOptions.mockResolvedValueOnce({ ...options(["EUR"]), beneficiary: { id: 5, name: "Other", country_code: "DE", currency: "EUR" } });
+    await act(async () => { rerender({ selected: { ...beneficiary, id: 5, country_code: "DE", currency: "EUR", payout_method: "SWIFT" }, balances: [wallet] }); });
+    await advanceQuoteClock(1000); expect(result.current.available).toBe(false); expect(api.dynamicQuote).not.toHaveBeenCalled();
+  });
+
+  it("expires without polling, rejects an expired response, and never advances automatically", async () => {
+    // Install before mounting so the hook's expiry interval uses the same clock as Date.now().
+    vi.useFakeTimers();
+    const { result } = mount();
+    await advanceQuoteClock(0);
+    expect(result.current.currency).toBe("GBP"); expect(result.current.busy).toBe(false);
+    expect(result.current.ready).toBe(true);
+    act(() => result.current.changeSendAmount("1000")); await advanceQuoteClock(500);
+    expect(result.current.quoteState).toBe("valid"); expect(result.current.expired).toBe(false);
+    await advanceQuoteClock(301000);
+    expect(result.current.expired).toBe(true);
+    expect(result.current.quoteState).toBe("expired"); expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
+    api.dynamicQuote.mockResolvedValueOnce({ ...quote(), quote_expires_at: new Date(Date.now() - 1).toISOString() });
+    act(() => result.current.changeSendAmount("1000.00")); await advanceQuoteClock(500);
+    expect(result.current.quoteState).toBe("expired"); expect(result.current.quote).toBeNull();
+    expect(result.current.sendAmount).toBe("1000.00"); expect(result.current.receiveAmount).toBe("");
+    await advanceQuoteClock(5000);
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(2); expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each(["debounce", "request"] as const)("cancels %s work on unmount", async (phase) => {
+    const old = deferred<DynamicQuote>(); api.dynamicQuote.mockReturnValueOnce(old.promise);
+    const { result, unmount } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000"));
+    if (phase === "request") await advanceQuoteClock(500);
+    const signal = api.dynamicQuote.mock.calls[0]?.[2] as AbortSignal | undefined;
+    unmount(); await advanceQuoteClock(5000);
+    if (phase === "request") expect(signal?.aborted).toBe(true);
+    else expect(api.dynamicQuote).not.toHaveBeenCalled();
+    await act(async () => { old.resolve(quote()); await old.promise; });
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unverified source financial contract unavailable", async () => {
+    api.dynamicOptions.mockResolvedValueOnce({ ...options(), source_currency: "EUR", currency_scales: { EUR: 2, GBP: 2 } });
+    const { result, rerender } = mount();
+    rerender({ selected: beneficiary, balances: [{ ...wallet, currency: "EUR" }] });
+    await waitFor(() => expect(result.current.busy).toBe(false)); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000")); await advanceQuoteClock(5000);
+    expect(result.current.available).toBe(false); expect(result.current.quoteState).toBe("unavailable");
+    expect(api.dynamicQuote).not.toHaveBeenCalled();
   });
 });

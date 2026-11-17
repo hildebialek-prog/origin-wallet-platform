@@ -11,6 +11,7 @@ export type ApiRequestOptions = {
   token?: string | null;
   body?: Record<string, unknown> | FormData | null;
   headers?: HeadersInit;
+  signal?: AbortSignal;
 };
 
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -68,7 +69,7 @@ export const getResponseError = async (response: Response) => {
 
 export const requestApi = async <TResponse>(
   path: string,
-  { method = "GET", body, token, headers }: ApiRequestOptions = {},
+  { method = "GET", body, token, headers, signal }: ApiRequestOptions = {},
 ): Promise<TResponse> => {
   const url = buildApiUrl(path);
   const isFormData = body instanceof FormData;
@@ -77,6 +78,7 @@ export const requestApi = async <TResponse>(
   try {
     response = await fetch(url, {
       method,
+      ...(signal ? { signal } : {}),
       headers: {
         Accept: "application/json",
         ...(body && !isFormData ? { "Content-Type": "application/json" } : {}),

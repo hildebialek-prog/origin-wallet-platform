@@ -7,7 +7,9 @@ import { normalizeStatus } from "@/lib/status";
 import { dynamicOptions, dynamicQuote, dynamicReview, dynamicSubmit, dynamicStatus, dynamicTransfers,
   type DynamicMode, type DynamicOptions, type DynamicQuote, type DynamicReview, type DynamicSubmission,
   type DynamicTransfer, type DynamicTransferPage, type DynamicInstruction } from "@/services/niumDynamicService";
-import { amountError, currencyScale, instructionError, matchesQuote, matchesReview, matchesTransfer, matchesTransferPage, quoteOptionsAvailable, reasonCodes, walletDebitError } from "./dynamicPaymentTerms";
+import { amountError, quotedAmountDisplay, currencyScale, fitsScale, instructionError, matchesQuote, matchesReview, matchesTransfer, matchesTransferPage, quoteOptionsAvailable, reasonCodes, walletDebitError } from "./dynamicPaymentTerms";
+
+type QuoteState = "idle" | "debouncing" | "loading" | "valid" | "unavailable" | "expired" | "insufficient_funds" | "connection_error" | "invalid_amount";
 
 type Saved = { request: DynamicSubmission; id?: string; beneficiaryId?: never }
   | { request?: never; id: string; beneficiaryId: number };
@@ -19,7 +21,7 @@ const reasonText: Record<string, string> = {
   dynamic_quote_expired: "This quote expired. Request a new quote and review it again.",
   dynamic_quote_already_consumed: "This quote already belongs to a payment. Recover that payment before starting another.",
   dynamic_quote_binding_changed: "The beneficiary or payment details changed. Request a new quote.",
-  dynamic_insufficient_available_funds: "The USD wallet cannot cover the principal and applicable fees.",
+  dynamic_insufficient_available_funds: "The funding wallet cannot cover the principal and applicable fees.",
   dynamic_financial_authorization_unavailable: "Transfer pricing is not yet authorized. This payment is unavailable.",
   dynamic_pricing_corridor_unsupported: "The selected corridor has no supported Dynamic fee agreement.",
   dynamic_financial_terms_changed: "The transfer pricing changed. Request a new quote and review the terms again.",
@@ -61,10 +63,9 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const [amount, setAmount] = useState("");
   const [instruction, setInstruction] = useState<DynamicInstruction>({ purpose_code: "", source_of_funds: "", comment: "" });
   const [options, setOptions] = useState<DynamicOptions | null>(null);
-  const [quote, setQuote] = useState<DynamicQuote | null>(null);
-  const [review, setReview] = useState<DynamicReview | null>(null);
+  const [storedQuote, setQuote] = useState<DynamicQuote | null>(null);
+  const [storedReview, setReview] = useState<DynamicReview | null>(null);
   const [acceptedFingerprint, setAcceptedFingerprint] = useState<string | null>(null);
-  const accepted = !!review && acceptedFingerprint === review.accepted_fingerprint;
   const [saved, setSaved] = useState<Saved | null>(null);
   const [transfer, setTransfer] = useState<DynamicTransfer | null>(null);
   const [activity, setActivity] = useState<DynamicTransfer[]>([]);
@@ -83,36 +84,60 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const sending = useRef(false);
   const generation = useRef(0);
   const pendingQuote = useRef<number | null>(null);
+  const quoteAbort = useRef<AbortController | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editRevision, setEditRevision] = useState(0);
+  const [quoteFailure, setQuoteFailure] = useState<QuoteState>("idle");
+  const quoteScope = useRef("");
+  const cancelQuoteWork = () => {
+    if (debounceTimer.current !== null) clearTimeout(debounceTimer.current);
+    debounceTimer.current = null;
+    quoteAbort.current?.abort(); quoteAbort.current = null;
+  };
   const identity = `${auth.userId}:${auth.token}`;
   const [stateIdentity, setStateIdentity] = useState(identity);
   const sameIdentity = stateIdentity === identity;
   const currentIdentity = useRef(identity);
   currentIdentity.current = identity;
-  const scope = `${identity}:${beneficiaryId}:${selected?.provider_id}:${selected?.country_code}:${selected?.currency}:${selected?.payout_method}`;
-  const currentScope = useRef(scope);
-  currentScope.current = scope;
-  const expired = !!quote && Date.parse(quote.quote_expires_at) <= Math.max(now, Date.now());
-  const reviewExpired = !!review && Date.parse(review.review_expires_at) <= Math.max(now, Date.now());
+  const beneficiaryScope = `${identity}:${beneficiaryId}:${selected?.provider_id}:${selected?.country_code}:${selected?.currency}:${selected?.payout_method}`;
+  const currentBeneficiaryScope = useRef(beneficiaryScope);
+  currentBeneficiaryScope.current = beneficiaryScope;
   const locked = (busy && !quoting) || recovering || saved !== null;
   const recoveryBeneficiaryId = saved?.request?.beneficiary_id ?? saved?.beneficiaryId;
   const availabilityReasons = [...new Set([...reasonCodes(options?.reason_codes), ...reasonCodes(options?.quote_availability?.reason_codes)])];
   const available = quoteOptionsAvailable(options, beneficiaryId)
-    && options!.quote_availability.payout_rail === selected?.payout_method;
-  const currencies = available ? options!.quote_availability.destination_currencies : [];
+    && options!.beneficiary.currency === selected?.currency && options!.beneficiary.country_code === selected?.country_code
+    && options!.quote_availability.payout_rail === selected?.payout_method
+    && options!.quote_availability.destination_currencies.includes(selected?.currency ?? "");
+  const currencies = available ? options!.quote_availability.destination_currencies.filter((code) => code === selected?.currency) : [];
   const rails = available ? options!.eligible_payout_rails! : [];
   const payoutRail = rails.length === 1 && rails[0] === options?.quote_availability.payout_rail ? rails[0] : "";
   const amountModes = available ? options!.quote_availability.supported_amount_modes! : [];
   const scales = available ? options!.currency_scales : undefined;
-  const sourceScale = currencyScale(scales, "USD");
+  const authorizedSourceCurrency = available ? options!.source_currency! : "";
+  const sourceScale = currencyScale(scales, authorizedSourceCurrency);
   const destinationScale = currencyScale(scales, currency);
   const availabilityReason = options && !available
     ? describeReasons(availabilityReasons) || "Complete provider, customer, financial and payout-method authority is unavailable. Dynamic quoting is disabled."
     : "";
-  const wallets = balances.filter((balance) => balance.provider_id === selected?.provider_id && balance.currency === "USD");
+  const wallets = balances.filter((balance) => balance.provider_id === selected?.provider_id && balance.currency === authorizedSourceCurrency
+    && (balance.user_id === undefined || String(balance.user_id) === auth.userId));
   const wallet = wallets.length === 1 ? wallets[0] : null;
+  const sourceCurrency = wallet?.currency ?? authorizedSourceCurrency;
+  // Wallet identity, pair, rail and precision bind the reference; balance updates are checked separately.
+  const fundingBinding = JSON.stringify([wallet?.id, wallet?.user_id, wallet?.provider_id, wallet?.external_account_id, sourceCurrency]);
+  const scope = JSON.stringify([beneficiaryScope, fundingBinding, currency, payoutRail, sourceScale, destinationScale, mode, amount]);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const quote = quoteScope.current === scope ? storedQuote : null;
+  const review = quote ? storedReview : null;
+  const accepted = !!review && acceptedFingerprint === review.accepted_fingerprint;
+  const expired = !!quote && Date.parse(quote.quote_expires_at) <= Math.max(now, Date.now());
+  const reviewExpired = !!review && Date.parse(review.review_expires_at) <= Math.max(now, Date.now());
+  const exactWalletBalance = fitsScale(wallet?.available_balance, 8);
   const balanceError = quote ? walletDebitError(review?.total_usd_debit ?? quote.planned_total_usd_debit, wallet?.available_balance) : "";
-  const sendAmount = mode === "SOURCE_AMOUNT" ? amount : quote?.planned_total_usd_debit ?? "";
-  const receiveAmount = mode === "DESTINATION_AMOUNT" ? amount : quote?.quoted_destination_amount.amount ?? "";
+  const sendAmount = mode === "SOURCE_AMOUNT" ? amount : quotedAmountDisplay(quote?.planned_total_usd_debit, sourceScale);
+  const receiveAmount = mode === "DESTINATION_AMOUNT" ? amount : quotedAmountDisplay(quote?.quoted_destination_amount.amount, destinationScale);
   const executable = !!quote && !!review && available && amountModes.includes(mode)
     && matchesQuote(quote, beneficiaryId, currency, mode, amount, scales) && matchesReview(review, quote, instruction);
   const reportError = (failure: unknown) => {
@@ -128,6 +153,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     setStateIdentity(identity);
     ++lookupSequence.current; lookupActive.current = false;
     setRecovering(false); setRecoveryPage(null); setRecoveryError("");
+    cancelQuoteWork(); setQuoteFailure("idle");
     ++generation.current;
     pendingQuote.current = null;
     setSaved(null); setTransfer(null); setQuote(null); setReview(null); setOptions(null); setAcceptedFingerprint(null);
@@ -154,8 +180,9 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   }, [identity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const version = ++generation.current;
-    pendingQuote.current = null;
+    let active = true;
+    cancelQuoteWork(); setQuoteFailure("idle");
+    ++generation.current; pendingQuote.current = null;
     setQuoting(false);
     setQuote(null); setReview(null); setAcceptedFingerprint(null); setOptions(null); setCurrency("");
     setRefusalCodes([]);
@@ -163,8 +190,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     if (!beneficiaryId || saved) { setBusy(false); return; }
     setBusy(true); setError(""); setRefusalCodes([]);
     dynamicOptions(auth, beneficiaryId).then((result) => {
-      if (generation.current !== version) return;
-      if (currentScope.current !== scope) return;
+      if (!active || currentBeneficiaryScope.current !== beneficiaryScope) return;
       if (!result?.beneficiary || result.beneficiary.id !== beneficiaryId || result.beneficiary.currency !== selected?.currency
         || result.beneficiary.country_code !== selected?.country_code) throw new Error("Beneficiary response changed or is incomplete. Refresh the beneficiary list.");
       setOptions(result);
@@ -174,10 +200,10 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
         setCurrency(result.beneficiary.currency);
         setMode(result.quote_availability.supported_amount_modes![0]);
       }
-    }).catch((failure) => { if (generation.current === version && currentScope.current === scope) reportError(failure); })
-      .finally(() => { if (generation.current === version) setBusy(false); });
-    return () => { ++generation.current; pendingQuote.current = null; };
-  }, [selected, identity]); // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch((failure) => { if (active && currentBeneficiaryScope.current === beneficiaryScope) reportError(failure); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; cancelQuoteWork(); ++generation.current; pendingQuote.current = null; };
+  }, [beneficiaryScope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!saved?.id || !auth.token) return;
@@ -199,14 +225,21 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const rememberActivity = (result: DynamicTransfer) => setActivity((items) =>
     [result, ...items.filter((item) => item.id !== result.id)].slice(0, 5));
   const clearReview = () => {
+    cancelQuoteWork();
     ++generation.current; pendingQuote.current = null;
     setBusy(false); setQuoting(false); setReview(null); setAcceptedFingerprint(null); setError(""); setRefusalCodes([]);
   };
   const invalidate = () => {
+    cancelQuoteWork(); setQuoteFailure("idle");
     ++generation.current; pendingQuote.current = null;
     setQuoting(false); setBusy(false); setQuote(null); setReview(null); setAcceptedFingerprint(null); setError("");
     setRefusalCodes([]);
   };
+
+  useEffect(() => {
+    invalidate();
+    // Balance amounts deliberately do not invalidate consent; existing fund guards recheck them.
+  }, [fundingBinding]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recovery is GET-only. A failed or empty lookup never authorizes another POST.
   const lookup = async (kind: "recent" | "reference" | "id", value = "", page = 1) => {
@@ -253,33 +286,67 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     }
   };
   const getQuote = async () => {
+    if (debounceTimer.current !== null) clearTimeout(debounceTimer.current);
+    debounceTimer.current = null;
     if (!sameIdentity || sending.current || lookupActive.current || busy || pendingQuote.current !== null || saved || !ready || !canWrite || !currency
       || !available || !currencies.includes(currency)) return;
+    if (!wallet) { setError("An unambiguous funding wallet is unavailable."); setQuoteFailure("unavailable"); return; }
     const modes = options!.quote_availability.supported_amount_modes;
-    if (!modes?.includes(mode)) { setError("Nium does not support quoting from this amount field for the selected beneficiary."); return; }
+    if (!modes?.includes(mode)) { setError("Nium does not support quoting from this amount field for the selected beneficiary."); setQuoteFailure("unavailable"); return; }
     const validation = amountError(mode, amount, mode === "SOURCE_AMOUNT" ? sourceScale : destinationScale);
-    if (validation) { setError(validation); return; }
+    if (validation) { setError(validation); setQuoteFailure("invalid_amount"); return; }
     if (mode === "SOURCE_AMOUNT") {
       const funds = walletDebitError(amount, wallet?.available_balance);
-      if (funds) { setError(funds); return; }
+      if (funds) { setError(funds); setQuoteFailure(exactWalletBalance ? "insufficient_funds" : "unavailable"); return; }
     }
     const version = ++generation.current;
     const requestedScope = scope;
     pendingQuote.current = version;
+    const controller = new AbortController(); quoteAbort.current = controller;
+    setQuoteFailure("loading");
     setBusy(true); setQuoting(true); setError(""); setRefusalCodes([]); setQuote(null); setReview(null); setAcceptedFingerprint(null);
     try {
-      const result = await dynamicQuote(auth, { beneficiary_id: beneficiaryId, destination_currency: currency, amount_mode: mode, entered_amount: amount });
+      const result = await dynamicQuote(auth, { beneficiary_id: beneficiaryId, destination_currency: currency, amount_mode: mode, entered_amount: amount }, controller.signal);
       if (generation.current !== version || currentScope.current !== requestedScope) return;
-      if (!matchesQuote(result, beneficiaryId, currency, mode, amount, scales) || result.payout_rail !== payoutRail
+      if (!matchesQuote(result, beneficiaryId, currency, mode, amount, scales) || result.payout_rail !== payoutRail || result.source_currency !== sourceCurrency
         || result.customer_pricing?.country !== selected?.country_code) throw new Error("The quoted amounts or payout method do not match this payment. Request a new quote.");
-      setQuote(result);
-    } catch (failure) { if (generation.current === version && currentScope.current === requestedScope) reportError(failure); }
+      if (Date.parse(result.quote_expires_at) <= Date.now()) {
+        setQuoteFailure("expired"); setError("This quote expired. Edit an amount to request a new quote."); return;
+      }
+      quoteScope.current = requestedScope;
+      setQuote(result); setQuoteFailure("idle");
+    } catch (failure) {
+      if (generation.current === version && currentScope.current === requestedScope && !controller.signal.aborted) {
+        reportError(failure);
+        const reasons = failure instanceof ApiRequestError ? reasonCodes(failure.payload?.reason_codes) : [];
+        setQuoteFailure(reasons.includes("dynamic_insufficient_available_funds") ? "insufficient_funds"
+          : reasons.includes("dynamic_quote_expired") ? "expired"
+          : (failure instanceof ApiRequestError && failure.status === 0) || failure instanceof TypeError ? "connection_error" : "unavailable");
+      }
+    }
     finally {
       if (generation.current === version && currentScope.current === requestedScope) {
-        pendingQuote.current = null; setBusy(false); setQuoting(false);
+        pendingQuote.current = null; quoteAbort.current = null; setBusy(false); setQuoting(false);
       }
     }
   };
+  const autoQuote = useRef(getQuote);
+  autoQuote.current = getQuote;
+  useEffect(() => {
+    if (editRevision === 0 || !amount || saved || !canWrite || !available || !currency) return;
+    const validation = amountError(mode, amount, mode === "SOURCE_AMOUNT" ? sourceScale : destinationScale);
+    if (validation) { setError(validation); setQuoteFailure("invalid_amount"); return; }
+    const version = generation.current;
+    const requestedScope = scope;
+    setQuoteFailure("debouncing");
+    debounceTimer.current = setTimeout(() => {
+      debounceTimer.current = null;
+      if (version === generation.current && requestedScope === currentScope.current) void autoQuote.current();
+    }, 500);
+    return () => { if (debounceTimer.current !== null) clearTimeout(debounceTimer.current); debounceTimer.current = null; };
+    // Only a user amount edit schedules a Quote. Result projection, clock ticks and rerenders never do.
+  }, [editRevision]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const getReview = async () => {
     if (!sameIdentity || lookupActive.current || busy || saved || !ready || !canWrite || !available || !quote || Date.parse(quote.quote_expires_at) <= Date.now()) return;
     if (!matchesQuote(quote, beneficiaryId, currency, mode, amount, scales)) return;
@@ -297,7 +364,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
           { reason_codes: result.reason_codes });
       }
       if (!matchesReview(result, quote, instruction)) throw new Error("The server cannot currently authorize these payment terms. Submission is unavailable.");
-      if (!wallet || result.balance_id !== wallet.id) throw new Error("The reviewed funding wallet does not match the available USD balance.");
+      if (!wallet || result.balance_id !== wallet.id) throw new Error("The reviewed funding wallet does not match the available funding balance.");
       const funds = walletDebitError(result.total_usd_debit, wallet.available_balance);
       if (funds) throw new Error(funds);
       setReview(result);
@@ -355,6 +422,10 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     } catch (failure) { setError(errorText(failure)); }
   };
 
+  let quoteState: QuoteState = quote ? "valid" : quoteFailure;
+  if (!sameIdentity || !available || !wallet || (balanceError && !exactWalletBalance)) quoteState = "unavailable";
+  else if (expired) quoteState = "expired";
+  else if (balanceError) quoteState = "insufficient_funds";
   return { selected, currency: sameIdentity ? currency : "", mode, amount: sameIdentity ? amount : "",
     sendAmount: sameIdentity ? sendAmount : "", receiveAmount: sameIdentity ? receiveAmount : "", instruction,
     options: sameIdentity ? options : null, quote: sameIdentity ? quote : null, review: sameIdentity ? review : null,
@@ -363,7 +434,9 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     recoveryPage: sameIdentity ? recoveryPage : null, recoveryError: sameIdentity ? recoveryError : "", recovering,
     lookupRecent: (page = 1) => lookup("recent", "", page), lookupReference: (value: string) => lookup("reference", value),
     lookupId: (value: string) => lookup("id", value),
-    availableUsdBalance: typeof wallet?.available_balance === "string" ? wallet.available_balance : null, balanceError,
+    sourceCurrency,
+    quoteState,
+    availableBalance: typeof wallet?.available_balance === "string" ? wallet.available_balance : null, balanceError,
     available: sameIdentity && available, currencies: sameIdentity ? currencies : [], rails, payoutRail, availabilityReason,
     amountModes: sameIdentity ? amountModes : [], sourceScale, destinationScale,
     executableAmountModes: sameIdentity && executable ? [review!.amount_mode] : [],
@@ -376,8 +449,8 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
       if (value !== "" && !currencies.includes(value)) return;
       invalidate(); setCurrency(value); if (mode === "DESTINATION_AMOUNT") setAmount("");
     },
-    changeSendAmount: (value: string) => { invalidate(); setMode("SOURCE_AMOUNT"); setAmount(value); },
-    changeReceiveAmount: (value: string) => { invalidate(); setMode("DESTINATION_AMOUNT"); setAmount(value); },
+    changeSendAmount: (value: string) => { invalidate(); setMode("SOURCE_AMOUNT"); setAmount(value); setEditRevision((revision) => revision + 1); },
+    changeReceiveAmount: (value: string) => { invalidate(); setMode("DESTINATION_AMOUNT"); setAmount(value); setEditRevision((revision) => revision + 1); },
     changeInstruction: (key: keyof DynamicInstruction, value: string) => { clearReview(); setInstruction((current) => ({ ...current, [key]: value })); },
   };
 }

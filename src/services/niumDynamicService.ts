@@ -29,7 +29,7 @@ export type DynamicOptions = {
 };
 export type DynamicQuote = {
   status: string; dynamic_quote_id: string; provider_quote_id: string; beneficiary_id: number;
-  amount_mode: DynamicMode; entered_amount: string; source_currency: "USD"; destination_currency: string;
+  amount_mode: DynamicMode; entered_amount: string; source_currency: string; destination_currency: string;
   quote_expires_at: string; quoted_principal: DynamicMoney; planned_included_fee: DynamicMoney;
   planned_total_usd_debit: string; quoted_destination_amount: DynamicMoney; nium_quoted_fx_rate: string;
   pricing_status?: string; financial_verification?: string;
@@ -66,8 +66,8 @@ type Auth = { userId: string; token: string };
 const path = (userId: string) => `/user/users/${encodeURIComponent(userId)}/nium/dynamic-payouts`;
 export const dynamicOptions = (auth: Auth, beneficiaryId: number) =>
   requestApi<DynamicOptions>(`${path(auth.userId)}/options?beneficiary_id=${beneficiaryId}`, { token: auth.token });
-export const dynamicQuote = (auth: Auth, body: { beneficiary_id: number; destination_currency: string; amount_mode: DynamicMode; entered_amount: string }) =>
-  requestApi<DynamicQuote>(`${path(auth.userId)}/quotes`, { method: "POST", token: auth.token, body });
+export const dynamicQuote = (auth: Auth, body: { beneficiary_id: number; destination_currency: string; amount_mode: DynamicMode; entered_amount: string }, signal?: AbortSignal) =>
+  requestApi<DynamicQuote>(`${path(auth.userId)}/quotes`, { method: "POST", token: auth.token, body, ...(signal ? { signal } : {}) });
 export const dynamicReview = (auth: Auth, body: { beneficiary_id: number; dynamic_quote_id: string; instruction: DynamicInstruction }) =>
   requestApi<DynamicReview>(`${path(auth.userId)}/reviews`, { method: "POST", token: auth.token, body });
 export const dynamicSubmit = (auth: Auth, body: DynamicSubmission) =>

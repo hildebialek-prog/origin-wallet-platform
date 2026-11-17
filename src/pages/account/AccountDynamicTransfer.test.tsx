@@ -68,7 +68,6 @@ async function quotePayment(mode: DynamicMode = "SOURCE_AMOUNT") {
   await screen.findByRole("option", { name: "GBP" });
   fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "GBP" } });
   fireEvent.change(screen.getByLabelText(mode === "SOURCE_AMOUNT" ? "You send" : "Recipient gets"), { target: { value: mode === "SOURCE_AMOUNT" ? "1000" : "784" } });
-  fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
   await screen.findByRole("region", { name: "Quoted payment" });
 }
 async function reviewPayment() {
@@ -151,7 +150,6 @@ describe("Move funds Dynamic payment", () => {
     mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
     await screen.findByRole("option", { name: "GBP" });
     fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
     await screen.findByRole("alert");
     expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
     expect(screen.queryByText("Included Nium transaction fee (contract): USD 20")).not.toBeInTheDocument();
@@ -195,7 +193,7 @@ describe("Move funds Dynamic payment", () => {
     expect(quoted.queryByText(/Origin fee|Origin service fee|platform fee/i)).not.toBeInTheDocument();
     expect(quoted.getByText("Quoted total wallet debit: USD 1000")).toBeVisible();
     expect(screen.getByLabelText("You send")).toHaveValue("1000");
-    expect(screen.getByLabelText("Recipient gets")).toHaveValue("784");
+    expect(screen.getByLabelText("Recipient gets")).toHaveValue("784.00");
     await reviewPayment();
     const reviewed = within(await screen.findByRole("region", { name: "Authoritative payment review" }));
     expect(reviewed.getByText("Beneficiary: GBP Payee (#4)")).toBeVisible();
@@ -248,7 +246,7 @@ describe("Move funds Dynamic payment", () => {
     expect(authority.getByText("Unavailable")).toBeVisible();
     expect(authority.getByText("Customer pricing authorized")).toBeVisible();
     expect(authority.getByText("A matching READY Review and confirmation are required.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Request Nium quote" })).toBeDisabled();
+    expect(screen.getByLabelText("You send")).toBeDisabled();
     expect(api.dynamicQuote).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
   });
 
@@ -318,7 +316,7 @@ describe("Move funds Dynamic payment", () => {
     mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
     await screen.findByText("This beneficiary currently has no available recipient currency.");
     expect(within(screen.getByLabelText("Recipient currency")).getAllByRole("option")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Request Nium quote" })).toBeDisabled();
+    expect(screen.getByLabelText("You send")).toBeDisabled();
     expect(screen.getByText("This payment corridor is unavailable for your Nium account.")).toBeVisible();
     expect(api.dynamicQuote).not.toHaveBeenCalled();
   });
@@ -341,7 +339,7 @@ describe("Move funds Dynamic payment", () => {
     await screen.findByText("Dynamic is unavailable for this beneficiary's corridor.");
     expect(api.dynamicOptions).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, 4);
     expect(dynamicMethod).toBeChecked();
-    expect(screen.getByRole("button", { name: "Request Nium quote" })).toBeDisabled();
+    expect(screen.getByLabelText("You send")).toBeDisabled();
     expect(screen.queryByPlaceholderText("Enter an amount")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Submit payment" })).not.toBeInTheDocument();
     expect(api.dynamicQuote).not.toHaveBeenCalled();
@@ -357,7 +355,7 @@ describe("Move funds Dynamic payment", () => {
     await screen.findByText("Refusal codes: dynamic_provider_account_ineligible");
     expect(screen.getByLabelText("Recipient currency")).toBeDisabled();
     expect(within(screen.getByLabelText("Recipient currency")).queryByRole("option", { name: "GBP" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Request Nium quote" })).toBeDisabled();
+    expect(screen.getByLabelText("You send")).toBeDisabled();
     expect(api.dynamicQuote).not.toHaveBeenCalled();
   });
 
@@ -418,7 +416,6 @@ describe("Move funds Dynamic payment", () => {
     expect(screen.getByLabelText("You send")).toHaveValue("");
     fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: currency } });
     fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
     await screen.findByRole("region", { name: "Quoted payment" });
     await reviewPayment();
     fireEvent.click(await screen.findByRole("checkbox"));
@@ -441,7 +438,7 @@ describe("Move funds Dynamic payment", () => {
     expect(api.submitTransfer).not.toHaveBeenCalled();
   });
 
-  it("discards quote, Review and consent when switching to another backend-provided currency", async () => {
+  it("discards quote, Review and consent when clearing currency and never offers a currency outside the beneficiary binding", async () => {
     api.dynamicOptions.mockResolvedValueOnce({ ...optionAuthority, beneficiary: { id: 4, name: "GBP Payee", currency: "GBP", country_code: "GB" },
       currency_scales: { USD: 2, GBP: 2, EUR: 2 },
       status: "QUOTE_REFERENCE_ONLY", reason_codes: [],
@@ -449,8 +446,9 @@ describe("Move funds Dynamic payment", () => {
     mount(); await quotePayment(); await reviewPayment();
     fireEvent.click(await screen.findByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "EUR" } });
-    expect(screen.getByLabelText("Recipient currency")).toHaveValue("EUR");
+    expect(screen.queryByRole("option", { name: "EUR" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "" } });
+    expect(screen.getByLabelText("Recipient currency")).toHaveValue("");
     expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Authoritative payment review" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
@@ -463,11 +461,10 @@ describe("Move funds Dynamic payment", () => {
     await screen.findByRole("option", { name: "GBP" });
     fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "GBP" } });
     fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("do not match this payment");
     expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
     api.dynamicQuote.mockResolvedValueOnce({ ...makeQuote(), entered_amount: "1001" });
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
+    fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000.00" } });
     expect(await screen.findByRole("alert")).toHaveTextContent("do not match this payment");
     expect(api.dynamicReview).not.toHaveBeenCalled();
   });
@@ -500,8 +497,8 @@ describe("Move funds Dynamic payment", () => {
 
   it.each(["SOURCE_AMOUNT", "DESTINATION_AMOUNT"] as const)("quotes, reviews and submits %s with the server-provided included fee", async (mode) => {
     mount(); await quotePayment(mode);
-    expect(screen.getByLabelText("You send")).toHaveValue("1000");
-    expect(screen.getByLabelText("Recipient gets")).toHaveValue("784");
+    expect(screen.getByLabelText("You send")).toHaveValue(mode === "SOURCE_AMOUNT" ? "1000" : "1000.00");
+    expect(screen.getByLabelText("Recipient gets")).toHaveValue(mode === "DESTINATION_AMOUNT" ? "784" : "784.00");
     expect(within(screen.getByRole("region", { name: "Quoted payment" })).getByText("USD transfer principal: USD 980")).toBeVisible();
     await reviewPayment();
     const review = await screen.findByRole("region", { name: "Authoritative payment review" });
@@ -510,7 +507,7 @@ describe("Move funds Dynamic payment", () => {
     expect(within(screen.getByRole("region", { name: "Payment summary" })).getByText("USD 1000")).toBeVisible();
     expect(document.querySelector('[aria-current="step"]')).toHaveTextContent("Review");
     expect(screen.getByLabelText("Current route")).toHaveTextContent("/account/transfers");
-    expect(api.dynamicQuote).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, expect.objectContaining({ amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784" }));
+    expect(api.dynamicQuote).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, expect.objectContaining({ amount_mode: mode, entered_amount: mode === "SOURCE_AMOUNT" ? "1000" : "784" }), expect.any(AbortSignal));
     fireEvent.click(screen.getByRole("checkbox"));
     const submit = screen.getByRole("button", { name: "Submit payment" });
     fireEvent.click(submit); fireEvent.click(submit);
@@ -524,30 +521,37 @@ describe("Move funds Dynamic payment", () => {
     expect(screen.queryByText(/Admin Approve/i)).not.toBeInTheDocument();
   });
 
-  it("uses the last edited field and clears the other amount until an explicit quote request", async () => {
+  it("uses the last edited field and clears the other amount until the debounced automatic quote returns", async () => {
     mount(); await quotePayment();
     expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Recipient gets")).toHaveValue("784.00");
+    // Change the projected value before restoring its trailing zeros so React observes an actual edit.
+    fireEvent.change(screen.getByLabelText("Recipient gets"), { target: { value: "784" } });
+    expect(screen.getByLabelText("You send")).toHaveValue("");
     fireEvent.change(screen.getByLabelText("Recipient gets"), { target: { value: "784.00" } });
     expect(screen.getByLabelText("You send")).toHaveValue("");
     expect(screen.getByLabelText("Recipient gets")).toHaveValue("784.00");
     expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
     expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
     await screen.findByRole("region", { name: "Quoted payment" });
-    expect(api.dynamicQuote).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ amount_mode: "DESTINATION_AMOUNT", entered_amount: "784.00" }));
-    expect(screen.getByLabelText("You send")).toHaveValue("1000");
+    expect(api.dynamicQuote).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ amount_mode: "DESTINATION_AMOUNT", entered_amount: "784.00" }), expect.any(AbortSignal));
+    expect(screen.getByLabelText("You send")).toHaveValue("1000.00");
+    fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000" } });
+    expect(screen.getByLabelText("Recipient gets")).toHaveValue("");
     fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000.00" } });
     expect(screen.getByLabelText("Recipient gets")).toHaveValue("");
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
+    expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(2);
     await screen.findByRole("region", { name: "Quoted payment" });
-    expect(api.dynamicQuote).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ amount_mode: "SOURCE_AMOUNT", entered_amount: "1000.00" }));
+    expect(api.dynamicQuote).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ amount_mode: "SOURCE_AMOUNT", entered_amount: "1000.00" }), expect.any(AbortSignal));
+    expect(api.dynamicReview).not.toHaveBeenCalled();
     expect(api.dynamicSubmit).not.toHaveBeenCalled();
   });
 
   it("shows the total debit but prevents Review when the destination quote exceeds the USD balance", async () => {
     api.getBalances.mockResolvedValueOnce([{ id: 3, provider_id: 10, currency: "USD", available_balance: "999.99" }]);
     mount(); await quotePayment("DESTINATION_AMOUNT");
-    expect(screen.getByLabelText("You send")).toHaveValue("1000");
+    expect(screen.getByLabelText("You send")).toHaveValue("1000.00");
     expect(screen.getByLabelText("Recipient gets")).toHaveValue("784");
     expect(await screen.findByRole("alert")).toHaveTextContent("cannot cover the total wallet debit");
     fireEvent.change(screen.getByLabelText("Payment purpose code"), { target: { value: "IR005" } });
@@ -603,12 +607,11 @@ describe("Move funds Dynamic payment", () => {
     await screen.findByRole("option", { name: "GBP" });
     fireEvent.change(screen.getByLabelText("Recipient currency"), { target: { value: "GBP" } });
     fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("cannot cover the principal");
     api.dynamicQuote.mockResolvedValueOnce({ ...makeQuote(), quote_expires_at: new Date(Date.now() - 1000).toISOString() });
-    fireEvent.click(screen.getByRole("button", { name: "Request Nium quote" }));
-    await screen.findByText("Quote expired. Request a new quote.");
-    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000.00" } });
+    await screen.findByText("Quote expired. Edit an amount to get a new quote.");
+    expect(screen.queryByRole("button", { name: "Review payment" })).not.toBeInTheDocument();
     expect(api.dynamicReview).not.toHaveBeenCalled();
   });
 
