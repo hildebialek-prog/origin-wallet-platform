@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import type { DynamicTransfer } from "@/services/niumDynamicService";
-import { amountPlaceholder, dynamicStatusLabel, instructionError } from "./dynamicPaymentTerms";
+import { amountPlaceholder, dynamicStatusLabel, dynamicSourceOfFundsOptions, instructionError } from "./dynamicPaymentTerms";
 import type { DynamicPayment } from "./useDynamicPayment";
 
 const field = "h-12 rounded-xl border border-[#d7d7d2] bg-white px-3 text-[#0f2442] disabled:opacity-60 dark:border-white/10 dark:bg-[#10141b] dark:text-white";
@@ -63,6 +63,37 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
       }[p.quoteState]}</p>
       {p.busy && p.quoteState !== "loading" && <p role="status">Checking payment terms…</p>}
     </div>
+    <section aria-label="Payment instructions" className="space-y-4 rounded-xl border p-5">
+      <label className="grid gap-2">Payment purpose code
+        <select aria-label="Payment purpose code" aria-describedby="dynamic-purpose-status" className={field}
+          value={p.purposeOptions.some((option) => option.code === p.instruction.purpose_code) ? p.instruction.purpose_code : ""}
+          disabled={p.locked || p.purposeStatus !== "ready"}
+          onChange={(e) => p.changeInstruction("purpose_code", e.target.value)}>
+          <option value="">Select payment purpose</option>
+          {p.purposeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+        </select>
+      </label>
+      <p id="dynamic-purpose-status" role={p.purposeStatus === "error" ? "alert" : "status"} aria-live="polite" className="text-sm">
+        {p.purposeStatus === "loading" ? "Loading payment purposes…"
+          : p.purposeStatus === "error" ? "Payment purposes are temporarily unavailable. Reopen payment details to try again."
+          : p.purposeStatus === "empty" ? "No payment purposes are currently available."
+          : p.invalidPurpose}
+      </p>
+      <label className="grid gap-2">Source of funds
+        <select aria-label="Source of funds" className={field}
+          value={dynamicSourceOfFundsOptions.includes(p.instruction.source_of_funds) ? p.instruction.source_of_funds : ""}
+          disabled={p.locked} onChange={(e) => p.changeInstruction("source_of_funds", e.target.value)}>
+          <option value="">Select source of funds</option>
+          {dynamicSourceOfFundsOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </label>
+      <label className="grid gap-2">Payment reference
+        <Input aria-label="Payment reference" className={field} maxLength={255} value={p.instruction.comment}
+          disabled={p.locked} onChange={(e) => p.changeInstruction("comment", e.target.value)} />
+      </label>
+      {invalidInstruction && Object.values(p.instruction).every((value) => value.length > 0)
+        && <p role="alert">{invalidInstruction}</p>}
+    </section>
     {p.quote && <section aria-label="Quoted payment" className="space-y-3 rounded-xl border p-5">
       <p>{p.quote.source_currency} transfer principal: {p.quote.quoted_principal.currency} {p.quote.quoted_principal.amount}</p>
       <p>Included Nium transaction fee (contract): {p.quote.planned_included_fee.currency} {p.quote.planned_included_fee.amount}</p>
@@ -78,16 +109,10 @@ export function DynamicDetails({ payment: p, onBack, onReview }: {
       <p>Quote: {p.quote.dynamic_quote_id}</p><p>Provider quote: {p.quote.provider_quote_id}</p>
       <p>{p.expired ? "Quote expired. Edit an amount to get a new quote." : `Quote expires: ${p.quote.quote_expires_at}`}</p>
       {p.balanceError && <p role="alert">{p.balanceError}</p>}
-      {([['purpose_code', 'Payment purpose code'], ['source_of_funds', 'Source of funds'], ['comment', 'Payment reference']] as const)
-        .map(([key, label]) => <label key={key} className="grid gap-2">{label}
-          <Input aria-label={label} className={field} maxLength={255} value={p.instruction[key]}
-            disabled={p.locked} onChange={(e) => p.changeInstruction(key, e.target.value)} />
-        </label>)}
-      {invalidInstruction && Object.values(p.instruction).every((value) => value.length > 0)
-        && <p role="alert">{invalidInstruction}</p>}
-      <Button className={button} disabled={p.locked || p.busy || p.expired || !!p.balanceError || !!invalidInstruction}
-        onClick={onReview}>Review payment</Button>
     </section>}
+    <Button className={button} disabled={p.locked || p.busy || !p.quote || p.quoteState !== "valid" || p.expired
+      || !!p.balanceError || !!invalidInstruction || !!p.invalidPurpose}
+      onClick={onReview}>Review payment</Button>
     <Button variant="outline" disabled={p.busy || !!p.saved} onClick={onBack}>Back</Button>
   </div>;
 }

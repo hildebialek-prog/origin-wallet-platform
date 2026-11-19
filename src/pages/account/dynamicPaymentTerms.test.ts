@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountError, amountPlaceholder, quotedAmountDisplay, instructionError, matchesQuote, matchesReview, matchesTransfer, quoteOptionsAvailable, matchesTransferPage, walletDebitError } from "./dynamicPaymentTerms";
+import { amountError, amountPlaceholder, quotedAmountDisplay, instructionError, purposeCodeError, matchesQuote, matchesReview, matchesTransfer, quoteOptionsAvailable, matchesTransferPage, walletDebitError } from "./dynamicPaymentTerms";
 import type { DynamicCustomerPricing, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer } from "@/services/niumDynamicService";
 
 const scales = { USD: 2, GBP: 2 };
@@ -29,6 +29,17 @@ const review: DynamicReview = { status: "READY", review_id: "a".repeat(64), acce
   destination_amount: quote.quoted_destination_amount, instruction, reason_codes: [] };
 
 describe("Dynamic payment consent comparisons", () => {
+  it.each([
+    ["purpose_code", "CORRIDOR-SPECIFIC"], ["source_of_funds", "Corporate Account"], ["comment", "Changed invoice"],
+  ] as const)("rejects a server Review that substitutes the selected %s", (field, value) => {
+    expect(matchesReview({ ...review, instruction: { ...instruction, [field]: value } }, quote, instruction)).toBe(false);
+    expect(matchesReview(review, quote, { ...instruction, [field]: value })).toBe(false);
+  });
+  it("preserves a provider-validated corridor purpose without using a HK default", () => {
+    const selected = { purpose_code: "CORRIDOR-SPECIFIC", source_of_funds: "Corporate Account", comment: "Confirmed invoice" };
+    expect(matchesReview({ ...review, instruction: selected }, quote, selected)).toBe(true);
+  });
+
   it.each([undefined, "provider-other"])("rejects a missing or changed provider quote ID at Review: %s", (id) => {
     expect(matchesReview({ ...review, provider_quote_id: id }, quote, instruction)).toBe(false);
   });
@@ -38,6 +49,11 @@ describe("Dynamic payment consent comparisons", () => {
   it("requires the accepted fingerprint to identify the exact Review and rejects an expired READY response", () => {
     expect(matchesReview({ ...review, review_id: "different-review" }, quote, instruction)).toBe(false);
     expect(matchesReview({ ...review, review_expires_at: new Date(Date.now() - 1).toISOString() }, quote, instruction)).toBe(false);
+  });
+  it("rejects Review with a different quote expiry even when every other binding matches", () => {
+    const differentExpiry = new Date(Date.parse(quote.quote_expires_at) + 1000).toISOString();
+    expect(matchesReview(review, quote, instruction)).toBe(true);
+    expect(matchesReview({ ...review, quote_expires_at: differentExpiry, review_expires_at: differentExpiry }, quote, instruction)).toBe(false);
   });
   it.each([{ customer_pricing: undefined }, { customer_pricing: null }, { contracted_nium_transaction_fee: undefined }, { financial_verification: undefined },
     { provider_quote_id: undefined }, { provider_quote_id: null }, { provider_quote_id: "quote\n" }, { provider_quote_id: "q".repeat(101) }, { dynamic_quote_id: undefined },
@@ -85,6 +101,9 @@ describe("Dynamic payment consent comparisons", () => {
   });
   it("accepts a UTF-8 instruction within the backend byte limit", () => {
     expect(instructionError({ ...instruction, comment: "ก".repeat(85) })).toBe("");
+  });
+  it.each(["", "salary", "Corporate account", "UNLISTED", " Salary", "Salary "])("rejects a missing or non-enum source of funds %j", (source_of_funds) => {
+    expect(instructionError({ ...instruction, source_of_funds })).toContain("Select a source of funds");
   });
   it("requires complete transfer amounts and the reviewed identity before displaying a submission as confirmed", () => {
     const transfer: DynamicTransfer = { id: "intent-id", beneficiary: { id: 4, country_code: "GB" }, source_currency: "USD",
@@ -168,6 +187,17 @@ describe("Dynamic payment consent comparisons", () => {
   });
 });
 
+
+describe("Dynamic purpose catalogue membership", () => {
+  const options = [{ code: "BACKEND-CODE", label: "Human readable purpose" }];
+  it.each(["", "UNKNOWN", "Human readable purpose", " BACKEND-CODE"])("rejects %j instead of mapping or defaulting it", (code) => {
+    expect(purposeCodeError(code, options)).not.toBe("");
+  });
+  it("requires the exact backend code and fails closed for an empty list", () => {
+    expect(purposeCodeError("BACKEND-CODE", options)).toBe("");
+    expect(purposeCodeError("BACKEND-CODE", [])).not.toBe("");
+  });
+});
 
 describe("backend currency precision presentation", () => {
   it.each([

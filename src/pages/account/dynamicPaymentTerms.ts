@@ -1,4 +1,5 @@
 import type { DynamicCustomerPricing, DynamicFeeClassification, DynamicInstruction, DynamicMode, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer, DynamicTransferPage } from "@/services/niumDynamicService";
+import type { PurposeCodeOption } from "@/services/fxOrderService";
 
 export const reasonCodes = (value: unknown): string[] => Array.isArray(value)
   ? value.filter((code): code is string => typeof code === "string" && code.length > 0) : [];
@@ -33,10 +34,30 @@ export function quoteOptionsAvailable(options: DynamicOptions | null, beneficiar
     && /^[A-Z][A-Z0-9_]*$/.test(rails[0]) && rails[0] === q.payout_rail;
 }
 
+// Nium remittance sourceOfFunds enum from API documentation, confirmed by the operator.
+export const dynamicSourceOfFundsOptions: readonly string[] = [
+  "Salary", "Personal Savings", "Personal Wealth", "Retirement Funds",
+  "Business Owner/Shareholder", "Loan Facility", "Personal Account", "Corporate Account",
+];
+
+export function hasControlCharacters(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 export function instructionError(instruction: DynamicInstruction) {
+  if (!dynamicSourceOfFundsOptions.includes(instruction.source_of_funds)) return "Select a source of funds from the available list.";
   return Object.values(instruction).some((value) => !value || value.trim() !== value
-    || /[\x00-\x1f\x7f]/.test(value) || new TextEncoder().encode(value).length > 255)
+    || hasControlCharacters(value) || new TextEncoder().encode(value).length > 255)
     ? "Enter payment instructions without surrounding whitespace or control characters, using at most 255 UTF-8 bytes per field." : "";
+}
+
+// The backend catalogue supplies vocabulary. Review still validates the exact payout context with Nium.
+export function purposeCodeError(code: string, options: readonly PurposeCodeOption[]) {
+  return code && options.some((option) => option.code === code) ? "" : "Select a payment purpose from the available list.";
 }
 
 // Comparison only: never derive FX or price a transfer in the browser.

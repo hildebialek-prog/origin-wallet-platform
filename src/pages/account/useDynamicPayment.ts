@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/services/apiClient";
 import type { Balance, Beneficiary } from "@/services/moneyMovementService";
-import type { ProviderSummary } from "@/services/fxOrderService";
+import { getNiumPurposeCodes, type ProviderSummary, type PurposeCodeOption } from "@/services/fxOrderService";
 import { normalizeStatus } from "@/lib/status";
 import { dynamicOptions, dynamicQuote, dynamicReview, dynamicSubmit, dynamicStatus, dynamicTransfers,
   type DynamicMode, type DynamicOptions, type DynamicQuote, type DynamicReview, type DynamicSubmission,
   type DynamicTransfer, type DynamicTransferPage, type DynamicInstruction } from "@/services/niumDynamicService";
-import { amountError, quotedAmountDisplay, currencyScale, fitsScale, instructionError, matchesQuote, matchesReview, matchesTransfer, matchesTransferPage, quoteOptionsAvailable, reasonCodes, walletDebitError } from "./dynamicPaymentTerms";
+import { amountError, quotedAmountDisplay, currencyScale, fitsScale, hasControlCharacters, instructionError, purposeCodeError, matchesQuote, matchesReview, matchesTransfer, matchesTransferPage, quoteOptionsAvailable, reasonCodes, walletDebitError } from "./dynamicPaymentTerms";
 
 type QuoteState = "idle" | "debouncing" | "loading" | "valid" | "unavailable" | "expired" | "insufficient_funds" | "connection_error" | "invalid_amount";
+type PurposeState = { scope: string; status: "idle" | "loading" | "ready" | "empty" | "error"; options: PurposeCodeOption[] };
 
 type Saved = { request: DynamicSubmission; id?: string; beneficiaryId?: never }
   | { request?: never; id: string; beneficiaryId: number };
@@ -62,6 +63,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const [mode, setMode] = useState<DynamicMode>("SOURCE_AMOUNT");
   const [amount, setAmount] = useState("");
   const [instruction, setInstruction] = useState<DynamicInstruction>({ purpose_code: "", source_of_funds: "", comment: "" });
+  const [purposes, setPurposes] = useState<PurposeState>({ scope: "", status: "idle", options: [] });
   const [options, setOptions] = useState<DynamicOptions | null>(null);
   const [storedQuote, setQuote] = useState<DynamicQuote | null>(null);
   const [storedReview, setReview] = useState<DynamicReview | null>(null);
@@ -102,6 +104,10 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const beneficiaryScope = `${identity}:${beneficiaryId}:${selected?.provider_id}:${selected?.country_code}:${selected?.currency}:${selected?.payout_method}`;
   const currentBeneficiaryScope = useRef(beneficiaryScope);
   currentBeneficiaryScope.current = beneficiaryScope;
+  const purposeStatus = sameIdentity && purposes.scope === beneficiaryScope ? purposes.status
+    : beneficiaryId && auth.userId && auth.token ? "loading" : "idle";
+  const purposeOptions = sameIdentity && purposes.scope === beneficiaryScope && purposeStatus === "ready" ? purposes.options : [];
+  const invalidPurpose = purposeCodeError(instruction.purpose_code, purposeOptions);
   const locked = (busy && !quoting) || recovering || saved !== null;
   const recoveryBeneficiaryId = saved?.request?.beneficiary_id ?? saved?.beneficiaryId;
   const availabilityReasons = [...new Set([...reasonCodes(options?.reason_codes), ...reasonCodes(options?.quote_availability?.reason_codes)])];
@@ -139,6 +145,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const sendAmount = mode === "SOURCE_AMOUNT" ? amount : quotedAmountDisplay(quote?.planned_total_usd_debit, sourceScale);
   const receiveAmount = mode === "DESTINATION_AMOUNT" ? amount : quotedAmountDisplay(quote?.quoted_destination_amount.amount, destinationScale);
   const executable = !!quote && !!review && available && amountModes.includes(mode)
+    && !invalidPurpose
     && matchesQuote(quote, beneficiaryId, currency, mode, amount, scales) && matchesReview(review, quote, instruction);
   const reportError = (failure: unknown) => {
     setRefusalCodes(failure instanceof ApiRequestError ? reasonCodes(failure.payload?.reason_codes) : []);
@@ -181,8 +188,9 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
 
   useEffect(() => {
     let active = true;
+    const generationRef = generation;
     cancelQuoteWork(); setQuoteFailure("idle");
-    ++generation.current; pendingQuote.current = null;
+    ++generationRef.current; pendingQuote.current = null;
     setQuoting(false);
     setQuote(null); setReview(null); setAcceptedFingerprint(null); setOptions(null); setCurrency("");
     setRefusalCodes([]);
@@ -202,7 +210,37 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
       }
     }).catch((failure) => { if (active && currentBeneficiaryScope.current === beneficiaryScope) reportError(failure); })
       .finally(() => { if (active) setBusy(false); });
-    return () => { active = false; cancelQuoteWork(); ++generation.current; pendingQuote.current = null; };
+    return () => { active = false; cancelQuoteWork(); ++generationRef.current; pendingQuote.current = null; };
+  }, [beneficiaryScope]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let active = true;
+    setPurposes({ scope: beneficiaryScope, status: "loading", options: [] });
+    if (!beneficiaryId || !auth.userId || !auth.token || saved) {
+      setPurposes({ scope: beneficiaryScope, status: "idle", options: [] });
+      return;
+    }
+    // Existing backend vocabulary only; no hardcoded defaults or inferred corridor permission.
+    getNiumPurposeCodes(auth).then((result) => {
+      if (!active || currentBeneficiaryScope.current !== beneficiaryScope) return;
+      if (!Array.isArray(result?.data) || result.data.some((option) => !option
+        || typeof option.code !== "string" || !option.code || option.code.trim() !== option.code
+        || new TextEncoder().encode(option.code).length > 255 || hasControlCharacters(option.code)
+        || typeof option.label !== "string" || !option.label.trim()
+        || hasControlCharacters(option.label))
+        || new Set(result.data.map((option) => option.code)).size !== result.data.length) {
+        throw new Error("Invalid payment purpose catalogue.");
+      }
+      setPurposes({ scope: beneficiaryScope, status: result.data.length ? "ready" : "empty", options: result.data });
+      setInstruction((current) => !current.purpose_code || result.data.some((option) => option.code === current.purpose_code)
+        ? current : { ...current, purpose_code: "" });
+    }).catch(() => {
+      if (active && currentBeneficiaryScope.current === beneficiaryScope) {
+        setPurposes({ scope: beneficiaryScope, status: "error", options: [] });
+        setInstruction((current) => ({ ...current, purpose_code: "" }));
+      }
+    });
+    return () => { active = false; };
   }, [beneficiaryScope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -225,9 +263,11 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const rememberActivity = (result: DynamicTransfer) => setActivity((items) =>
     [result, ...items.filter((item) => item.id !== result.id)].slice(0, 5));
   const clearReview = () => {
-    cancelQuoteWork();
-    ++generation.current; pendingQuote.current = null;
-    setBusy(false); setQuoting(false); setReview(null); setAcceptedFingerprint(null); setError(""); setRefusalCodes([]);
+    // Instructions do not affect Quote. Preserve its debounce/request while discarding any pending Review.
+    if (pendingQuote.current === null && debounceTimer.current === null) {
+      ++generation.current; setBusy(false); setQuoting(false);
+    }
+    setReview(null); setAcceptedFingerprint(null); setError(""); setRefusalCodes([]);
   };
   const invalidate = () => {
     cancelQuoteWork(); setQuoteFailure("idle");
@@ -350,6 +390,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   const getReview = async () => {
     if (!sameIdentity || lookupActive.current || busy || saved || !ready || !canWrite || !available || !quote || Date.parse(quote.quote_expires_at) <= Date.now()) return;
     if (!matchesQuote(quote, beneficiaryId, currency, mode, amount, scales)) return;
+    if (invalidPurpose) { setError(invalidPurpose); return; }
     const invalidInstruction = instructionError(instruction);
     if (invalidInstruction) { setError(invalidInstruction); return; }
     if (balanceError) { setError(balanceError); return; }
@@ -427,6 +468,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
   else if (expired) quoteState = "expired";
   else if (balanceError) quoteState = "insufficient_funds";
   return { selected, currency: sameIdentity ? currency : "", mode, amount: sameIdentity ? amount : "",
+    purposeStatus, purposeOptions, invalidPurpose,
     sendAmount: sameIdentity ? sendAmount : "", receiveAmount: sameIdentity ? receiveAmount : "", instruction,
     options: sameIdentity ? options : null, quote: sameIdentity ? quote : null, review: sameIdentity ? review : null,
     accepted: sameIdentity && accepted, saved: sameIdentity ? saved : null, transfer: sameIdentity ? transfer : null,
@@ -447,6 +489,7 @@ export function useDynamicPayment(selected: Beneficiary | null, canWrite: boolea
     refreshStatus: () => setStatusRefresh((value) => value + 1),
     changeCurrency: (value: string) => {
       if (value !== "" && !currencies.includes(value)) return;
+      if (value !== currency) setInstruction({ purpose_code: "", source_of_funds: "", comment: "" });
       invalidate(); setCurrency(value); if (mode === "DESTINATION_AMOUNT") setAmount("");
     },
     changeSendAmount: (value: string) => { invalidate(); setMode("SOURCE_AMOUNT"); setAmount(value); setEditRevision((revision) => revision + 1); },

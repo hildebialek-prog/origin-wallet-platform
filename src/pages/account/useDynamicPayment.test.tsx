@@ -1,13 +1,15 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Balance, Beneficiary } from "@/services/moneyMovementService";
 import type { DynamicCustomerPricing, DynamicMode, DynamicOptions, DynamicQuote, DynamicReview, DynamicTransfer } from "@/services/niumDynamicService";
 import { useDynamicPayment } from "./useDynamicPayment";
+import { DynamicReviewStep } from "./DynamicPaymentSteps";
 import { ApiRequestError } from "@/services/apiClient";
 
-const api = vi.hoisted(() => ({ dynamicOptions: vi.fn(), dynamicQuote: vi.fn(), dynamicReview: vi.fn(), dynamicSubmit: vi.fn(), dynamicStatus: vi.fn(), dynamicTransfers: vi.fn() }));
+const api = vi.hoisted(() => ({ getNiumPurposeCodes: vi.fn(), dynamicOptions: vi.fn(), dynamicQuote: vi.fn(), dynamicReview: vi.fn(), dynamicSubmit: vi.fn(), dynamicStatus: vi.fn(), dynamicTransfers: vi.fn() }));
 const session = vi.hoisted(() => ({ user: { id: "12" }, token: "customer-token" }));
 vi.mock("@/services/niumDynamicService", () => api);
+vi.mock("@/services/fxOrderService", () => api);
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => session }));
 const beneficiary: Beneficiary = { id: 4, provider_id: 10, beneficiary_type: "individual", full_name: "Payee", country_code: "GB", currency: "GBP", payout_method: "LOCAL", status: "active" };
 const wallet: Balance = { id: 3, user_id: 12, provider_id: 10, currency: "USD", available_balance: "1000.00000000" };
@@ -77,6 +79,7 @@ beforeEach(() => {
   session.user = { id: "12" }; session.token = "customer-token";
   api.dynamicTransfers.mockResolvedValue({ data: [], page: 1, per_page: 20, has_more: false, next_page: null });
   api.dynamicOptions.mockResolvedValue(options());
+  api.getNiumPurposeCodes.mockResolvedValue({ data: [{ code: instruction.purpose_code, label: "Purpose returned by backend" }] });
   api.dynamicQuote.mockImplementation(async (_auth, body) => quote(body.amount_mode));
   api.dynamicReview.mockImplementation(async () => {
     const results = api.dynamicQuote.mock.results;
@@ -84,6 +87,187 @@ beforeEach(() => {
   });
 });
 afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
+
+describe("Dynamic instruction catalogue and binding", () => {
+  it.each(["", "NOT-IN-CATALOGUE"])("refuses a missing or unlisted purpose %j before Review", async (code) => {
+    const { result } = mount(); await ready(result); await enterAndQuote(result);
+    act(() => {
+      result.current.changeInstruction("purpose_code", code);
+      result.current.changeInstruction("source_of_funds", instruction.source_of_funds);
+      result.current.changeInstruction("comment", instruction.comment);
+    });
+    await act(async () => { await result.current.getReview(); });
+    expect(result.current.error).toContain("Select a payment purpose");
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("preserves the exact valid instruction and existing Review request shape", async () => {
+    const { result } = mount(); await ready(result); await enterAndQuote(result); await prepareReview(result);
+    expect(api.getNiumPurposeCodes).toHaveBeenCalledWith({ userId: "12", token: "customer-token" });
+    expect(api.dynamicReview).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, {
+      beneficiary_id: beneficiary.id, dynamic_quote_id: result.current.quote!.dynamic_quote_id, instruction,
+    });
+    expect(result.current.review?.status).toBe("READY");
+  });
+
+  it("cannot request Review with complete instructions before a quote exists", async () => {
+    const { result } = mount(); await ready(result); await prepareReview(result);
+    expect(result.current.instruction).toEqual(instruction);
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each(["", "salary", "UNLISTED", " Salary", "Salary "])("rejects source of funds %j before Review", async (source) => {
+    const { result } = mount(); await ready(result); await enterAndQuote(result);
+    act(() => {
+      result.current.changeInstruction("purpose_code", instruction.purpose_code);
+      result.current.changeInstruction("source_of_funds", source);
+      result.current.changeInstruction("comment", instruction.comment);
+    });
+    await act(async () => { await result.current.getReview(); });
+    expect(result.current.error).toContain("Select a source of funds");
+    expect(result.current.review).toBeNull();
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each(["Salary", "Personal Savings", "Personal Wealth", "Retirement Funds", "Business Owner/Shareholder",
+    "Loan Facility", "Personal Account", "Corporate Account"])("preserves the selected source of funds %j through Review", async (source) => {
+    const { result } = mount(); await ready(result); await enterAndQuote(result);
+    const q = result.current.quote!;
+    const selectedInstruction = { ...instruction, source_of_funds: source };
+    api.dynamicReview.mockResolvedValueOnce({ ...review(q), instruction: selectedInstruction });
+    act(() => {
+      result.current.changeInstruction("purpose_code", instruction.purpose_code);
+      result.current.changeInstruction("source_of_funds", source);
+      result.current.changeInstruction("comment", instruction.comment);
+    });
+    await act(async () => { await result.current.getReview(); });
+    expect(api.dynamicReview).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, {
+      beneficiary_id: beneficiary.id, dynamic_quote_id: q.dynamic_quote_id, instruction: selectedInstruction,
+    });
+    expect(result.current.review?.instruction).toEqual(selectedInstruction);
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clears Review and accepted consent when source of funds changes while retaining the quote", async () => {
+    const { result } = mount(); await ready(result); await enterAndQuote(result); await prepareReview(result);
+    const q = result.current.quote!;
+    act(() => result.current.setAccepted(true));
+    expect(result.current.accepted).toBe(true);
+    act(() => result.current.changeInstruction("source_of_funds", "Personal Savings"));
+    expect(result.current.quote).toBe(q); expect(result.current.quoteState).toBe("valid");
+    expect(result.current.review).toBeNull(); expect(result.current.accepted).toBe(false);
+    expect(result.current.executableAmountModes).toEqual([]);
+    render(<DynamicReviewStep payment={result.current} onBack={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Submit payment" })).not.toBeInTheDocument();
+    await act(async () => { await result.current.submit(); });
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("rejects a raw newline in the reference before sending Review", async () => {
+    const { result } = mount(); await ready(result); await enterAndQuote(result);
+    act(() => {
+      result.current.changeInstruction("purpose_code", instruction.purpose_code);
+      result.current.changeInstruction("source_of_funds", instruction.source_of_funds);
+      result.current.changeInstruction("comment", "Invoice\n");
+    });
+    await act(async () => { await result.current.getReview(); });
+    expect(result.current.instruction.comment).toBe("Invoice\n");
+    expect(result.current.error).toContain("control characters");
+    expect(result.current.quoteState).toBe("valid");
+    expect(result.current.review).toBeNull();
+    expect(api.dynamicReview).not.toHaveBeenCalled(); expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("ignores an old beneficiary's catalogue and clears instructions on a rail change", async () => {
+    const old = deferred<{ data: { code: string; label: string }[] }>();
+    api.getNiumPurposeCodes.mockReturnValueOnce(old.promise);
+    const { result, rerender } = mount(); await ready(result);
+    act(() => {
+      result.current.changeInstruction("purpose_code", "OLD");
+      result.current.changeInstruction("source_of_funds", instruction.source_of_funds);
+      result.current.changeInstruction("comment", instruction.comment);
+    });
+    rerender({ selected: { ...beneficiary, payout_method: "SWIFT" }, balances: [wallet] });
+    await waitFor(() => expect(result.current.purposeStatus).toBe("ready"));
+    await act(async () => { old.resolve({ data: [{ code: "OLD", label: "Old catalogue" }] }); await old.promise; });
+    expect(result.current.purposeOptions.map((option) => option.code)).toEqual([instruction.purpose_code]);
+    expect(result.current.instruction).toEqual({ purpose_code: "", source_of_funds: "", comment: "" });
+    expect(result.current.review).toBeNull(); expect(result.current.accepted).toBe(false);
+  });
+
+  it("clears instructions on a user currency change", async () => {
+    const { result } = mount(); await ready(result); await prepareReview(result);
+    act(() => result.current.changeCurrency(""));
+    expect(result.current.instruction).toEqual({ purpose_code: "", source_of_funds: "", comment: "" });
+    expect(result.current.quote).toBeNull(); expect(result.current.review).toBeNull();
+  });
+
+  it.each([undefined, { data: [{ code: "", label: "Missing code" }] },
+    { data: [{ code: "A", label: "One" }, { code: "A", label: "Duplicate" }] }])(
+    "fails closed for an invalid catalogue response %j", async (response) => {
+      api.getNiumPurposeCodes.mockResolvedValueOnce(response);
+      const { result } = mount(); await ready(result);
+      await waitFor(() => expect(result.current.purposeStatus).toBe("error"));
+      expect(result.current.purposeOptions).toEqual([]); expect(result.current.invalidPurpose).not.toBe("");
+    });
+
+  it("keeps the amount debounce while a pre-quote instruction is edited", async () => {
+    const { result } = mount(); await ready(result); vi.useFakeTimers();
+    act(() => result.current.changeSendAmount("1000"));
+    await advanceQuoteClock(250);
+    act(() => result.current.changeInstruction("comment", "Before quote"));
+    await advanceQuoteClock(250);
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(1);
+    expect(result.current.quoteState).toBe("valid"); expect(result.current.instruction.comment).toBe("Before quote");
+  });
+
+  it.each([["comment", "Changed during Review"], ["source_of_funds", "Personal Savings"], ["purpose_code", "CORRIDOR-SPECIFIC"]] as const)(
+    "keeps an in-flight quote while editing instructions and rejects a late Review after changing %s", async (field, value) => {
+    const response = deferred<DynamicQuote>(); api.dynamicQuote.mockReturnValueOnce(response.promise);
+    const { result } = mount(); await ready(result);
+    act(() => result.current.changeSendAmount("1000"));
+    let request!: ReturnType<typeof result.current.getQuote>;
+    act(() => { request = result.current.getQuote(); });
+    const signal = api.dynamicQuote.mock.calls[0][2] as AbortSignal;
+    act(() => result.current.changeInstruction("comment", "During quote"));
+    expect(signal.aborted).toBe(false); expect(result.current.busy).toBe(true);
+    await act(async () => { response.resolve(quote()); await request; });
+    expect(result.current.quoteState).toBe("valid"); expect(result.current.instruction.comment).toBe("During quote");
+    const q = result.current.quote!;
+    const late = deferred<DynamicReview>(); api.dynamicReview.mockReturnValueOnce(late.promise);
+    act(() => {
+      result.current.changeInstruction("purpose_code", instruction.purpose_code);
+      result.current.changeInstruction("source_of_funds", instruction.source_of_funds);
+    });
+    let reviewRequest!: ReturnType<typeof result.current.getReview>;
+    act(() => { reviewRequest = result.current.getReview(); });
+    expect(result.current.busy).toBe(true);
+    expect(api.dynamicReview).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, {
+      beneficiary_id: beneficiary.id, dynamic_quote_id: q.dynamic_quote_id,
+      instruction: { ...instruction, comment: "During quote" },
+    });
+    act(() => result.current.changeInstruction(field, value));
+    expect(result.current.busy).toBe(false);
+    let reviewed: boolean | undefined;
+    await act(async () => {
+      late.resolve({ ...review(q), instruction: { ...instruction, comment: "During quote" } });
+      reviewed = await reviewRequest;
+    });
+    expect(reviewed).toBeUndefined();
+    expect(result.current.quote).toBe(q); expect(result.current.quoteState).toBe("valid");
+    expect(result.current.instruction[field]).toBe(value);
+    expect(result.current.review).toBeNull(); expect(result.current.accepted).toBe(false);
+    expect(result.current.executableAmountModes).toEqual([]); expect(result.current.busy).toBe(false);
+    render(<DynamicReviewStep payment={result.current} onBack={() => {}} />);
+    expect(screen.queryByRole("region", { name: "Authoritative payment review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit payment" })).not.toBeInTheDocument();
+    act(() => result.current.setAccepted(true));
+    expect(result.current.accepted).toBe(false);
+    await act(async () => { await result.current.submit(); });
+    expect(api.dynamicQuote).toHaveBeenCalledTimes(1); expect(api.dynamicReview).toHaveBeenCalledTimes(1);
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+});
 
 describe("bidirectional Dynamic quote state", () => {
   it.each([undefined, {}, { USD: 2 }, { USD: 2, GBP: "2" }, { USD: 2, GBP: 3 }, { USD: 2, GBP: -1 }])("refuses missing or unsupported authoritative scales: %j", async (scales) => {

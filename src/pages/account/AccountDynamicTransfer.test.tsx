@@ -102,6 +102,130 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); clients.splice(0).forEach((client) => client.clear()); sessionStorage.clear(); localStorage.clear(); vi.restoreAllMocks(); });
 
+describe("Dynamic instruction fields before Quote", () => {
+  it("shows all fields before quoting, displays the backend label and keeps the wire code without a default", async () => {
+    mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
+    await screen.findByRole("option", { name: "Payment purpose" });
+    const purpose = screen.getByRole("combobox", { name: "Payment purpose code" });
+    expect(purpose).toHaveValue("");
+    expect(screen.getByLabelText("Source of funds")).toHaveValue("");
+    const sourceOfFunds = screen.getByRole("combobox", { name: "Source of funds" });
+    expect(within(sourceOfFunds).getAllByRole("option").map((option) => ({ value: (option as HTMLOptionElement).value, label: option.textContent })))
+      .toEqual([
+        { value: "", label: "Select source of funds" },
+        ...["Salary", "Personal Savings", "Personal Wealth", "Retirement Funds", "Business Owner/Shareholder",
+          "Loan Facility", "Personal Account", "Corporate Account"].map((value) => ({ value, label: value })),
+      ]);
+    const reference = screen.getByRole("textbox", { name: "Payment reference" });
+    expect(reference).toHaveAttribute("maxlength", "255");
+    fireEvent.change(purpose, { target: { value: instruction.purpose_code } });
+    fireEvent.change(screen.getByLabelText("Source of funds"), { target: { value: instruction.source_of_funds } });
+    fireEvent.change(reference, { target: { value: instruction.comment } });
+    expect(purpose).toHaveValue(instruction.purpose_code);
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "Quoted payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit payment" })).not.toBeInTheDocument();
+    expect(api.dynamicQuote).not.toHaveBeenCalled(); expect(api.dynamicReview).not.toHaveBeenCalled();
+  });
+
+  it("shows purpose loading independently and preserves a reference typed before the catalogue returns", async () => {
+    let resolve!: (value: { data: { code: string; label: string }[] }) => void;
+    api.getNiumPurposeCodes.mockReturnValueOnce(new Promise((yes) => { resolve = yes; }));
+    mount(); fireEvent.click(await screen.findByRole("button", { name: /GBP Payee/ }));
+    await screen.findByRole("option", { name: "GBP" });
+    expect(screen.getByText("Loading payment purposes…")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Payment purpose code" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Payment reference"), { target: { value: "Typed before catalogue" } });
+    resolve({ data: [{ code: instruction.purpose_code, label: "Backend purpose" }] });
+    await screen.findByRole("option", { name: "Backend purpose" });
+    expect(screen.getByLabelText("Payment reference")).toHaveValue("Typed before catalogue");
+    expect(screen.getByRole("combobox", { name: "Payment purpose code" })).toHaveValue("");
+  });
+
+  it.each(["error", "empty"])("blocks Review for a purpose catalogue %s without adding fallback values", async (state) => {
+    if (state === "error") api.getNiumPurposeCodes.mockRejectedValueOnce(new Error("Catalogue unavailable"));
+    else api.getNiumPurposeCodes.mockResolvedValueOnce({ data: [] });
+    mount(); await quotePayment();
+    expect(screen.getByText(state === "error"
+      ? "Payment purposes are temporarily unavailable. Reopen payment details to try again."
+      : "No payment purposes are currently available.")).toBeVisible();
+    const purpose = screen.getByRole("combobox", { name: "Payment purpose code" });
+    expect(purpose).toBeDisabled(); expect(within(purpose).getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    expect(api.dynamicReview).not.toHaveBeenCalled();
+  });
+
+  it.each(["", " Invoice", "Invoice ", "ก".repeat(86)])(
+    "keeps backend reference validation for %j", async (comment) => {
+      mount(); await quotePayment();
+      fireEvent.change(screen.getByLabelText("Payment purpose code"), { target: { value: instruction.purpose_code } });
+      fireEvent.change(screen.getByLabelText("Source of funds"), { target: { value: instruction.source_of_funds } });
+      fireEvent.change(screen.getByLabelText("Payment reference"), { target: { value: comment } });
+      expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+      expect(api.dynamicReview).not.toHaveBeenCalled();
+    });
+
+  it("uses the single-line reference value after the browser removes a newline", async () => {
+    const q = makeQuote();
+    api.dynamicQuote.mockResolvedValueOnce(q);
+    mount(); await quotePayment();
+    fireEvent.change(screen.getByLabelText("Payment purpose code"), { target: { value: instruction.purpose_code } });
+    fireEvent.change(screen.getByLabelText("Source of funds"), { target: { value: instruction.source_of_funds } });
+    const reference = screen.getByLabelText("Payment reference");
+    // A text input strips CR/LF before onChange; raw control-character rejection is covered at the hook/terms boundary.
+    fireEvent.change(reference, { target: { value: "Invoice\n" } });
+    expect(reference).toHaveValue(instruction.comment);
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    await screen.findByRole("region", { name: "Authoritative payment review" });
+    expect(api.dynamicReview).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, {
+      beneficiary_id: 4, dynamic_quote_id: q.dynamic_quote_id, instruction,
+    });
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("requires source of funds and sends an exact 255-byte reference through the existing payload", async () => {
+    const q = makeQuote();
+    api.dynamicQuote.mockResolvedValueOnce(q);
+    mount(); await quotePayment();
+    fireEvent.change(screen.getByLabelText("Payment purpose code"), { target: { value: instruction.purpose_code } });
+    const comment = "a".repeat(255);
+    api.dynamicReview.mockResolvedValueOnce({ ...makeReview(q), instruction: { ...instruction, comment } });
+    fireEvent.change(screen.getByLabelText("Payment reference"), { target: { value: comment } });
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Source of funds"), { target: { value: instruction.source_of_funds } });
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    await waitFor(() => expect(api.dynamicReview).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, {
+      beneficiary_id: 4, dynamic_quote_id: q.dynamic_quote_id, instruction: { ...instruction, comment },
+    }));
+    await screen.findByRole("region", { name: "Authoritative payment review" });
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+
+  it("sends a selected source of funds unchanged and offers no unlisted value", async () => {
+    const q = makeQuote(); api.dynamicQuote.mockResolvedValueOnce(q);
+    const selectedInstruction = { ...instruction, source_of_funds: "Business Owner/Shareholder" };
+    api.dynamicReview.mockResolvedValueOnce({ ...makeReview(q), instruction: selectedInstruction });
+    mount(); await quotePayment();
+    fireEvent.change(screen.getByLabelText("Payment purpose code"), { target: { value: instruction.purpose_code } });
+    fireEvent.change(screen.getByLabelText("Payment reference"), { target: { value: instruction.comment } });
+    const sourceOfFunds = screen.getByRole("combobox", { name: "Source of funds" });
+    expect(sourceOfFunds).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    fireEvent.change(sourceOfFunds, { target: { value: "UNLISTED" } });
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    expect(api.dynamicReview).not.toHaveBeenCalled();
+    fireEvent.change(sourceOfFunds, { target: { value: selectedInstruction.source_of_funds } });
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    const reviewRegion = await screen.findByRole("region", { name: "Authoritative payment review" });
+    expect(within(reviewRegion).getByText(`Source of funds: ${selectedInstruction.source_of_funds}`)).toBeVisible();
+    expect(api.dynamicReview).toHaveBeenCalledWith({ userId: "12", token: "customer-token" }, {
+      beneficiary_id: 4, dynamic_quote_id: q.dynamic_quote_id, instruction: selectedInstruction,
+    });
+    expect(api.dynamicSubmit).not.toHaveBeenCalled();
+  });
+});
+
 describe("Move funds Dynamic payment", () => {
   it("finds a payment after complete browser identity loss using recent listing and a selected GET status", async () => {
     api.dynamicTransfers.mockResolvedValueOnce({ data: [makeTransfer("pending_provider_confirmation")], page: 1, per_page: 20, has_more: true, next_page: 2 });
@@ -611,7 +735,7 @@ describe("Move funds Dynamic payment", () => {
     api.dynamicQuote.mockResolvedValueOnce({ ...makeQuote(), quote_expires_at: new Date(Date.now() - 1000).toISOString() });
     fireEvent.change(screen.getByLabelText("You send"), { target: { value: "1000.00" } });
     await screen.findByText("Quote expired. Edit an amount to get a new quote.");
-    expect(screen.queryByRole("button", { name: "Review payment" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
     expect(api.dynamicReview).not.toHaveBeenCalled();
   });
 
