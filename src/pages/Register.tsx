@@ -1,325 +1,90 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { AlertCircle, Loader2, Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthMessages, useAuthWait } from "@/components/auth/AuthCeremony";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
-
-const getAuthErrorMessage = (error: unknown, fallback: string) => {
-  const message = error instanceof Error ? error.message : fallback;
-  return message || fallback;
-};
 
 const phoneCountryOptions = [
-  { label: "Vietnam (+84)", value: "+84" },
-  { label: "Hong Kong (+852)", value: "+852" },
-  { label: "Singapore (+65)", value: "+65" },
-  { label: "United States (+1)", value: "+1" },
+  { label: "Vietnam (+84)", value: "+84" }, { label: "Hong Kong (+852)", value: "+852" },
+  { label: "Singapore (+65)", value: "+65" }, { label: "United States (+1)", value: "+1" },
   { label: "United Kingdom (+44)", value: "+44" },
 ];
-
 const toE164Phone = (callingCode: string, localPhone: string) => {
   const code = callingCode.replace(/\D/g, "");
   const number = localPhone.replace(/\D/g, "").replace(/^0+/, "");
-  return code && number ? `+${code}${number}` : "";
+  return code && number ? "+" + code + number : "";
 };
 
-const Register = () => {
+export default function Register() {
+  const { register, verifyRegister, registration, leaveRegistration, cancelCeremony, busy, loading, user } = useAuth();
   const navigate = useNavigate();
-  const { register, verifyRegister, authError, clearAuthError } = useAuth();
-
-  const [step, setStep] = useState<"form" | "verify">("form");
+  const wait = useAuthWait();
   const [fullName, setFullName] = useState("");
-  const [phoneCallingCode, setPhoneCallingCode] = useState("+84");
-  const [localPhone, setLocalPhone] = useState("");
+  const [callingCode, setCallingCode] = useState("+84");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [notice, setNotice] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  const [isEmailLoading, setIsEmailLoading] = useState(false);
-  const [isVerifyLoading, setIsVerifyLoading] = useState(false);
-
   useEffect(() => {
-    clearAuthError();
-    setError("");
-    setNotice("");
-  }, [clearAuthError]);
-
-  const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
+    if (user) navigate("/account", { replace: true });
+    else if (registration?.verified) navigate("/login", { replace: true });
+  }, [navigate, registration?.verified, user]);
+  useEffect(() => leaveRegistration, [leaveRegistration]);
+  const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (busy || wait > 0 || loading) return;
     setError("");
-    setNotice("");
-
-    if (password !== confirmPassword) {
-      setError("Password confirmation does not match.");
-      return;
-    }
-
-    const phone = toE164Phone(phoneCallingCode, localPhone);
-    if (!phone) {
-      setError("Enter a valid phone number.");
-      return;
-    }
-
-    setIsEmailLoading(true);
-
-    try {
-      const challenge = await register({
-        fullName: fullName.trim(),
-        phone,
-        email: email.trim(),
-        password,
-        passwordConfirmation: confirmPassword,
-      });
-      setEmail(challenge.email || email.trim());
-      setNotice(challenge.message || "Verification code sent to your email.");
-      setStep("verify");
-    } catch (authFailure) {
-      setError(getAuthErrorMessage(authFailure, "Unable to create account."));
-    } finally {
-      setIsEmailLoading(false);
-    }
+    if (password !== confirmation) { setError("Password confirmation does not match."); return; }
+    const formattedPhone = toE164Phone(callingCode, phone);
+    if (!formattedPhone) { setError("Enter a valid phone number."); return; }
+    const value = password;
+    const confirmed = confirmation;
+    setPassword(""); setConfirmation("");
+    void register({ fullName: fullName.trim(), phone: formattedPhone, email: email.trim(), password: value, passwordConfirmation: confirmed });
   };
-
-  const handleVerifyRegister = async (event: FormEvent<HTMLFormElement>) => {
+  const verify = (event: FormEvent) => {
     event.preventDefault();
-    setError("");
-    setIsVerifyLoading(true);
-
-    try {
-      await verifyRegister(email.trim(), verificationCode.trim());
-      navigate("/account");
-    } catch (authFailure) {
-      setError(getAuthErrorMessage(authFailure, "Unable to verify registration."));
-    } finally {
-      setIsVerifyLoading(false);
-    }
+    if (busy || wait > 0 || !registration) return;
+    const value = code;
+    setCode(""); setError("");
+    void verifyRegister(registration.email, value);
   };
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_bottom_left,_rgba(14,165,233,0.12),_transparent_30%),linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#eff6ff_100%)] p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="w-full max-w-md"
-      >
-        <Card className="border border-slate-200 bg-white/95 shadow-2xl backdrop-blur">
-          <CardHeader className="space-y-4 pb-3 text-center">
-            <div className="flex justify-center">
-              <img src="/logo/logo.jpg" alt="Origin Wallet" className="h-16 w-16 rounded-2xl object-cover" />
-            </div>
-            <div className="space-y-2">
-              <CardTitle className="text-2xl font-bold text-slate-900">
-                {step === "form" ? "Create your account" : "Verify your email"}
-              </CardTitle>
-              <CardDescription className="text-base leading-7 text-slate-600">
-                {step === "form"
-                  ? "Register with your details or continue with Google."
-                  : `Enter the verification code sent to ${email}.`}
-              </CardDescription>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-5">
-            {(error || authError) && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error || authError}</span>
-              </div>
-            )}
-
-            {notice && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                {notice}
-              </div>
-            )}
-
-            {step === "form" ? (
-              <>
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="fullName"
-                        type="text"
-                        value={fullName}
-                        onChange={(event) => setFullName(event.target.value)}
-                        placeholder="Jane Doe"
-                        className="h-12 pl-10"
-                        autoComplete="name"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <div className="grid grid-cols-[160px_minmax(0,1fr)] gap-2">
-                      <select
-                        aria-label="Country calling code"
-                        value={phoneCallingCode}
-                        onChange={(event) => setPhoneCallingCode(event.target.value)}
-                        className="h-12 rounded-md border border-slate-200 bg-white px-3 text-sm"
-                      >
-                        {phoneCountryOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={localPhone}
-                        onChange={(event) => setLocalPhone(event.target.value)}
-                        placeholder="901234567"
-                        className="h-12 pl-10"
-                        autoComplete="tel"
-                        required
-                      />
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500">Stored as {toE164Phone(phoneCallingCode, localPhone) || "an E.164 phone number"}.</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        placeholder="you@example.com"
-                        className="h-12 pl-10"
-                        autoComplete="email"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Minimum 6 characters"
-                        className="h-12 pl-10"
-                        autoComplete="new-password"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        placeholder="Re-enter your password"
-                        className="h-12 pl-10"
-                        autoComplete="new-password"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button type="submit" disabled={isEmailLoading} className="h-12 w-full bg-green-600 hover:bg-green-700">
-                    {isEmailLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create account with email
-                  </Button>
-                </form>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-slate-200" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-3 text-slate-400">Or</span>
-                  </div>
-                </div>
-
-                <GoogleSignInButton
-                  onSuccess={() => navigate("/account")}
-                  onError={(message) => setError(getAuthErrorMessage(new Error(message), "Unable to register with Google."))}
-                />
-              </>
-            ) : (
-              <form onSubmit={handleVerifyRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="verificationCode">Verification code</Label>
-                  <div className="relative">
-                    <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="verificationCode"
-                      value={verificationCode}
-                      onChange={(event) => setVerificationCode(event.target.value)}
-                      placeholder="Enter the 6-digit code"
-                      className="h-12 pl-10 tracking-[0.3em]"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={isVerifyLoading} className="h-12 w-full bg-green-600 hover:bg-green-700">
-                  {isVerifyLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Verify and continue
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-12 w-full"
-                  onClick={() => {
-                    setStep("form");
-                    setVerificationCode("");
-                    setNotice("");
-                    setError("");
-                    clearAuthError();
-                  }}
-                >
-                  Back
-                </Button>
-              </form>
-            )}
-
-            <p className="text-center text-sm text-slate-500">
-              Already have an account?{" "}
-              <Link to="/login" className="font-semibold text-green-700 hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
-
-        <div className="mt-6 text-center">
-          <Link to="/" className="text-sm text-slate-500 hover:text-slate-800">
-            Back to home
-          </Link>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
-export default Register;
+  return <div translate="no" className="notranslate flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#eff6ff_100%)] p-4 py-10">
+    <Card className="w-full max-w-md border-slate-200 bg-white shadow-xl">
+      <CardHeader className="text-center">
+        <img src="/logo/logo.jpg" alt="Origin Wallet" className="mx-auto h-16 w-16 rounded-2xl object-cover" />
+        <CardTitle className="text-2xl">{registration ? "Verify your email" : "Create your account"}</CardTitle>
+        <CardDescription>{registration ? "Enter the registration email code. Then sign in with your password to set up Google Authenticator." : "Register with your details. Email verification and Google Authenticator enrollment are required before account access."}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <AuthMessages />{error && <p role="alert">{error}</p>}
+        {loading ? <p role="status">Validating account session…</p> : registration ? <form onSubmit={verify} className="space-y-4">
+          <p className="text-sm">Verification email: {registration.email}</p>
+          <Label htmlFor="registration-code">Registration email code</Label>
+          <Input id="registration-code" inputMode="numeric" type="text" maxLength={6} pattern="[0-9]{6}" value={code}
+            onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} required autoComplete="off" disabled={busy || wait > 0} />
+          <Button type="submit" disabled={busy || wait > 0}>{busy ? "Please wait…" : "Verify email"}</Button>
+          <Button type="button" variant="outline" onClick={() => { setCode(""); cancelCeremony(); }}>Cancel registration</Button>
+        </form> : <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-2"><Label htmlFor="full-name">Full name</Label><Input id="full-name" maxLength={255} required value={fullName} onChange={event => setFullName(event.target.value)} disabled={busy || wait > 0} autoComplete="name" /></div>
+          <div className="space-y-2"><Label htmlFor="calling-code">Calling code</Label><select id="calling-code" value={callingCode} onChange={event => setCallingCode(event.target.value)} disabled={busy || wait > 0} className="w-full rounded-md border p-2">{phoneCountryOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+          <div className="space-y-2"><Label htmlFor="phone">Phone number</Label><Input id="phone" type="tel" maxLength={24} required value={phone} onChange={event => setPhone(event.target.value)} disabled={busy || wait > 0} autoComplete="tel-national" /></div>
+          <div className="space-y-2"><Label htmlFor="register-email">Email</Label><Input id="register-email" type="email" maxLength={255} required value={email} onChange={event => setEmail(event.target.value)} disabled={busy || wait > 0} autoComplete="username" /></div>
+          <div className="space-y-2"><Label htmlFor="register-password">Password</Label><Input id="register-password" type="password" minLength={6} required value={password} onChange={event => setPassword(event.target.value)} disabled={busy || wait > 0} autoComplete="new-password" /></div>
+          <div className="space-y-2"><Label htmlFor="confirm-password">Confirm password</Label><Input id="confirm-password" type="password" minLength={6} required value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={busy || wait > 0} autoComplete="new-password" /></div>
+          <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={busy || wait > 0}>{busy ? "Please wait…" : "Create account with email"}</Button>
+          {busy && <Button type="button" variant="outline" onClick={cancelCeremony}>Cancel registration</Button>}
+        </form>}
+        <GoogleSignInButton />
+        <p className="text-sm">Already have an account? <Link to="/login" className="text-green-700">Sign in</Link></p>
+        <Link to="/" className="text-sm text-slate-600">Back to home</Link>
+      </CardContent>
+    </Card>
+  </div>;
+}

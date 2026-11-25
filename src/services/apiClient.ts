@@ -15,6 +15,7 @@ export type ApiRequestOptions = {
 };
 
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+export const customerUnauthorizedEvent = "origin-wallet-customer-unauthorized";
 
 export class ApiRequestError extends Error {
   status: number;
@@ -96,6 +97,9 @@ export const requestApi = async <TResponse>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && token && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(customerUnauthorizedEvent, { detail: { token } }));
+    }
     const error = await getResponseError(response);
     throw new ApiRequestError(error.message, response.status, error.errors, error.payload);
   }

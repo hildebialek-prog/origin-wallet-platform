@@ -97,7 +97,7 @@ const Layout = () => {
                 <div className="border-t border-emerald-100 bg-emerald-50/55 px-4 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                   <p className="flex items-center gap-1 text-xs text-emerald-900/65 dark:text-emerald-100/70">
                     <Globe className="h-3 w-3" />
-                    Translated by Google
+                    Language preference (translation temporarily unavailable)
                   </p>
                 </div>
               </div>

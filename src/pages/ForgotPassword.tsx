@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthWait } from "@/components/auth/AuthCeremony";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,9 @@ import { Label } from "@/components/ui/label";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
-  const { requestPasswordReset, resetPassword, authError, clearAuthError } = useAuth();
+  const { requestPasswordReset, resetPassword, authError, clearAuthError, cancelCeremony, busy } = useAuth();
+  const wait = useAuthWait();
+  const redirectTimer = useRef<number | undefined>();
   const [step, setStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -27,8 +30,14 @@ const ForgotPassword = () => {
     setSuccess("");
   }, [clearAuthError]);
 
+  useEffect(() => () => {
+    window.clearTimeout(redirectTimer.current);
+    cancelCeremony();
+  }, [cancelCeremony]);
+
   const handleRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy || wait > 0) return;
     setError("");
     setSuccess("");
     setIsSubmitting(true);
@@ -48,6 +57,7 @@ const ForgotPassword = () => {
 
   const handleReset = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy || wait > 0) return;
     setError("");
     setSuccess("");
 
@@ -57,19 +67,18 @@ const ForgotPassword = () => {
     }
 
     setIsResetting(true);
+    const resetValues = { email: email.trim(), verificationCode: verificationCode.trim(), password, passwordConfirmation: confirmPassword };
+    setVerificationCode("");
+    setPassword("");
+    setConfirmPassword("");
 
     try {
-      const message = await resetPassword({
-        email: email.trim(),
-        verificationCode: verificationCode.trim(),
-        password,
-        passwordConfirmation: confirmPassword,
-      });
+      const message = await resetPassword(resetValues);
       setSuccess(message || "Password reset successful. Redirecting to sign in...");
       setVerificationCode("");
       setPassword("");
       setConfirmPassword("");
-      window.setTimeout(() => {
+      redirectTimer.current = window.setTimeout(() => {
         navigate("/login", { replace: true });
       }, 1200);
     } catch (resetError) {
@@ -81,7 +90,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.14),_transparent_28%),linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f0fdf4_100%)] p-4">
+    <div translate="no" className="notranslate flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.14),_transparent_28%),linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f0fdf4_100%)] p-4">
       <motion.div
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -104,10 +113,12 @@ const ForgotPassword = () => {
           </CardHeader>
 
           <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">Your authenticator remains required after password reset. A reset code cannot sign you in.</p>
+            {wait > 0 && <p role="status">Try again in {wait} seconds.</p>}
             {(error || authError) && (
               <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error || authError}</span>
+                <span role="alert">{authError || error}</span>
               </div>
             )}
 
@@ -137,7 +148,7 @@ const ForgotPassword = () => {
                   </div>
                 </div>
 
-                <Button type="submit" disabled={isSubmitting} className="h-12 w-full bg-green-600 hover:bg-green-700">
+                <Button type="submit" disabled={isSubmitting || busy || wait > 0} className="h-12 w-full bg-green-600 hover:bg-green-700">
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Send reset code
                 </Button>
@@ -155,7 +166,9 @@ const ForgotPassword = () => {
                       placeholder="Enter the 6-digit code"
                       className="pl-10 tracking-[0.3em]"
                       inputMode="numeric"
-                      autoComplete="one-time-code"
+                      autoComplete="off"
+                      maxLength={6}
+                      pattern="[0-9]{6}"
                       required
                     />
                   </div>
@@ -195,7 +208,7 @@ const ForgotPassword = () => {
                   </div>
                 </div>
 
-                <Button type="submit" disabled={isResetting} className="h-12 w-full bg-green-600 hover:bg-green-700">
+                <Button type="submit" disabled={isResetting || busy || wait > 0} className="h-12 w-full bg-green-600 hover:bg-green-700">
                   {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Reset password
                 </Button>
@@ -205,6 +218,8 @@ const ForgotPassword = () => {
                   variant="outline"
                   className="h-12 w-full"
                   onClick={() => {
+                    window.clearTimeout(redirectTimer.current);
+                    cancelCeremony();
                     setStep("request");
                     setVerificationCode("");
                     setPassword("");

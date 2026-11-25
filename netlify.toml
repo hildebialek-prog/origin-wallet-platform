@@ -1,6 +1,8 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Vite emits dist/_headers with enforcing CSP for every path. Publish the
+  # complete build artifact; scripts/prerender.mjs preserves that headers file.
 
 [[redirects]]
   from = "https://www.originwallet.asia/*"

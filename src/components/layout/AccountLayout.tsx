@@ -87,9 +87,9 @@ const AccountLayout = () => {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/login", { replace: true });
+      navigate("/login", { replace: true, state: { from: location.pathname } });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, location.pathname]);
 
   useEffect(() => setMobileNavOpen(false), [location.pathname]);
 

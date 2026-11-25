@@ -1,6 +1,7 @@
 import { ChevronDown, Globe, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
+import AuthenticatorSecurity from "@/components/auth/AuthenticatorSecurity";
 import { LANGUAGES, type Language, useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -113,6 +114,7 @@ const AccountSettings = () => {
           </div>
         ) : (
           <div className="space-y-4">
+            <AuthenticatorSecurity />
             <Card className="rounded-2xl border border-[#d7d7d2] bg-white shadow-none dark:border-white/10 dark:bg-[#1b2027]">
               <CardContent className="flex items-center justify-between p-5">
                 <div className="text-[1.15rem] font-medium text-[#0f2442] dark:text-white">Update password</div>

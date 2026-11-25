@@ -103,7 +103,7 @@ const LanguageSelector = ({ variant = "desktop", compact = false }: LanguageSele
           {/* Footer info */}
           <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border-t text-xs text-muted-foreground flex items-center gap-1">
             <Globe className="w-3 h-3" />
-            Translated by Google
+            Language preference (translation temporarily unavailable)
           </div>
         </div>
       )}
