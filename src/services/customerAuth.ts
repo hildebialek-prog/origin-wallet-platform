@@ -17,7 +17,8 @@ export interface AuthChallenge {
 }
 export interface AuthResult extends Omit<Partial<AuthChallenge>, "next_action">, Partial<AuthResponse> {
   next_action?: string;
-  policy_pending?: boolean;
+  support_required?: boolean;
+  resend_after_seconds?: number;
   proof_expires_in_seconds?: number;
   registration_version?: string;
   email?: string;

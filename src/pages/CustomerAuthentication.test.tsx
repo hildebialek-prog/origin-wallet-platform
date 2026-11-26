@@ -109,25 +109,37 @@ describe("Customer mandatory Google Authenticator UI and route guards", () => {
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/challenges/cancel"))).toBe(true);
   });
 
-  it("shows the approval gate when Customer enrollment policy is inactive", async () => {
+  it("shows a support message when email ownership cannot safely be established", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
-      .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: [], policy_pending: true }));
+      .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: [], support_required: true }));
     renderLogin();
     await enterCredentials();
-    expect(await screen.findByText(/Enrollment policy is unavailable/)).toBeInTheDocument();
+    expect(await screen.findByText(/We cannot safely verify an established email ownership channel/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Verify" })).not.toBeInTheDocument();
     expect(screen.queryByRole("img", { name: /Scan/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("protected")).not.toBeInTheDocument();
   });
 
-  it("renders backend QR/key and one-time codes, requiring an explicit save acknowledgment before access", async () => {
+  it("rejects obsolete grant-only enrollment methods without offering an approval input", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
-      .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: ["operator_grant"], policy_pending: false }));
+      .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: ["operator_grant"] }));
     renderLogin();
     await enterCredentials();
-    await screen.findByLabelText("Approved operator grant");
+    await screen.findByText(/We cannot safely verify an established email ownership channel/);
+    expect(screen.queryByLabelText("Approved operator grant")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verify" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Use an approved replacement grant/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("protected")).not.toBeInTheDocument();
+  });
+
+  it("renders backend QR/key and one-time codes, requiring an explicit save acknowledgment before access", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
+      .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: ["enrollment_email_proof"], support_required: false }));
+    renderLogin();
+    await enterCredentials();
+    await screen.findByLabelText("Enrollment email code");
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", "b".repeat(64))));
-    fireEvent.change(screen.getByLabelText("Approved operator grant"), { target: { value: "c".repeat(64) } });
+    fireEvent.change(screen.getByLabelText("Enrollment email code"), { target: { value: "000123" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     await screen.findByRole("button", { name: "Show authenticator setup" });
     vi.mocked(fetch).mockResolvedValueOnce(response({ ...challenge("enrollment_ready", "b".repeat(64)), qr_svg: "<svg/>", manual_key: "SYNTHETICSETUPKEY" }));
@@ -273,15 +285,15 @@ describe("Customer mandatory Google Authenticator UI and route guards", () => {
     expect(sessionStorage.getItem(customerAuthStorageKey)).toContain("replaced-token");
     expect(screen.queryByText("synthetic-code-0")).not.toBeInTheDocument();
   });
-  it.each(["registration_email_proof", "migration_email_proof"])("renders %s strictly for enrollment", async method => {
+  it.each(["registration_email_proof", "enrollment_email_proof"])("renders %s strictly for enrollment", async method => {
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
       .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: [method], proof_expires_in_seconds: 120 }));
     renderLogin();
     await enterCredentials();
-    const label = method === "registration_email_proof" ? "Registration email code" : "Enrollment email proof";
+    const label = method === "registration_email_proof" ? "Registration email code" : "Enrollment email code";
     await screen.findByLabelText(label);
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", "b".repeat(64))));
-    fireEvent.change(screen.getByLabelText(label), { target: { value: method === "registration_email_proof" ? "000123" : "e".repeat(32) } });
+    fireEvent.change(screen.getByLabelText(label), { target: { value: "000123" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByRole("button", { name: "Show authenticator setup" })).toBeInTheDocument();
     expect(sessionStorage.getItem(customerAuthStorageKey)).toBeNull();
@@ -289,7 +301,7 @@ describe("Customer mandatory Google Authenticator UI and route guards", () => {
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/login/verify") || String(url).endsWith("/login/resend"))).toBe(false);
   });
 
-  it("verifies registration email then requests a fresh password, without entering the account", async () => {
+  it("verifies registration email then directly enrolls with its original browser binding, without entering the account", async () => {
     renderLogin("/register");
     await screen.findByRole("button", { name: "Create account with email" });
     fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Customer User" } });
@@ -301,27 +313,35 @@ describe("Customer mandatory Google Authenticator UI and route guards", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create account with email" }));
     await screen.findByLabelText("Registration email code");
     expect(screen.queryByTestId("protected")).not.toBeInTheDocument();
-    vi.mocked(fetch).mockResolvedValueOnce(response({ next_action: "credentials_required" }, 201));
+    vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", "b".repeat(64)), 201));
     fireEvent.change(screen.getByLabelText("Registration email code"), { target: { value: "000123" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify email" }));
-    await screen.findByRole("button", { name: "Sign in" });
-    expect(screen.getByLabelText("Password")).toHaveValue("");
-    expect(screen.getByLabelText("Email")).toHaveValue(user.email);
+    await screen.findByRole("button", { name: "Show authenticator setup" });
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Enrollment email code")).not.toBeInTheDocument();
     expect(screen.queryByTestId("protected")).not.toBeInTheDocument();
     expect(sessionStorage.getItem(customerAuthStorageKey)).toBeNull();
     const calls = vi.mocked(fetch).mock.calls;
     const registerBody = JSON.parse(String(calls.find(([url]) => String(url).endsWith("/auth/register"))?.[1]?.body));
     const verifyBody = JSON.parse(String(calls.find(([url]) => String(url).endsWith("/register/verify"))?.[1]?.body));
     expect(verifyBody.client_binding).toBe(registerBody.client_binding);
-    vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
-      .mockResolvedValueOnce(response(challenge("enrollment_ready", "b".repeat(64))));
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "fresh-synthetic-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    await screen.findByRole("button", { name: "Show authenticator setup" });
-    const loginBody = JSON.parse(String(vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/auth/login"))?.[1]?.body));
-    expect(loginBody.client_binding).toBe(registerBody.client_binding);
-    expect(loginBody.password).toBe("fresh-synthetic-password");
+    expect(calls.some(([url]) => String(url).endsWith("/auth/login") || String(url).includes("/enrollment/identity/"))).toBe(false);
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...challenge("enrollment_ready", "b".repeat(64)), manual_key: "REGISTERKEY", qr_svg: "<svg/>" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show authenticator setup" }));
+    await screen.findByLabelText("Google Authenticator code");
+    const setupBody = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/enrollment/setup"))?.[1];
+    expect(setupBody?.headers).toMatchObject({ "X-Auth-Client-Binding": registerBody.client_binding });
     expect(screen.queryByTestId("protected")).not.toBeInTheDocument();
+    vi.mocked(fetch).mockResolvedValueOnce(response({ token: "registered-token", user, recovery_codes: codes }))
+      .mockResolvedValueOnce(response({ user }));
+    await verify();
+    await screen.findByRole("heading", { name: "Save your recovery codes" });
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(screen.queryByTestId("protected")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("I have saved my recovery codes"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByTestId("protected")).toBeInTheDocument();
+    expect(sessionStorage.getItem(customerAuthStorageKey)).toContain("registered-token");
   });
 
   it("preserves password-reset email/code UI and returns to mandatory-MFA sign-in", async () => {

@@ -107,7 +107,8 @@ export interface Ceremony {
   expiresAt: number;
   qrSvg?: string;
   manualKey?: string;
-  policyPending?: boolean;
+  supportRequired?: boolean;
+  resendAt?: number;
   intent?: SecurityIntent;
 }
 interface AuthContextType {
@@ -133,7 +134,8 @@ interface AuthContextType {
   recoveryCodes: string[];
   clearAuthError: () => void;
   login: (email: string, password: string) => Promise<void>;
-  submitProof: (proof: string, useGrant?: boolean) => Promise<void>;
+  submitProof: (proof: string) => Promise<void>;
+  resendIdentity: () => Promise<void>;
   startRecovery: () => Promise<void>;
   assistedRecovery: (email: string) => Promise<void>;
   cancelCeremony: () => void;
@@ -426,7 +428,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             discardResult(methods, binding);
             throw new AuthFailure(422, "The enrollment authorization response is invalid. Restart sign-in.");
           }
-          changeCeremony({ ...ceremonyRef.current!, policyPending: methods.policy_pending,
+          changeCeremony({ ...ceremonyRef.current!, supportRequired: methods.support_required,
+            resendAt: Date.now() + (methods.resend_after_seconds ?? 120) * 1000,
             expiresAt: Math.min(ceremonyRef.current!.expiresAt, Date.now() + (methods.proof_expires_in_seconds ?? Number.POSITIVE_INFINITY) * 1000),
             challenge: { ...ceremonyRef.current!.challenge, methods: methods.methods } });
         }
@@ -442,7 +445,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [acceptChallenge, run]);
 
-  const submitProof = useCallback(async (proof: string, useGrant = false) => {
+  const resendIdentity = useCallback(async () => {
+    await run(async call => {
+      const current = ceremonyRef.current;
+      if (!current || current.challenge.next_action !== "enrollment_identity_required"
+        || current.supportRequired || !current.challenge.methods.includes("enrollment_email_proof")
+        || Date.now() < (current.resendAt ?? 0)) return;
+      const result = await call("enrollment/identity/request", { challenge_token: current.challenge.challenge_token }, current.binding);
+      if (result.token || result.challenge_token || result.next_action !== "enrollment_identity_required"
+        || !result.methods?.includes("enrollment_email_proof")) {
+        discardResult(result, current.binding);
+        throw new AuthFailure(422, "Email ownership verification is unavailable. Restart sign-in or contact support.");
+      }
+      changeCeremony({ ...current, resendAt: Date.now() + (result.resend_after_seconds ?? 120) * 1000 });
+    });
+  }, [changeCeremony, run]);
+
+  const submitProof = useCallback(async (proof: string) => {
     await run(async call => {
       const current = ceremonyRef.current;
       if (!current || current.expiresAt <= Date.now()) throw new AuthFailure(422, "Authentication challenge expired. Restart sign-in.");
@@ -454,7 +473,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       if (action === "enrollment_identity_required" || action === "recovery_required") {
         const path = action === "recovery_required" ? "recovery/verify" : "enrollment/identity/verify";
-        acceptChallenge(await call(path, { ...bound, [action === "enrollment_identity_required" ? (useGrant ? "grant_token" : "identity_proof") : (useGrant ? "grant_token" : "recovery_code")]: proof }, binding), binding,
+        acceptChallenge(await call(path, { ...bound, [action === "enrollment_identity_required" ? "identity_proof" : "recovery_code"]: proof }, binding), binding,
           [action === "recovery_required" ? "replacement_required" : "enrollment_ready"]);
         return;
       }
@@ -511,7 +530,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const assistedRecovery = useCallback(async (email: string) => {
     await run(async call => {
       await call("recovery/request", { email });
-      setNotice("Recovery request recorded. Contact your established Origin Wallet support channel. This does not approve recovery or create a support ticket.");
+      setNotice("Contact your established Origin Wallet support channel. Automatic recovery is unavailable. This does not approve recovery or create a support ticket.");
     });
   }, [run]);
   const startStepUp = useCallback(async (password: string, intent: SecurityIntent) => {
@@ -576,17 +595,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const result = await call("register/verify", { email, verification_code: verificationCode,
         registration_version: current.version, client_binding: current.binding }, current.binding);
-      if (result.token || result.next_action !== "credentials_required") {
-        discardResult(result, current.binding);
-        throw new AuthFailure(422, "Registration returned an invalid response. Sign in with your password.");
-      }
-      // Retain only browser evidence, never the password or email code.
-      changeRegistration({ ...current, verified: true, expiresAt: Date.now() + 30 * 60000 });
-      setNotice("Email verified. Sign in with your password to enroll your authenticator.");
+      // Only a restricted, original-browser enrollment capability is accepted.
+      acceptChallenge(result, current.binding, ["enrollment_ready"]);
+      changeRegistration(null);
+      setNotice("Email verified. Set up Google Authenticator to complete registration.");
       return true;
     });
     return completed === true;
-  }, [changeRegistration, run]);
+  }, [acceptChallenge, changeRegistration, run]);
 
   const requestPasswordReset = useCallback(async (email: string): Promise<EmailChallenge> => {
     const result = await run(async call => {
@@ -725,9 +741,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo(() => ({ onboarding: session?.onboarding ?? null, providers: session?.providers ?? [], registration,
     register, verifyRegister, leaveRegistration, requestPasswordReset, resetPassword, signInWithGoogle, updateProfile, updatePassword, user: session?.user ?? null, token: session?.token ?? null, loading,
     authError, notice, busy, retryAt, ceremony, recoveryCodes, clearAuthError, login, submitProof,
-    startRecovery, assistedRecovery, cancelCeremony, leaveSecurity, acknowledgeCodes, startStepUp, getSecurity, logout, refreshSession }),
+    startRecovery, resendIdentity, assistedRecovery, cancelCeremony, leaveSecurity, acknowledgeCodes, startStepUp, getSecurity, logout, refreshSession }),
   [session, registration, register, verifyRegister, leaveRegistration, requestPasswordReset, resetPassword, signInWithGoogle, updateProfile, updatePassword, loading, authError, notice, busy, retryAt, ceremony, recoveryCodes, clearAuthError, login, submitProof,
-    startRecovery, assistedRecovery, cancelCeremony, leaveSecurity, acknowledgeCodes, startStepUp, getSecurity, logout, refreshSession]);
+    startRecovery, resendIdentity, assistedRecovery, cancelCeremony, leaveSecurity, acknowledgeCodes, startStepUp, getSecurity, logout, refreshSession]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 export const useAuth = () => {

@@ -19,7 +19,7 @@ const accountDestination = (value: unknown) => {
 };
 
 export default function Login() {
-  const { user, loading, login, busy, ceremony, recoveryCodes, registration, cancelCeremony, assistedRecovery } = useAuth();
+  const { user, loading, login, busy, ceremony, recoveryCodes, registration, cancelCeremony } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState(registration?.verified ? registration.email : "");
@@ -59,12 +59,7 @@ export default function Login() {
             {busy && <Button type="button" variant="outline" onClick={cancelCeremony}>Cancel and restart</Button>}
           </form>}
         {!loading && !recoveryCodes.length && <div className="space-y-2 border-t pt-4">
-          <p className="text-sm text-slate-600">Lost your authenticator and recovery codes? Record an assisted recovery request and contact your established support channel.</p>
-          <Label htmlFor="recovery-email">Recovery email</Label>
-          <Input id="recovery-email" type="email" maxLength={255} value={email} onChange={event => setEmail(event.target.value)}
-            disabled={busy || wait > 0} autoComplete="username" />
-          <Button type="button" variant="outline" disabled={busy || wait > 0 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())}
-            onClick={() => void assistedRecovery(email.trim())}>Request assisted recovery</Button>
+          <p className="text-sm text-slate-600">Lost your authenticator and all recovery codes? Contact your established Origin Wallet support channel. Automatic email-only recovery is unavailable.</p>
         </div>}
         <p className="text-sm text-slate-600">Resetting your password does not remove the authenticator requirement.</p>
         <GoogleSignInButton />

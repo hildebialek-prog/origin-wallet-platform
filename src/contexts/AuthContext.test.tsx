@@ -36,7 +36,7 @@ const beginLogin = async (hook: AuthHook) => {
 };
 const beginEnrollment = async (hook: AuthHook, pending = false) => {
   vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
-    .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: pending ? [] : ["operator_grant"], policy_pending: pending }));
+    .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: pending ? [] : ["enrollment_email_proof"], support_required: pending }));
   await act(async () => hook.result.current.login(customerUser.email, "synthetic-password"));
 };
 const expectNoSession = (hook: AuthHook) => {
@@ -104,22 +104,22 @@ describe("Customer mandatory MFA state and session isolation", () => {
     expect(hook.result.current.authError).toContain("invalid");
   });
 
-  it("requires backend-approved Customer enrollment authorization before provisioning", async () => {
+  it("fails closed before setup when an established ownership channel is unavailable", async () => {
     const hook = await mountAuth();
     await beginEnrollment(hook, true);
     expectNoSession(hook);
-    expect(hook.result.current.ceremony?.policyPending).toBe(true);
+    expect(hook.result.current.ceremony?.supportRequired).toBe(true);
     expect(hook.result.current.ceremony?.manualKey).toBeUndefined();
     expect(requests().some(item => item.url.endsWith("/enrollment/setup"))).toBe(false);
     expect(requests().some(item => item.body && "identity_proof" in item.body)).toBe(false);
   });
 
-  it("enrolls using an operator grant, backend QR/key and TOTP, holding codes/token until save acknowledgment", async () => {
+  it("enrolls using email ownership proof, backend QR/key and TOTP, holding codes/token until save acknowledgment", async () => {
     const hook = await mountAuth();
     await beginEnrollment(hook);
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", nextCapability)));
-    await act(async () => hook.result.current.submitProof("d".repeat(64), true));
-    expect(requests().find(item => item.url.endsWith("/identity/verify"))?.body).toEqual({ challenge_token: capability, grant_token: "d".repeat(64) });
+    await act(async () => hook.result.current.submitProof("000123"));
+    expect(requests().find(item => item.url.endsWith("/identity/verify"))?.body).toEqual({ challenge_token: capability, identity_proof: "000123" });
     vi.mocked(fetch).mockResolvedValueOnce(response({ ...challenge("enrollment_ready", nextCapability), qr_svg: "<svg/>", manual_key: "SYNTHETICKEY" }));
     await act(async () => hook.result.current.submitProof(""));
     expect(hook.result.current.ceremony?.manualKey).toBe("SYNTHETICKEY");
@@ -137,15 +137,15 @@ describe("Customer mandatory MFA state and session isolation", () => {
     expect(sessionStorage.getItem(customerAuthStorageKey)).not.toContain("synthetic-recovery");
   });
 
-  it.each([false, true])("authorizes replacement only with a recovery code or approved grant (grant=%s)", async grant => {
+  it.each(["synthetic-backup", "another-synthetic-backup"])("authorizes restricted replacement with a recovery code (%s)", async code => {
     const hook = await mountAuth();
     await beginLogin(hook);
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("recovery_required", nextCapability)));
     await act(async () => hook.result.current.startRecovery());
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("replacement_required", replacementCapability)));
-    await act(async () => hook.result.current.submitProof(grant ? "d".repeat(64) : "synthetic-backup", grant));
+    await act(async () => hook.result.current.submitProof(code));
     expect(requests().find(item => item.url.endsWith("/recovery/verify"))?.body).toEqual({
-      challenge_token: nextCapability, [grant ? "grant_token" : "recovery_code"]: grant ? "d".repeat(64) : "synthetic-backup",
+      challenge_token: nextCapability, recovery_code: code,
     });
     expectNoSession(hook);
     expect(hook.result.current.ceremony?.challenge.challenge_token).toBe(replacementCapability);
@@ -185,6 +185,37 @@ describe("Customer mandatory MFA state and session isolation", () => {
     }
   });
 
+  it("automatically requests only enrollment email proof and enforces the resend cooldown", async () => {
+    const hook = await mountAuth();
+    vi.useFakeTimers();
+    await beginEnrollment(hook);
+    const login = requests().find(item => item.url.endsWith("/login"))!;
+    const identity = requests().find(item => item.url.endsWith("/identity/request"))!;
+    expect(identity.init?.headers).toMatchObject({ "X-Auth-Client-Binding": login.body?.client_binding });
+    expect(hook.result.current.ceremony?.challenge.methods).toEqual(["enrollment_email_proof"]);
+    expect(requests().some(item => item.body && "grant_token" in item.body)).toBe(false);
+    await act(async () => hook.result.current.resendIdentity());
+    expect(requests().filter(item => item.url.endsWith("/identity/request"))).toHaveLength(1);
+    await act(async () => { vi.advanceTimersByTime(121000); });
+    vi.mocked(fetch).mockResolvedValueOnce(response({ next_action: "enrollment_identity_required",
+      methods: ["enrollment_email_proof"], resend_after_seconds: 120 }));
+    await act(async () => hook.result.current.resendIdentity());
+    expect(requests().filter(item => item.url.endsWith("/identity/request"))).toHaveLength(2);
+    expectNoSession(hook);
+    expect(hook.result.current.ceremony?.manualKey).toBeUndefined();
+  });
+
+  it.each([422, 429])("fails closed after invalid/expired or rate-limited enrollment email proof (%s)", async status => {
+    const hook = await mountAuth();
+    await beginEnrollment(hook);
+    vi.mocked(fetch).mockResolvedValueOnce(response({ message: "private-code-and-trace" }, status, { "Retry-After": "30" }));
+    await act(async () => hook.result.current.submitProof("000123"));
+    expectNoSession(hook);
+    expect(hook.result.current.ceremony).toBeNull();
+    expect(hook.result.current.authError).not.toContain("private-code");
+    if (status === 429) expect(hook.result.current.retryAt).toBeGreaterThan(Date.now());
+  });
+
   it("records assisted intake without authenticating or claiming approval/ticket creation", async () => {
     const hook = await mountAuth();
     vi.mocked(fetch).mockResolvedValueOnce(response({ message: "Recovery request recorded." }, 202));
@@ -198,7 +229,7 @@ describe("Customer mandatory MFA state and session isolation", () => {
     const hook = await mountAuth();
     await beginEnrollment(hook);
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", nextCapability)));
-    await act(async () => hook.result.current.submitProof("d".repeat(64), true));
+    await act(async () => hook.result.current.submitProof("000123"));
     vi.mocked(fetch).mockResolvedValueOnce(response({ ...challenge("enrollment_ready", nextCapability), qr_svg: "<svg/>", manual_key: "SYNTHETICKEY" }));
     await act(async () => hook.result.current.submitProof(""));
     vi.mocked(fetch).mockResolvedValueOnce(response({ token: "discarded-token", user: customerUser, recovery_codes: recoveryCodes }))
@@ -216,7 +247,7 @@ describe("Customer mandatory MFA state and session isolation", () => {
     const hook = await mountAuth();
     await beginEnrollment(hook);
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", nextCapability)));
-    await act(async () => hook.result.current.submitProof("d".repeat(64), true));
+    await act(async () => hook.result.current.submitProof("000123"));
     vi.mocked(fetch).mockResolvedValueOnce(response({ ...challenge("enrollment_ready", nextCapability), qr_svg: "<svg/>", manual_key: "SYNTHETICKEY" }));
     await act(async () => hook.result.current.submitProof(""));
     vi.mocked(fetch).mockResolvedValueOnce(response({ token: "incomplete-token", user: customerUser, recovery_codes: ["only-one"] }))
@@ -344,14 +375,14 @@ describe("Customer mandatory MFA state and session isolation", () => {
     else expect(hook.result.current.token).toBe("customer-token");
   });
 
-  it.each(["migration_email_proof", "registration_email_proof"])("uses restricted identity_proof for %s, with no normal-login email fallback", async method => {
+  it.each(["enrollment_email_proof", "registration_email_proof"])("uses restricted identity_proof for %s, with no normal-login email fallback", async method => {
     const hook = await mountAuth();
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
       .mockResolvedValueOnce(response({ next_action: "enrollment_identity_required", methods: [method], proof_expires_in_seconds: 120 }));
     await act(async () => hook.result.current.login(customerUser.email, "synthetic-password"));
     expectNoSession(hook);
     expect(hook.result.current.ceremony?.expiresAt).toBeLessThanOrEqual(Date.now() + 120000);
-    const proof = method === "registration_email_proof" ? "000123" : "e".repeat(32);
+    const proof = "000123";
     vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", nextCapability)));
     await act(async () => hook.result.current.submitProof(proof));
     expect(requests().find(item => item.url.endsWith("/identity/verify"))?.body).toEqual({ challenge_token: capability, identity_proof: proof });
@@ -360,7 +391,7 @@ describe("Customer mandatory MFA state and session isolation", () => {
     expect(requests().some(item => item.url.endsWith("/login/verify") || item.url.endsWith("/login/resend"))).toBe(false);
   });
 
-  it("registers and verifies email without a session, then reuses verified browser binding with fresh credentials", async () => {
+  it("registers and verifies email without a session, then directly starts bound enrollment without redundant email proof", async () => {
     const hook = await mountAuth();
     const version = "11111111-2222-4333-8444-555555555555";
     vi.mocked(fetch).mockResolvedValueOnce(response({ email: customerUser.email, registration_version: version, expires_in_minutes: 15 }, 202));
@@ -368,19 +399,15 @@ describe("Customer mandatory MFA state and session isolation", () => {
     const binding = requests()[0].body?.client_binding;
     expect(binding).toMatch(/^[a-f0-9]{64}$/);
     expectNoSession(hook);
-    vi.mocked(fetch).mockResolvedValueOnce(response({ next_action: "credentials_required" }, 201));
+    vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_ready", nextCapability), 201));
     await act(async () => { expect(await hook.result.current.verifyRegister(customerUser.email, "000123")).toBe(true); });
     expectNoSession(hook);
-    expect(hook.result.current.registration?.verified).toBe(true);
+    expect(hook.result.current.registration).toBeNull();
     expect(requests().find(item => item.url.endsWith("/register/verify"))?.body).toEqual({
       email: customerUser.email, verification_code: "000123", registration_version: version, client_binding: binding,
     });
-    vi.mocked(fetch).mockResolvedValueOnce(response(challenge("enrollment_identity_required")))
-      .mockResolvedValueOnce(response(challenge("enrollment_ready", nextCapability)));
-    await act(async () => hook.result.current.login(customerUser.email, "fresh-synthetic-password"));
-    expect(requests().find(item => item.url.endsWith("/auth/login"))?.body).toEqual({
-      email: customerUser.email, password: "fresh-synthetic-password", client_binding: binding,
-    });
+    expect(hook.result.current.ceremony?.binding).toBe(binding);
+    expect(requests().some(item => item.url.endsWith("/auth/login") || item.url.includes("/enrollment/identity/"))).toBe(false);
     expectNoSession(hook);
     expect(hook.result.current.registration).toBeNull();
     expect(hook.result.current.ceremony?.challenge.next_action).toBe("enrollment_ready");

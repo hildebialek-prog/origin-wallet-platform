@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { AuthMessages, useAuthWait } from "@/components/auth/AuthCeremony";
+import AuthCeremony, { AuthMessages, useAuthWait } from "@/components/auth/AuthCeremony";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ const toE164Phone = (callingCode: string, localPhone: string) => {
 };
 
 export default function Register() {
-  const { register, verifyRegister, registration, leaveRegistration, cancelCeremony, busy, loading, user } = useAuth();
+  const { register, verifyRegister, registration, ceremony, recoveryCodes, leaveRegistration, cancelCeremony, busy, loading, user } = useAuth();
   const navigate = useNavigate();
   const wait = useAuthWait();
   const [fullName, setFullName] = useState("");
@@ -32,9 +32,9 @@ export default function Register() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
-    if (user) navigate("/account", { replace: true });
+    if (user && !recoveryCodes.length) navigate("/account", { replace: true });
     else if (registration?.verified) navigate("/login", { replace: true });
-  }, [navigate, registration?.verified, user]);
+  }, [navigate, recoveryCodes.length, registration?.verified, user]);
   useEffect(() => leaveRegistration, [leaveRegistration]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -59,12 +59,12 @@ export default function Register() {
     <Card className="w-full max-w-md border-slate-200 bg-white shadow-xl">
       <CardHeader className="text-center">
         <img src="/logo/logo.jpg" alt="Origin Wallet" className="mx-auto h-16 w-16 rounded-2xl object-cover" />
-        <CardTitle className="text-2xl">{registration ? "Verify your email" : "Create your account"}</CardTitle>
-        <CardDescription>{registration ? "Enter the registration email code. Then sign in with your password to set up Google Authenticator." : "Register with your details. Email verification and Google Authenticator enrollment are required before account access."}</CardDescription>
+        <CardTitle className="text-2xl">{ceremony || recoveryCodes.length ? "Complete authenticator enrollment" : registration ? "Verify your email" : "Create your account"}</CardTitle>
+        <CardDescription>{registration ? "Enter the registration email code, then set up Google Authenticator." : "Email verification and Google Authenticator enrollment are required before account access."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <AuthMessages />{error && <p role="alert">{error}</p>}
-        {loading ? <p role="status">Validating account session…</p> : registration ? <form onSubmit={verify} className="space-y-4">
+        {loading ? <p role="status">Validating account session…</p> : ceremony || recoveryCodes.length ? <AuthCeremony /> : registration ? <form onSubmit={verify} className="space-y-4">
           <p className="text-sm">Verification email: {registration.email}</p>
           <Label htmlFor="registration-code">Registration email code</Label>
           <Input id="registration-code" inputMode="numeric" type="text" maxLength={6} pattern="[0-9]{6}" value={code}
